@@ -37,7 +37,7 @@ Follow the steps for GKI:
 [Installation](https://kernelsu.org/guide/installation.html)
 
 To get boot.img format:  
-[Get My Kernel Format](https://github.com/TheWildJames/Get_My_Kernel_Format)
+[Get My Kernel Format](https://github.com/TheFloresto/Get_My_Kernel_Format)
 
 ---
 
