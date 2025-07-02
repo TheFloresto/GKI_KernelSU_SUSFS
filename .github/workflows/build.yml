@@ -407,7 +407,7 @@ jobs:
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT '"$UTS_TIMESTAMP"'"}' ./common/scripts/mkcompile_h
 
           # Add custom suffix to setlocalversion
-          sed -i '$s|echo "\$res"|echo "\$res-TheFloresto+"|' ./common/scripts/setlocalversion
+          sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
 
           # Conditional logic for build/build.sh
           if [ -f "build/build.sh" ]; then
@@ -418,7 +418,7 @@ jobs:
             sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
             rm -rf ./common/android/abi_gki_protected_exports_*
             sed -i 's/-maybe-dirty//' ./build/kernel/kleaf/impl/stamp.bzl
-            sed -i "/^CONFIG_LOCALVERSION=/ s/\"$/\"-TheFloresto+/" ./common/arch/arm64/configs/gki_defconfig
+            sed -i "/^CONFIG_LOCALVERSION=/ s/\"$/\"-@NoFloresto+@mr_vokintos/" ./common/arch/arm64/configs/gki_defconfig
           fi
 
           # Remove check_defconfig
