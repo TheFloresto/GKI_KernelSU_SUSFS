@@ -141,7 +141,7 @@ jobs:
       - build-kernels-a15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.7"
+      RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
       - name: Checkout code
@@ -203,7 +203,7 @@ jobs:
         run: |
             LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
             if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v1.5.7-r0"
+              LATEST_TAG="v1.5.8-r0"
             fi
             
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
