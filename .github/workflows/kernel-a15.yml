@@ -23,6 +23,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
+        include:
           - sub_level: "92"
             os_patch_level: "2025-07"
           - sub_level: "X"
