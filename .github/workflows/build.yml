@@ -50,7 +50,7 @@ jobs:
           remove-codeql: 'true'          # Frees ~5.4 GB
           remove-docker-images: 'true'   # Frees ~3.2 GB
           remove-large-packages: 'true'  # Frees ~3.1 GB
-          remove-swapfile: 'false'        # Frees ~20 GB
+          remove-swapfile: 'false'       # Frees ~20 GB
           remove-cached-tools: 'false'   # Avoid unless confirmed safe
           verbose: 'true'                # Enable detailed logging
 
@@ -67,10 +67,8 @@ jobs:
         run: |
           # Set CONFIG dynamically based on inputs values
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
-
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
-
           echo "CONFIG set to: $CONFIG"
 
       - name: Install ccache
@@ -239,17 +237,49 @@ jobs:
               cd ./KernelSU-Next
               cp -v ../../kernel_patches/next/0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch ./
               patch -p1 --forward --fuzz=3 < 0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch
-              
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
-              cd ./KernelS
+              cd ./KernelSU
               ;;
             "SUKISU")
               echo "Applying SUSFS patches for SukiSU..."
               cd ./KernelSU
               ;;
           esac
+
+      - name: Patch sucompat.c for SukiSU
+        if: ${{ inputs.kernelsu_variant == 'SUKISU' }}
+        run: |
+          echo "Patching sucompat.c to handle su_kps for SukiSU..."
+          SUCOMPAT_FILE="$CONFIG/common/drivers/kernelsu/sucompat.c"
+          if [ -f "$SUCOMPAT_FILE" ]; then
+            # Create a patch file for sucompat.c
+            cat > sucompat.patch << 'EOF'
+--- sucompat.c
++++ sucompat.c
+@@ -401,6 +401,7 @@
+ {
+         int i;
+ 
++#ifdef CONFIG_KSU_SUSFS_SUS_SU
+         for (i = 0; i < ARRAY_SIZE(su_kps); i++) {
+                 if (su_kps[i]) {
+                         /* existing code */
+                 }
+         }
++#endif
+ }
+EOF
+            # Apply the patch
+            cd "$CONFIG/common/drivers/kernelsu"
+            patch -p0 < sucompat.patch
+            echo "Patched sucompat.c successfully"
+            cat sucompat.c | grep -A 5 -B 5 "ARRAY_SIZE(su_kps)" || echo "No su_kps found in sucompat.c after patching"
+          else
+            echo "Error: sucompat.c not found at $SUCOMPAT_FILE"
+            exit 1
+          fi
 
       - name: Getting KernelSU Version
         run: |
@@ -272,6 +302,8 @@ jobs:
               BASE_VERSION=10200
               ;;
             "MKSU")
+              cd ./KernelSU
+              BASE_VERSION=10200
               ;;
             "SUKISU")
               cd ./KernelSU
@@ -404,7 +436,7 @@ jobs:
           fi
 
       - name: Build
-        run : |
+        run: |
           set -e
           set -x
           cd "$CONFIG"
