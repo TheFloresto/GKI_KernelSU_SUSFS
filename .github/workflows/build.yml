@@ -120,13 +120,16 @@ jobs:
       - name: Clone AnyKernel3 and Other Dependencies
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
-          ANYKERNEL_BRANCH="gki-2.0"
+          ANYKERNEL_BRANCH="sukisu"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          git clone https://github.com/TheFloresto/kernel_patches.git -b main
+          git clone https://github.com/TheFloresto/kernel_patches.git
+          if [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
+            git clone https://github.com/TheFloresto/SukiSU_patch.git
+          fi
 
       - name: Check Disk Space Before Sync
         run: |
@@ -163,6 +166,8 @@ jobs:
                 echo "BRANCH=-s next" >> $GITHUB_ENV
               elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]]; then
+                echo "BRANCH=-s susfs-main" >> $GITHUB_ENV
               fi
               ;;
             "Other")
@@ -196,6 +201,9 @@ jobs:
             "MKSU")
               echo "Adding KernelSU MKSU..."
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+            "SUKISU")
+              echo "Adding SukiSU..."
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
           esac
           
@@ -229,12 +237,16 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
               cp -v ../../kernel_patches/next/0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch ./
-              patch -p1 --fuzz=3 < 0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch
+              patch -p1 --forward --fuzz=3 < 0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch
               
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelS
+              ;;
+            "SUKISU")
+              echo "Applying SUSFS patches for SukiSU..."
+              cd ./KernelSU
               ;;
           esac
 
@@ -260,6 +272,10 @@ jobs:
               ;;
             "MKSU")
               ;;
+            "SUKISU")
+              cd ./KernelSU
+              BASE_VERSION=10200
+              ;;
           esac
           
           cd ./kernel
@@ -278,6 +294,10 @@ jobs:
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
             cp ../../kernel_patches/wild/syscall_hooks.patch ./
+            patch -p1 -F 3 < syscall_hooks.patch
+          elif [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
+            echo "Applying hooks for SukiSU..."
+            cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
             patch -p1 -F 3 < syscall_hooks.patch
           fi
 
@@ -299,6 +319,13 @@ jobs:
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
+
+          # Add KPM configuration settings for SUKISU
+          if [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
+            echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./common/arch/arm64/configs/gki_defconfig
           fi
                     
           # Add additional tmpfs config setting
