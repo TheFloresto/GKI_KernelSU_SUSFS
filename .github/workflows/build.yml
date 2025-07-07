@@ -228,13 +228,13 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_apk_sign.c.patch ./
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_apk_sign.c.patch
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_core_hook.c.patch ./
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_selinux.c.patch ./
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_selinux.c.patch
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_ksud.c.patch ./
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
               patch -p1 --forward --fuzz=3 < fix_ksud.c.patch
               ;;
             "MKSU")
