@@ -30,6 +30,11 @@ on:
         description: 'Include NEXT?'
         required: true
         type: boolean
+        default: false
+      include_sukisu:
+        description: 'Include SukiSU?'
+        required: true
+        type: boolean
         default: true
       include_mksu:
         description: 'Include MKSU?'
@@ -81,6 +86,7 @@ jobs:
           [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SUKISU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-kernels-a12:
@@ -198,6 +204,7 @@ jobs:
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
           get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
+          get_ref "SUKISU" "https://github.com/TheFloresto/SukiSU_patch.git" "TheFloresto/SukiSU_patch" "commit"
 
       - name: Generate and Create New Tag
         run: |
@@ -257,6 +264,7 @@ jobs:
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> 5ec1cff: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
           -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
+          -> SukiSU: https://github.com/SukiSU-Ultra/SukiSU-Ultra / https://t.me/Sukiksu
           -> SUSFS4KSU: 
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
             -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
