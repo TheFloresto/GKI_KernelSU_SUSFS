@@ -358,7 +358,7 @@ jobs:
           # modify UTS_VERSION with dynamic date
           perl -pi -e "s{UTS_VERSION=\"\\\$\\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
           
-          sed -i '$s|echo "\$res"|echo "\$res@NoFloresto"|' ./common/scripts/setlocalversion
+          sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
           if [ -f "build/build.sh" ]; then
            sed -i 's/-dirty//' ./common/scripts/setlocalversion
           else
