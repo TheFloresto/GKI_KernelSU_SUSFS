@@ -229,7 +229,7 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
               cp -v ../../kernel_patches/next/0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch ./
-              patch -p1 --fuzz=3 < 0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch
+              patch -p1 --forward --fuzz=3 < 0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch
               
               ;;
             "MKSU")
