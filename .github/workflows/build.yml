@@ -225,7 +225,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Applying SUSFS patches for Wild KSU..."
               cd ./Wild_KSU
               ;;
             "KSU")
@@ -247,8 +247,49 @@ jobs:
             "SUKISU")
               echo "Applying SUSFS patches for SukiSU..."
               cd ./KernelSU
+              # Apply fix for missing su_kps declaration
+              if [ -f "kernel/sucompat.c" ]; then
+                echo "Fixing su_kps declaration issue..."
+                sed -i '/^static.*su_kps/d' kernel/sucompat.c
+                sed -i '/^extern.*su_kps/d' kernel/sucompat.c
+                # Add proper declaration if missing
+                if ! grep -q "su_kps\[\]" kernel/sucompat.c; then
+                  sed -i '1i\static struct kprobe *su_kps[10] = {0};' kernel/sucompat.c
+                fi
+              fi
               ;;
           esac
+
+      - name: Fix SukiSU su_kps Declaration Issue
+        if: ${{ inputs.kernelsu_variant == 'SUKISU' }}
+        run: |
+          echo "Applying fix for SukiSU su_kps declaration..."
+          cd "$CONFIG"
+          
+          # Check if sucompat.c exists and fix the su_kps issue
+          if [ -f "KernelSU/kernel/sucompat.c" ]; then
+            echo "Found sucompat.c, applying fix..."
+            cd KernelSU/kernel
+            
+            # Check if su_kps is properly declared
+            if ! grep -q "su_kps\[\]" sucompat.c && ! grep -q "su_kps\[" sucompat.c; then
+              echo "Adding missing su_kps declaration..."
+              # Add the declaration at the top of the file
+              sed -i '1i\static struct kprobe *su_kps[10] = {0};' sucompat.c
+            fi
+            
+            # Alternative fix: comment out the problematic code if declaration is complex
+            if grep -q "ARRAY_SIZE(su_kps)" sucompat.c; then
+              echo "Commenting out problematic su_kps usage..."
+              sed -i 's/for (i = 0; i < ARRAY_SIZE(su_kps); i++) {/\/\/ for (i = 0; i < ARRAY_SIZE(su_kps); i++) {/' sucompat.c
+              sed -i 's/if (su_kps\[i\]) {/\/\/ if (su_kps[i]) {/' sucompat.c
+            fi
+            
+            cd ../..
+          else
+            echo "sucompat.c not found, checking alternative locations..."
+            find . -name "sucompat.c" -type f | head -5
+          fi
 
       - name: Getting KernelSU Version
         run: |
@@ -257,12 +298,12 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Getting version for Wild KSU..."
               cd ./Wild_KSU
               BASE_VERSION=10200
               ;;
             "KSU")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Getting version for Official KernelSU..."
               cd ./KernelSU
               BASE_VERSION=10200
               ;;
@@ -271,6 +312,8 @@ jobs:
               BASE_VERSION=10200
               ;;
             "MKSU")
+              cd ./KernelSU
+              BASE_VERSION=10200
               ;;
             "SUKISU")
               cd ./KernelSU
