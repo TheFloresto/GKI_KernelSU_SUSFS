@@ -413,7 +413,7 @@ jobs:
           fi
           ccache --show-stats
 
-- name: Patch Image file Android 12 and Android 13 (sukisu only)
+      - name: Patch Image file Android 12 and Android 13 (sukisu only)
         if: ${{ inputs.use_kpm && inputs.kernelsu_variant == 'SUKISU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
         run: |
           if [ "${{ inputs.kernel_version }}" != "6.6" ]; then
@@ -427,7 +427,7 @@ jobs:
             cd ../../../..
           fi
 
-- name: Patch Image file Android 14 and Android 15 (sukisu only)
+      - name: Patch Image file Android 14 and Android 15 (sukisu only)
         if: ${{ inputs.use_kpm && inputs.kernelsu_variant == 'SUKISU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
         run: |
           if [ "${{ inputs.kernel_version }}" != "6.6" ]; then
