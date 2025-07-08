@@ -325,6 +325,7 @@ jobs:
           if [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
             echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KALLSYMS=y" ./common/arch/arm64/configs/gki_defconfig
           fi
                     
           # Add additional tmpfs config setting
