@@ -50,6 +50,11 @@ on:
           - Dev
           - Other
         default: Dev
+      use_kpm:
+        description: 'Whether to enable the KPM function?'
+        required: false
+        type: boolean
+        default: true
       kernelsu_branch_other:
         description: "If 'Other' is selected, specify your custom branch"
         required: false
