@@ -105,6 +105,7 @@ jobs:
       kernelsu_variant: ${{ matrix.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      use_kpm: ${{ inputs.use_kpm }}
 
   build-kernels-a13:
     needs: set-matrix
@@ -117,6 +118,7 @@ jobs:
       kernelsu_variant: ${{ matrix.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      use_kpm: ${{ inputs.use_kpm }}
 
   build-kernels-a14:
     needs: set-matrix
@@ -129,6 +131,7 @@ jobs:
       kernelsu_variant: ${{ matrix.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      use_kpm: ${{ inputs.use_kpm }}
 
   build-kernels-a15:
     needs: set-matrix
@@ -141,6 +144,7 @@ jobs:
       kernelsu_variant: ${{ matrix.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      use_kpm: ${{ inputs.use_kpm }}
 
   release:
     if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}
