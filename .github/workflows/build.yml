@@ -247,8 +247,8 @@ jobs:
             "SUKISU")
               echo "Applying SUSFS patches for SukiSU..."
               cd ./KernelSU
-              cp -v ../../SukiSU_patch/kpm/patch_linux.patch ./
-              patch -p1 --forward --fuzz=3 < patch_linux.patch
+              cp -v ../../SukiSU_patch/kpm/patch_linux ./
+              patch -p1 --forward --fuzz=3 < patch_linux
               ;;
           esac
 
