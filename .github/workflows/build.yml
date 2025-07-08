@@ -416,7 +416,7 @@ jobs:
       - name: Patch Image file Android 12 and Android 13 (sukisu only)
         if: ${{ inputs.use_kpm && inputs.kernelsu_variant == 'SUKISU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
         run: |
-          if [ "${{ inputs.kernel_version }}" != "6.6" ]; then
+          if [ "${{ inputs.kernel_version }}" != "1.1" ]; then
             echo "Patching Image file..."
             cd "$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
@@ -430,7 +430,7 @@ jobs:
       - name: Patch Image file Android 14 and Android 15 (sukisu only)
         if: ${{ inputs.use_kpm && inputs.kernelsu_variant == 'SUKISU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
         run: |
-          if [ "${{ inputs.kernel_version }}" != "6.6" ]; then
+          if [ "${{ inputs.kernel_version }}" != "1.1" ]; then
             echo "Patching Image file..."
             cd "$CONFIG/bazel-bin/common/kernel_aarch64/"
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
