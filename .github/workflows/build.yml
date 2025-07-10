@@ -446,7 +446,19 @@ jobs:
             mv -v bootimgs/Image SukiSU_patch/kpm/
             chmod +x ./SukiSU_patch/kpm/patch_linux
             cd SukiSU_patch/kpm/
-            ./patch_linux Image
+            if [ ! -f "Image" ]; then
+              echo "Error: Image file not found in SukiSU_patch/kpm/"
+              exit 1
+            fi
+            ./patch_linux Image 2>&1 | tee patch_linux.log
+            if [ $? -ne 0 ]; then
+              echo "Error: patch_linux failed. Check patch_linux.log for details."
+              exit 1
+            fi
+            if [ ! -f "oImage" ]; then
+              echo "Error: oImage not created by patch_linux"
+              exit 1
+            fi
             mv -v oImage Image
             gzip -n -k -f -9 -c ./Image > ./Image.gz
             lz4 -9 -k -f -c ./Image > ./Image.lz4
@@ -475,7 +487,19 @@ jobs:
             mv -v bootimgs/Image SukiSU_patch/kpm/
             chmod +x ./SukiSU_patch/kpm/patch_linux
             cd SukiSU_patch/kpm/
-            ./patch_linux Image
+            if [ ! -f "Image" ]; then
+              echo "Error: Image file not found in SukiSU_patch/kpm/"
+              exit 1
+            fi
+            ./patch_linux Image 2>&1 | tee patch_linux.log
+            if [ $? -ne 0 ]; then
+              echo "Error: patch_linux failed. Check patch_linux.log for details."
+              exit 1
+            fi
+            if [ ! -f "oImage" ]; then
+              echo "Error: oImage not created by patch_linux"
+              exit 1
+            fi
             mv -v oImage Image
             gzip -n -k -f -9 -c ./Image > ./Image.gz
             lz4 -9 -k -f -c ./Image > ./Image.lz4
