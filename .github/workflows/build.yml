@@ -454,10 +454,9 @@ jobs:
            mv -v Image.gz ../../bootimgs
            mv -v Image.lz4 ../../bootimgs
            cd ../..
-           else
-           echo "Creating gzip of the Image file..."
-           gzip -n -k -f -9 ./Image > ./Image.gz
-          fi
+
+          # Create gzip of the Image file
+          gzip -n -k -f -9 ./Image > ./Image.gz
 
       - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
@@ -483,10 +482,9 @@ jobs:
               mv -v Image.gz ../../bootimgs
               mv -v Image.lz4 ../../bootimgs
               cd ../..
-            else
-             echo "Creating gzip of the Image file..."
-             gzip -n -k -f -9 ./Image > ./Image.gz
-           fi
+
+          # Create gzip of the Image file
+          gzip -n -k -f -9 ./Image > ./Image.gz
 
       - name: Create ZIP Files for Different Formats
         run: |
