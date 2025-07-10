@@ -309,14 +309,16 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
-          cp ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 -F 3 < 69_hide_stuff.patch
-
+          
           if [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
-          cp ../../SukiSU_patch/69_hide_stuff.patch ./
-          patch -p1 -F 3 < 69_hide_stuff.patch
+            echo "Applying SukiSU-specific hide stuff patch..."
+            cp ../../SukiSU_patch/69_hide_stuff.patch ./
+            patch -p1 -F 3 < 69_hide_stuff.patch
+          else
+            echo "Applying default hide stuff patch..."
+            cp ../../kernel_patches/69_hide_stuff.patch ./
+            patch -p1 -F 3 < 69_hide_stuff.patch
+          fi
 
       - name: Add Configuration Settings
         run: |
