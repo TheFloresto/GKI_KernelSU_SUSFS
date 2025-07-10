@@ -414,7 +414,7 @@ jobs:
            sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
            rm -rf ./common/android/abi_gki_protected_exports_*
            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-           sed -E -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-@NoFloresto+@mr_vokintos\"/" ./common/arch/arm64/configs/gki_defconfig
+           sed -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-@NoFloresto+@mr_vokintos\"/" ./common/arch/arm64/configs/gki_defconfig
           fi
 
       - name: Build
@@ -433,82 +433,77 @@ jobs:
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
         run: |
-          mkdir bootimgs
-
+          mkdir -p bootimgs
           echo "Creating bootimgs folder and copying images..."
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
-
+          
           if [ "${{ inputs.use_kpm }}" = "true" ] && [ "${{ inputs.kernelsu_variant }}" = "SUKISU" ]; then
-           echo "Patching Image file for SUKISU..."
-           mv -v bootimgs/Image SukiSU_patch/kpm/
-           chmod +x ./SukiSU_patch/kpm/patch_linux
-           cd SukiSU_patch/kpm/
-           ./patch_linux Image
-           mv -v oImage Image
-           gzip -n -k -f -9 -c ./Image > ./Image.gz
-           lz4 -9 -k -f -c ./Image > ./Image.lz4
-           mv -v Image ../../bootimgs
-           mv -v Image.gz ../../bootimgs
-           mv -v Image.lz4 ../../bootimgs
-           cd ../..
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
+            echo "Patching Image file for SUKISU..."
+            mv -v bootimgs/Image SukiSU_patch/kpm/
+            chmod +x ./SukiSU_patch/kpm/patch_linux
+            cd SukiSU_patch/kpm/
+            ./patch_linux Image
+            mv -v oImage Image
+            gzip -n -k -f -9 -c ./Image > ./Image.gz
+            lz4 -9 -k -f -c ./Image > ./Image.lz4
+            mv -v Image ../../bootimgs
+            mv -v Image.gz ../../bootimgs
+            mv -v Image.lz4 ../../bootimgs
+            cd ../..
+          else
+             echo "Creating gzip of the Image file..."
+             gzip -n -k -f -9 ./Image > ./Image.gz
+          fi
 
       - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
         run: |
-          mkdir bootimgs
-
+          mkdir -p bootimgs
           echo "Creating bootimgs folder and copying images..."
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./bootimgs
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./bootimgs
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
-
-            if [ "${{ inputs.use_kpm }}" = "true" ] && [ "${{ inputs.kernelsu_variant }}" = "SUKISU" ]; then
-              echo "Patching Image file for SUKISU..."
-              mv -v bootimgs/Image SukiSU_patch/kpm/
-              chmod +x ./SukiSU_patch/kpm/patch_linux
-              cd SukiSU_patch/kpm/
-              ./patch_linux Image
-              mv -v oImage Image
-              gzip -n -k -f -9 -c ./Image > ./Image.gz
-              lz4 -9 -k -f -c ./Image > ./Image.lz4
-              mv -v Image ../../bootimgs
-              mv -v Image.gz ../../bootimgs
-              mv -v Image.lz4 ../../bootimgs
-              cd ../..
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
+          
+          if [ "${{ inputs.use_kpm }}" = "true" ] && [ "${{ inputs.kernelsu_variant }}" = "SUKISU" ]; then
+            echo "Patching Image file for SUKISU..."
+            mv -v bootimgs/Image SukiSU_patch/kpm/
+            chmod +x ./SukiSU_patch/kpm/patch_linux
+            cd SukiSU_patch/kpm/
+            ./patch_linux Image
+            mv -v oImage Image
+            gzip -n -k -f -9 -c ./Image > ./Image.gz
+            lz4 -9 -k -f -c ./Image > ./Image.lz4
+            mv -v Image ../../bootimgs
+            mv -v Image.gz ../../bootimgs
+            mv -v Image.lz4 ../../bootimgs
+            cd ../..
+          else
+             echo "Creating gzip of the Image file..."
+             gzip -n -k -f -9 ./Image > ./Image.gz
+          fi
 
       - name: Create ZIP Files for Different Formats
         run: |
           echo "Creating zip files for all formats..."
           cd ./AnyKernel3
-          
-          # Create and upload zip for each format
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
-          echo "Creating zip file: $ZIP_NAME..."
-          mv ../Image ./Image
-          zip -r "../$ZIP_NAME" ./*
+          cp ../bootimgs/Image .
+          zip -r9 ../${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-AnyKernel3.zip Image LICENSE META-INF/ anykernel.sh tools/
           rm ./Image
-          
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3-lz4.zip"
-          echo "Creating zip file: $ZIP_NAME..."
-          mv ../Image.lz4 ./Image.lz4
-          zip -r "../$ZIP_NAME" ./*
+          cp ../bootimgs/Image.lz4 .
+          zip -r9 ../${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-AnyKernel3-lz4.zip Image.lz4 LICENSE META-INF/ anykernel.sh tools/
           rm ./Image.lz4
-          
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3-gz.zip"
-          echo "Creating zip file: $ZIP_NAME..."
-          mv ../Image.gz ./Image.gz
-          zip -r "../$ZIP_NAME" ./*
-          rm ./Image.gz
+          if [ -f ../bootimgs/Image.gz ]; then
+            cp ../bootimgs/Image.gz .
+            zip -r9 ../${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-AnyKernel3-gz.zip Image.gz LICENSE META-INF/ anykernel.sh tools/
+            rm ./Image.gz
+          else
+            echo "Image.gz not found in bootimgs, skipping ${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-AnyKernel3-gz.zip creation..."
+          fi
+          cd ..
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
@@ -519,19 +514,17 @@ jobs:
           GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-"${{ inputs.os_patch_level }}"_"${{ inputs.revision }}".zip
           FALLBACK_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip
           
-          # Check if the GKI URL is available
           echo "Checking if GKI kernel URL is reachable: $GKI_URL"
           status=$(curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null)
           
           if [ "$status" = "200" ]; then
-              echo "[+] Downloading from GKI_URL"
-              curl -Lo gki-kernel.zip "$GKI_URL"
+            echo "[+] Downloading from GKI_URL"
+            curl -Lo gki-kernel.zip "$GKI_URL"
           else
-              echo "[+] $GKI_URL not found, using $FALLBACK_URL"
-              curl -Lo gki-kernel.zip "$FALLBACK_URL"
+            echo "[+] $GKI_URL not found, using $FALLBACK_URL"
+            curl -Lo gki-kernel.zip "$FALLBACK_URL"
           fi
           
-          # Unzip the downloaded kernel and remove the zip
           echo "Unzipping the downloaded kernel..."
           unzip gki-kernel.zip && rm gki-kernel.zip
           
@@ -542,46 +535,48 @@ jobs:
           echo "Running unpack_bootimg.py..."
           $UNPACK_BOOTIMG --boot_img="$FULL_PATH"
           
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-          
           echo "Building boot.img"
           $MKBOOTIMG --header_version 4 --kernel Image --output boot.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
+          cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-boot.img
           
-          echo "Building boot-gz.img"
-          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
-          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
+          if [ -f ./Image.gz ]; then
+            echo "Building boot-gz.img"
+            $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+            $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+            cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-boot-gz.img
+          else
+            echo "Image.gz not found, skipping boot-gz.img creation..."
+          fi
           
           echo "Building boot-lz4.img"
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
+          cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-boot-lz4.img
 
       - name: Android 13/14/15 boot image build script
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
         run: |
           cd bootimgs
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
           
           echo "Building boot.img"
           $MKBOOTIMG --header_version 4 --kernel Image --output boot.img
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
+          cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-boot.img
           
-          echo "Building boot-gz.img"
-          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img
-          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
+          if [ -f ./Image.gz ]; then
+            echo "Building boot-gz.img"
+            $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img
+            $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+            cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-boot-gz.img
+          else
+            echo "Image.gz not found, skipping boot-gz.img creation..."
+          fi
           
           echo "Building boot-lz4.img"
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-          cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
+          cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-boot-lz4.img
           
       - name: Compress all img files with gzip
         run: |
