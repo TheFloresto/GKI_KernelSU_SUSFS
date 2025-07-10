@@ -251,7 +251,6 @@ jobs:
             "SUKISU")
               echo "Applying SUSFS patches for SukiSU..."
               cd ./KernelSU
-              curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch | patch -p1 --forward --fuzz=3
               ;;
           esac
 
