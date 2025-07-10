@@ -304,7 +304,7 @@ jobs:
             cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
             patch -p1 -F 3 < syscall_hooks.patch
           fi
-
+          
       - name: Apply Hide Stuff Patches
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -316,13 +316,8 @@ jobs:
             patch -p1 -F 3 < 69_hide_stuff.patch || exit 1
             echo "Downloading SukiSU WiFi HAL revert patch..."
             curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch -o wifi_hal_revert.patch
-            echo "Checking if WiFi HAL revert patch can be applied..."
-            if patch -p1 -F 3 --dry-run < wifi_hal_revert.patch; then
-              echo "Applying SukiSU WiFi HAL revert patch..."
-              patch -p1 -F 3 < wifi_hal_revert.patch || exit 1
-            else
-              echo "WiFi HAL revert patch already applied or reversed, skipping..."
-            fi
+            echo "Force-applying SukiSU WiFi HAL revert patch..."
+            patch -p1 -F 3 --force < wifi_hal_revert.patch || exit 1
           else
             echo "Applying default hide stuff patch..."
             cp ../../kernel_patches/69_hide_stuff.patch ./
