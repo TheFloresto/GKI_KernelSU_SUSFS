@@ -82,7 +82,7 @@ jobs:
 
       - name: Set up ccache
         run: |
-          mkdir -p ~/.cache/bazel
+          mkdir -p ~/.ccache ~/.cache/bazel
           ccache --version
           ccache --max-size=2G
           ccache --set-config=compression=true
