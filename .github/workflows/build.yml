@@ -78,7 +78,7 @@ jobs:
           echo "CONFIG set to: $CONFIG"
 
       - name: Install ccache
-        run: sudo apt update && sudo apt install -y ccache
+        run: sudo apt update && sudo apt install -y ccache lz4
 
       - name: Set up ccache
         run: |
@@ -132,7 +132,7 @@ jobs:
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git
           if [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
-            git clone https://github.com/TheFloresto/SukiSU_patch.git
+            git clone https://github.com/ShirkNeko/SukiSU_patch.git
           fi
 
       - name: Check Disk Space Before Sync
@@ -251,6 +251,7 @@ jobs:
             "SUKISU")
               echo "Applying SUSFS patches for SukiSU..."
               cd ./KernelSU
+              curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch | patch -p1 --forward --fuzz=3
               ;;
           esac
 
@@ -278,7 +279,7 @@ jobs:
               ;;
             "SUKISU")
               cd ./KernelSU
-              BASE_VERSION=10200
+              BASE_VERSION=13014
               ;;
           esac
           
@@ -312,6 +313,12 @@ jobs:
           cp ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 -F 3 < 69_hide_stuff.patch
 
+          if [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          cp ../../SukiSU_patch/69_hide_stuff.patch ./
+          patch -p1 -F 3 < 69_hide_stuff.patch
+
       - name: Add Configuration Settings
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -321,7 +328,7 @@ jobs:
           # Add KSU configuration settings
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
           
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ] || [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
           fi
 
@@ -329,6 +336,7 @@ jobs:
           if [ "${{ inputs.kernelsu_variant }}" == "SUKISU" ]; then
             echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/gki_defconfig
             echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KALLSYMS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           fi
                     
           # Add additional tmpfs config setting
@@ -401,7 +409,7 @@ jobs:
           fi
 
       - name: Build
-        run : |
+        run: |
           set -e
           set -x
           cd "$CONFIG"
@@ -409,14 +417,13 @@ jobs:
           if [ -f "build/build.sh" ]; then
             LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
           else
-            tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=full //common:kernel_aarch64_dist || exit 1
+           tools/bazel build --sandbox_writable_path=$HOME/.ccache --disk_cache=/home/runner/.cache/bazel --experimental_multi_threaded_digest --config=fast --lto=full //common:kernel_aarch64_dist || exit 1
           fi
           ccache --show-stats
 
       - name: Patch Image file Android 12 and Android 13 (sukisu only)
         if: ${{ inputs.use_kpm && inputs.kernelsu_variant == 'SUKISU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
         run: |
-          if [ "${{ inputs.kernel_version }}" != "1.1" ]; then
             echo "Patching Image file..."
             cd "$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
@@ -424,13 +431,14 @@ jobs:
             ./patch
             rm -rf Image
             mv oImage Image
-            cd ../../../..
-          fi
+            # Recreate Image.lz4 from the patched Image
+            lz4 -f -l Image Image.lz4
+            cd ../../..
+            fi
 
       - name: Patch Image file Android 14 and Android 15 (sukisu only)
         if: ${{ inputs.use_kpm && inputs.kernelsu_variant == 'SUKISU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
         run: |
-          if [ "${{ inputs.kernel_version }}" != "1.1" ]; then
             echo "Patching Image file..."
             cd "$CONFIG/bazel-bin/common/kernel_aarch64/"
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
@@ -438,8 +446,10 @@ jobs:
             ./patch
             rm -rf Image
             mv oImage Image
+            # Recreate Image.lz4 from the patched Image
+            lz4 -f -l Image Image.lz4
             cd ../../..
-          fi
+            fi
 
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
