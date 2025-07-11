@@ -228,8 +228,23 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward --fuzz=3 < 0001-Susfs-1.5.9.patch 
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_apk_sign.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_selinux.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_ksud.c.patch
+
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_rules.c.patch
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -287,6 +302,14 @@ jobs:
           cp ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 -F 3 < 69_hide_stuff.patch
 
+      - name: Apply WIFI Patches
+        run: |
+          if [ "${{ inputs.kernel_version }}" == "6.1" ]; then
+            echo "Applying WIFI patch for kernel 6.1..."
+            curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch -o test.patch
+            patch -p1 --forward --fuzz=3 < test.patch || true
+          fi
+
       - name: Add Configuration Settings
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -294,28 +317,27 @@ jobs:
           echo "Adding configuration settings to gki_defconfig..."
 
           # Add KSU configuration settings
-          echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           fi
                     
           # Add additional tmpfs config setting
-          echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TMPFS_XATTR=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TMPFS_POSIX_ACL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
 
           # Add additional config setting
-          echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
-
+          echo "CONFIG_IP_NF_TARGET_TTL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_TARGET_HL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_MATCH_HL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           # Add BBR Config
-          echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig 
-          echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig 
+          echo "CONFIG_TCP_CONG_ADVANCED=y" | tee -a ./common/arch/arm64/configs/gki_defconfig 
+          echo "CONFIG_TCP_CONG_BBR=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NET_SCH_FQ=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_BIC=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_WESTWOOD=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_HTCP=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
 
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -326,26 +348,26 @@ jobs:
           cd "$CONFIG"
 
           # Add SUSFS configuration settings
-          echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           fi
 
       - name: Change Kernel Name
@@ -366,7 +388,7 @@ jobs:
            sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
            rm -rf ./common/android/abi_gki_protected_exports_*
            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-           sed -E -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-@NoFloresto\"/" ./common/arch/arm64/configs/gki_defconfig
+           sed -E -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-@NoFloresto+@mr_vokintos\"/" ./common/arch/arm64/configs/gki_defconfig
           fi
 
       - name: Build
