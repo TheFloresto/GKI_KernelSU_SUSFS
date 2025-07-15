@@ -30,7 +30,7 @@ on:
         description: 'Include NEXT?'
         required: true
         type: boolean
-        default: true
+        default: false
       include_mksu:
         description: 'Include MKSU?'
         required: true
@@ -40,7 +40,7 @@ on:
         description: 'Include SukiSU?'
         required: true
         type: boolean
-        default: false
+        default: true
       kernelsu_branch:
         description: "Choose ksu branch"
         required: true
@@ -49,7 +49,7 @@ on:
           - Stable
           - Dev
           - Other
-        default: Dev
+        default: Stable
       kernelsu_branch_other:
         description: "If 'Other' is selected, specify your custom branch"
         required: false
