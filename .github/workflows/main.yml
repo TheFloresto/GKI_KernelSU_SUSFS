@@ -36,6 +36,11 @@ on:
         required: true
         type: boolean
         default: false
+      include_sukisu:
+        description: 'Include SukiSU?'
+        required: true
+        type: boolean
+        default: false
       kernelsu_branch:
         description: "Choose ksu branch"
         required: true
@@ -67,7 +72,7 @@ jobs:
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
             [🔗 View GitHub Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
             -F parse_mode="Markdown"
-            
+
   set-matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -81,6 +86,7 @@ jobs:
           [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-kernels-a12:
@@ -141,8 +147,7 @@ jobs:
       - build-kernels-a15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
-      RELEASE_BODY:
+      RELEASE_NAME: "GKI Kernels With KernelSU & SUSFS v1.5.9"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -151,25 +156,21 @@ jobs:
         run: |
           GITLAB_OWNER="simonpunk"
           GITLAB_REPO="susfs4ksu"
-          
           declare -A BRANCH_MAP=(
             ["gki_android12_5_10"]="gki-android12-5.10"
-            ["gki_android13_5_10"]="gki-android13-5.10"
+            ["gki_android13_5_10"]="gki-android co-5.10"
             ["gki_android13_5_15"]="gki-android13-5.15"
             ["gki_android14_5_15"]="gki-android14-5.15"
             ["gki_android14_6_1"]="gki-android14-6.1"
             ["gki_android15_6_6"]="gki-android15-6.6"
           )
-          
           for var_name in "${!BRANCH_MAP[@]}"; do
             branch_name="${BRANCH_MAP[$var_name]}"
             COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
-            
             if [[ -n "$COMMIT_HASH" ]]; then
               COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
               echo "$branch_name Commit: $COMMIT_HASH"
               echo "$branch_name Commit URL: $COMMIT_URL"
-              
               echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
               echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
             fi
@@ -178,7 +179,6 @@ jobs:
       - name: Get KernelSU variant refs and links
         run: |
           BRANCH="${{ inputs.kernelsu_branch }}"
-      
           get_ref() {
             local name="$1" repo="$2" path="$3" mode="$4"
             if [[ "$mode" == "tag" ]]; then
@@ -191,28 +191,24 @@ jobs:
             echo "${name}_REF=$ref" >> $GITHUB_ENV
             echo "${name}_URL=$url" >> $GITHUB_ENV
           }
-      
           [[ "$BRANCH" == "Stable" ]] && MODE="tag" || MODE="commit"
-
           get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
           get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
+          get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"
 
       - name: Generate and Create New Tag
         run: |
-            LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
-            if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v1.5.9-r0"
-            fi
-            
-            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
-            echo "New tag: $NEW_TAG"
-            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
-            git tag $NEW_TAG
-            git push origin $NEW_TAG
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.5.9-r0"
+          fi
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+          echo "New tag: $NEW_TAG"
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -222,43 +218,39 @@ jobs:
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
-          
           Branch type for KSU: ${{ inputs.kernelsu_branch }}
           Wild Current Kernel Tag: ${{ env.NEW_TAG }}
-      
           Features:
-          -> Wild KSU Kernels & Others
-          -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
-          -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.4
+          -> Wild KSU, KernelSU, KernelSU-Next, MKSU, SukiSU
+          -> Multi Manager Support for Wild Kernels & Next Kernels
+          -> SUSFS v1.5.9
+          -> Scope-Minimized Manual Hooks v1.4
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
           -> Wireguard Support
           -> BBR Support
           -> LTO = full
-      
           Notes:
-          -> Wild KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+          -> Wild KSU, KernelSU-Next, and SukiSU: SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks.
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/ or https://github.com/libxzr/HorizonKernelFlasher!
-      
-          Module: 
+          Module:
           -> https://github.com/sidex15/ksu_module_susfs
-      
           Managers:
           -> Wild KSU: https://github.com/WildKernels/Wild_KSU / https://t.me/WildKernels
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
           -> 5ec1cff's KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
           -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
+          -> SukiSU: https://github.com/SukiSU-Ultra/SukiSU-Ultra / https://t.me/SukiSU_Ultra
           -> rsuntk: https://github.com/rsuntk/KernelSU / https://t.me/rsukrnlsu
           -> backslashxx: https://github.com/backslashxx/KernelSU
-      
           Commit Hashes (at the time of release):
           -> Wild KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> 5ec1cff: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
           -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
-          -> SUSFS4KSU: 
+          -> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})
+          -> SUSFS4KSU:
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
             -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
             -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})
@@ -290,7 +282,7 @@ jobs:
         run: |
           echo "GitHub release created with the following files:"
           ls ./downloaded-artifacts/**/*
-            
+
       - name: Send Telegram Notification
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
