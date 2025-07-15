@@ -125,6 +125,10 @@ jobs:
       - name: Clone AnyKernel3 and Other Dependencies
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
+          echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
+          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
+          ANYKERNEL_BRANCH="sukisu"
+
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
