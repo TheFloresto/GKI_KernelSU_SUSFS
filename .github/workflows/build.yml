@@ -125,7 +125,7 @@ jobs:
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          git clone https://github.com/WildKernels/kernel_patches -b main
+          git clone https://github.com/TheFloresto/kernel_patches -b main
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
 
       - name: Check Disk Space Before Sync
@@ -408,11 +408,23 @@ jobs:
           set -e
           set -x
           cd "$CONFIG"
+
+          echo "Checking kernel version..."
+          if [[ "$CONFIG" == *"6.6"* ]]; then
+            echo "Fetching .bazelrc with sm8635-polly-66 configuration (cortex-a76)..."
+            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc || exit 1
+            EXTRA_BAZEL_FLAGS="--config=sm8635-polly-66"
+          else
+            echo "Fetching .bazelrc with sm8635-polly configuration (cortex-a720)..."
+            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly.bazelrc -o .bazelrc || exit 1
+            EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
+          fi
+
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
             LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
           else
-            tools/bazel build --sandbox_writable_path=/home/runner/.ccache --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full //common:kernel_aarch64_dist
+            tools/bazel build --sandbox_writable_path=/home/runner/.ccache --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS  //common:kernel_aarch64_dist
           fi
           ccache --show-stats
 
