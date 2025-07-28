@@ -1,48 +1,4 @@
-name: Build Script - Optimized
-permissions:
-  contents: write
-  actions: write 
-
-on:
-  workflow_call:
-    inputs:
-      android_version:
-        required: true
-        type: string
-      kernel_version:
-        required: true
-        type: string
-      sub_level:
-        required: true
-        type: string
-      os_patch_level:
-        required: true
-        type: string
-      kernelsu_variant:
-        required: true
-        type: string
-      kernelsu_branch:
-        required: true
-        type: string
-      kernelsu_branch_other:
-        required: false
-        type: string
-      revision:
-        required: false
-        type: string
-
-jobs:
-  build-gki:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
-      CCACHE_NOHASHDIR: "true"
-      CCACHE_HARDLINK: "true"
-      CCACHE_MAXSIZE: "5G"  # Увеличен размер кэша
-
-
-name: Build Script - Optimized
+name: Build Script
 permissions:
   contents: write
   actions: write 
@@ -110,83 +66,51 @@ jobs:
           
           wait  # Ждем завершения параллельных операций удаления файлов
 
-      - name: Setup Optimized SWAP
+      - name: Setup SWAP
         run: |
-          sudo swapoff -a
-          sudo fallocate -l 20G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon -p 1 /swapfile
-          # Оптимизация параметров VM для сборки
-          echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
-          echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
-          echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
-          echo 'vm.dirty_ratio=15' | sudo tee -a /etc/sysctl.conf
-          echo 'vm.dirty_background_ratio=5' | sudo tee -a /etc/sysctl.conf
-          sudo sysctl -p
+         sudo swapoff -a
+         sudo fallocate -l 20G /swapfile
+         sudo chmod 600 /swapfile
+         sudo mkswap /swapfile
+         sudo swapon -p 1 /swapfile
+         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
+         echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+         echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
+         sudo sysctl -p
+         free -h
           
       - name: Set CONFIG Environment Variable
         run: |
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
-          echo "CCACHE_DIR=$HOME/.ccache_$CONFIG" >> $GITHUB_ENV
 
-      - name: Restore ccache with Version-Specific Cache
-        uses: actions/cache@v4
-        id: ccache-restore
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ccache-optimized-${{ env.CONFIG }}-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            ccache-optimized-${{ env.CONFIG }}-${{ runner.os }}-
-            ccache-optimized-${{ env.CONFIG }}-
-            ccache-optimized-
-
-      - name: Setup Optimized ccache
+      - name: Install ccache and Setup Optimized Cache
         run: |
-          mkdir -p "$CCACHE_DIR"
+          sudo apt update && sudo apt install -y ccache
+          
+          # Create cache directories
+          mkdir -p ~/.ccache ~/.cache/bazel
+          
+          # Optimized ccache settings
           ccache --version
+          ccache --max-size="$CCACHE_MAXSIZE"
+          ccache --set-config=compression=true
+          ccache --set-config=compression_level=6
+          ccache --set-config=sloppiness=file_macro,locale,time_macros,include_file_mtime,include_file_ctime
+          ccache --set-config=hash_dir=false
+          ccache --set-config=hard_link=true
+          ccache --set-config=max_files=0
+          ccache --set-config=file_clone=true
           
-          # Оптимизированные настройки ccache
-          ccache -M "$CCACHE_MAXSIZE"
-          ccache -o compression=true
-          ccache -o compression_level=6  # Баланс между сжатием и скоростью
-          ccache -o sloppiness=file_macro,locale,time_macros,include_file_mtime,include_file_ctime
-          ccache -o hash_dir=false
-          ccache -o hard_link=true
-          ccache -o max_files=0  # Без ограничения количества файлов
-          ccache -o file_clone=true  # Ускорение через клонирование файлов
-          
-          echo "CCACHE configured with size: $CCACHE_MAXSIZE"
-          ccache -s
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "BAZEL_CACHE_DIR=$HOME/.cache/bazel" >> $GITHUB_ENV
 
-      - name: Download toolchain with aria2 (Parallel)
+      - name: Download toolchain
         run: |
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-build-2024
-          
-          # Параллельная загрузка с aria2 (как в fastbuild)
-          mkdir -p toolchain_temp
-          cd toolchain_temp
-          
-          # Загрузка build-tools с aria2
-          aria2c -s16 -x16 -k1M "${AOSP_MIRROR}/kernel/prebuilts/build-tools/+archive/${BRANCH}.tar.gz" -o build-tools.tar.gz &
-          
-          # Загрузка mkbootimg с aria2  
-          aria2c -s16 -x16 -k1M "${AOSP_MIRROR}/platform/system/tools/mkbootimg/+archive/${BRANCH}.tar.gz" -o mkbootimg.tar.gz &
-          
-          wait
-          
-          # Распаковка
-          mkdir -p ../kernel-build-tools
-          tar -xzf build-tools.tar.gz -C ../kernel-build-tools &
-          
-          mkdir -p ../mkbootimg  
-          tar -xzf mkbootimg.tar.gz -C ../mkbootimg &
-          
-          wait
-          cd ..
-          rm -rf toolchain_temp
+          git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
+          git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
       - name: Set environment variables
         run: |
@@ -212,152 +136,158 @@ jobs:
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
-      - name: Clone Dependencies with aria2 (Parallel)
+      - name: Clone AnyKernel3 and Other Dependencies
         run: |
-          echo "Cloning dependencies with parallel aria2..."
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-          
-          # Параллельная загрузка архивов
-          aria2c -s16 -x16 -k1M https://github.com/TheFloresto/AnyKernel3/archive/refs/heads/${ANYKERNEL_BRANCH}.zip -o anykernel.zip &
-          aria2c -s16 -x16 -k1M https://gitlab.com/simonpunk/susfs4ksu/-/archive/${SUSFS_BRANCH}/susfs4ksu-${SUSFS_BRANCH}.zip -o susfs.zip &
-          aria2c -s16 -x16 -k1M https://github.com/TheFloresto/kernel_patches/archive/refs/heads/main.zip -o patches.zip &
-          
-          wait
-          
-          # Параллельная распаковка
-          unzip -q anykernel.zip && mv AnyKernel3-${ANYKERNEL_BRANCH} AnyKernel3 &
-          unzip -q susfs.zip && mv susfs4ksu-${SUSFS_BRANCH} susfs4ksu &  
-          unzip -q patches.zip && mv kernel_patches-main kernel_patches &
-          
-          wait
-          rm -f *.zip
+          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://github.com/TheFloresto/kernel_patches.git -b main
 
-      - name: Initialize and Sync Kernel Source (Optimized)
+      - name: Initialize and Sync Kernel Source
         run: |
           mkdir -p "$CONFIG"
           cd "$CONFIG"
-          
           FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-          
-          # Оптимизированная инициализация repo
-          $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest \
-            -b common-${FORMATTED_BRANCH} --repo-rev=v2.16 --no-repo-verify
-          
-          # Проверка на deprecated ветку
+          $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
           REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
           if grep -q deprecated <<< $REMOTE_BRANCH; then
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
-          
-          # Максимально параллельная синхронизация
-          $REPO sync -c -j$(nproc --all) --no-tags --fail-fast --force-sync
+          $REPO sync -c -j$(nproc --all) --no-tags --fail-fast
 
-      - name: Determine KernelSU branch and Add KernelSU
+      - name: Determine the branch for KernelSU
+        run: |
+          case "${{ inputs.kernelsu_branch }}" in
+            "Stable")
+              echo "BRANCH=-" >> $GITHUB_ENV
+              ;;
+            "Dev")
+              if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
+                echo "BRANCH=-s main" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
+                echo "BRANCH=-s next" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
+                echo "BRANCH=-s wild" >> $GITHUB_ENV
+              fi
+              ;;
+            "Other")
+              if [[ -n "${{ inputs.kernelsu_branch_other }}" ]]; then
+                echo "BRANCH=-s ${{ inputs.kernelsu_branch_other }}" >> $GITHUB_ENV
+              else
+                echo "Error: Custom branch not provided for 'Other'" >&2
+                exit 1
+              fi
+              ;;
+          esac
+      
+      - name: Add KernelSU
         run: |
           cd "$CONFIG"
-          
-          # Определение ветки
-          case "${{ inputs.kernelsu_branch }}" in
-            "Stable") BRANCH="" ;;
-            "Dev")
-              case "${{ inputs.kernelsu_variant }}" in
-                "KSU"|"MKSU") BRANCH="-s main" ;;
-                "NEXT") BRANCH="-s next" ;;
-                "WILD") BRANCH="-s wild" ;;
-              esac ;;
-            "Other") BRANCH="-s ${{ inputs.kernelsu_branch_other }}" ;;
-          esac
-          
-          # Добавление KernelSU
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash $BRANCH ;;
+              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
             "KSU")
-              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH ;;
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
             "NEXT")
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH ;;
+              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
             "MKSU")
-              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash $BRANCH ;;
+              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
           esac
-
-      - name: Apply All Patches (Optimized)
+          
+      - name: Apply SUSFS Patches for KernelSU Variants
         run: |
           cd "$CONFIG"
           
-          # SUSFS патчи
+          # Copy SUSFS patches
           cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
           cd common
-          patch -p1 --forward --no-backup-if-mismatch < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
+          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
           cd ..
-          
           cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           
-          # KernelSU специфичные патчи
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              cd ./Wild_KSU ;;
+              cd ./Wild_KSU
+              ;;
             "KSU")
               cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward --no-backup-if-mismatch < 10_enable_susfs_for_ksu.patch ;;
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch
+              ;;
             "NEXT")
               cd ./KernelSU-Next
               cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward --no-backup-if-mismatch < 0001-Susfs-1.5.9.patch ;;
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch
+              ;;
             "MKSU")
-              cd ./KernelSU ;;
+              cd ./KernelSU
+              ;;
           esac
 
-      - name: Get KernelSU Version and Apply Additional Patches
+      - name: Getting KernelSU Version
         run: |
           cd "$CONFIG"
           
-          # Получение версии KSU
           case "${{ inputs.kernelsu_variant }}" in
-            "WILD") cd ./Wild_KSU/kernel ;;
-            "KSU") cd ./KernelSU/kernel ;;
-            "NEXT") cd ./KernelSU-Next/kernel ;;
-            "MKSU") cd ./KernelSU/kernel ;;
+            "WILD")
+              cd ./Wild_KSU
+              BASE_VERSION=10200
+              ;;
+            "KSU")
+              cd ./KernelSU
+              BASE_VERSION=10200
+              ;;
+            "NEXT")
+              cd ./KernelSU-Next
+              BASE_VERSION=10200
+              ;;
+            "MKSU")
+              cd ./KernelSU
+              BASE_VERSION=10200
+              ;;
           esac
           
-          BASE_VERSION=10200
+          cd ./kernel
           KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          
-          cd ../../common
-          
-          # Hide Stuff патч
+
+      - name: Apply Hide Stuff Patches
+        run: |
+          cd "$CONFIG/common"
           cp -v ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 --forward --no-backup-if-mismatch -F 3 < 69_hide_stuff.patch
+          patch -p1 --forward -F 3 < 69_hide_stuff.patch
+
+      - name: Apply Hooks Patches
+        run: |
+          cd "$CONFIG/common"
           
-          # Hooks патчи
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward --no-backup-if-mismatch -F 3 < 60_scope-minimized_manual_hooks.patch
+            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch  ./
+            patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             cp -v ../../kernel_patches/wild/syscall_hooks.patch ./
-            patch -p1 --forward --no-backup-if-mismatch -F 3 < syscall_hooks.patch
+            patch -p1 --forward -F 3 < syscall_hooks.patch
           fi
 
-      - name: Samsung KDP Fix for 6.6
-        if: ${{ inputs.kernel_version == '6.6' }}
+      - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
+        if: ${{ ( inputs.kernel_version == '6.6' ) }}
         run: |
-          cd "$CONFIG"
-          echo "[+] Adding Samsung KDP exported symbols"
-          SYMBOL_LIST=common/android/abi_gki_aarch64_galaxy
+          SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
           echo "kdp_set_cred_non_rcu" >> $SYMBOL_LIST
-          echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST  
+          echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST
           echo "kdp_usecount_inc" >> $SYMBOL_LIST
-          
-          cd common
+          cd $CONFIG/common
           PATCH="../../kernel_patches/samsung/min_kdp/add-min_kdp-symbols.patch"
           if patch -p1 --dry-run < $PATCH; then
             patch -p1 --no-backup-if-mismatch < $PATCH
           fi
-          
           cd drivers
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
@@ -423,68 +353,80 @@ jobs:
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
-      - name: Change Kernel Name (Optimized)
+      - name: Change Kernel Name
         run: |
           cd "$CONFIG"
           CURRENT_DATE=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
 
           if [ -f "build/build.sh" ]; then
-            perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-            sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
-            perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
+              perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
+              sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
+              perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
           else
-            perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-            echo "CONFIG_LOCALVERSION=\"-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
-            perl -pi -e "s/build-timestamp = \\\$\(or \\\$\(KBUILD_BUILD_TIMESTAMP\), \\\$\(build-timestamp-auto\)\)/build-timestamp = \"$CURRENT_DATE\"/" ./common/init/Makefile
-            rm -rf ./common/android/abi_gki_protected_exports_*
-            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+              perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
+              echo "CONFIG_LOCALVERSION=\"-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
+              perl -pi -e "s/build-timestamp = \\\$\(or \\\$\(KBUILD_BUILD_TIMESTAMP\), \\\$\(build-timestamp-auto\)\)/build-timestamp = \"$CURRENT_DATE\"/" ./common/init/Makefile
+              rm -rf ./common/android/abi_gki_protected_exports_*
+              perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
 
-      - name: Build with Optimizations
-        run: |
+      - name: Build with Advanced Optimizations
+        run : |
           set -e
+          set -x
           cd "$CONFIG"
+
+          # Get CPU count and calculate optimal jobs (double the cores)
+          CPU_COUNT=$(nproc --all)
+          OPTIMAL_JOBS=$((CPU_COUNT * 2))
           
-          # Использование ccache в PATH
-          export PATH="/usr/lib/ccache:$PATH"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          
-          echo "Building with optimized settings..."
-          
+          echo "Detected $CPU_COUNT CPU cores, using $OPTIMAL_JOBS jobs"
+          echo "GitHub Actions typically provides 2-4 cores, so using $OPTIMAL_JOBS parallel jobs"
+
           if [[ "$CONFIG" == *"6.6"* ]]; then
-            echo "Fetching optimized .bazelrc for 6.6..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc
+            echo "Fetching .bazelrc with sm8635-polly-66 configuration..."
+            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc || exit 1
             EXTRA_BAZEL_FLAGS="--config=sm8635-polly-66"
           else
-            echo "Fetching optimized .bazelrc..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly.bazelrc -o .bazelrc
+            echo "Fetching .bazelrc with sm8635-polly configuration..."
+            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly.bazelrc -o .bazelrc || exit 1
             EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
           fi
 
-          if [ -f "build/build.sh" ]; then
-            # Оптимизированная сборка для старых версий
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 \
-            CC="ccache clang" \
-            KCFLAGS="-O2" \
-            build/build.sh
-          else
-            # Оптимизированная сборка через Bazel
-            tools/bazel build \
-              --sandbox_writable_path=/home/runner/.cache \
-              --sandbox_writable_path="${{ env.CCACHE_DIR }}" \
-              --disk_cache=~/.cache/bazel \
-              --config=fast \
-              --lto=full \
-              --jobs=$(nproc --all) \
-              $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
-              $EXTRA_BAZEL_FLAGS \
-              //common:kernel_aarch64_dist
-          fi
+          # Use ccache in PATH for both build systems
+          export PATH="/usr/lib/ccache:$PATH"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           
-          echo "Build completed! ccache stats:"
+          echo "ccache status before build:"
           ccache -s
 
-      # Остальные шаги остаются без изменений...
+          if [ -f "build/build.sh" ]; then
+            echo "Building with legacy build system (Android 12/13)..."
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 \
+            CC="ccache clang" \
+            KCFLAGS="-O2 -pipe" \
+            JOBS=$OPTIMAL_JOBS \
+            build/build.sh || exit 1
+          else
+            echo "Building with Bazel (Android 14/15 - optimized)..."
+            tools/bazel build //common:kernel_aarch64_dist \
+              --sandbox_writable_path="${{ env.CCACHE_DIR }}" \
+              --sandbox_writable_path="${{ env.BAZEL_CACHE_DIR }}" \
+              --disk_cache="${{ env.BAZEL_CACHE_DIR }}" \
+              --remote_download_outputs=minimal \
+              --config=fast \
+              --lto=full \
+              --jobs=$OPTIMAL_JOBS \
+              --experimental_remote_cache_async \
+              --local_ram_resources="HOST_RAM*0.8" \
+              --local_cpu_resources="HOST_CPUS" \
+              $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
+              $EXTRA_BAZEL_FLAGS || exit 1
+          fi
+          
+          echo "Build completed successfully! Final ccache statistics:"
+          ccache -s
+
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
         run: |
@@ -524,19 +466,20 @@ jobs:
           zip -r "../$ZIP_NAME" ./*
           rm ./Image.gz
 
-      # Boot image creation steps remain the same...
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
         run: |
           cd bootimgs
+          
           GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-"${{ inputs.os_patch_level }}"_"${{ inputs.revision }}".zip
           FALLBACK_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip
           
           status=$(curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null)
+          
           if [ "$status" = "200" ]; then
-            curl -Lo gki-kernel.zip "$GKI_URL"
+              curl -Lo gki-kernel.zip "$GKI_URL"
           else
-            curl -Lo gki-kernel.zip "$FALLBACK_URL"
+              curl -Lo gki-kernel.zip "$FALLBACK_URL"
           fi
           
           unzip gki-kernel.zip && rm gki-kernel.zip
@@ -579,7 +522,7 @@ jobs:
           for image in *.img; do
             gzip -vnf9 "$image"
           done
-
+  
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
