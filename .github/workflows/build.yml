@@ -41,15 +41,54 @@ jobs:
       CCACHE_HARDLINK: "true"
       CCACHE_MAXSIZE: "5G"  # Увеличен размер кэша
 
+
+name: Build Script - Optimized
+permissions:
+  contents: write
+  actions: write 
+
+on:
+  workflow_call:
+    inputs:
+      android_version:
+        required: true
+        type: string
+      kernel_version:
+        required: true
+        type: string
+      sub_level:
+        required: true
+        type: string
+      os_patch_level:
+        required: true
+        type: string
+      kernelsu_variant:
+        required: true
+        type: string
+      kernelsu_branch:
+        required: true
+        type: string
+      kernelsu_branch_other:
+        required: false
+        type: string
+      revision:
+        required: false
+        type: string
+
+jobs:
+  build-gki:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+      CCACHE_MAXSIZE: "5G"
+
     steps:
       - name: Maximize Build Space and Setup Environment
         run: |
-          # Параллельное удаление ненужного ПО (как в fastbuild)
-          sudo apt-mark hold firefox libc-bin
-          sudo apt purge man-db -y &
-          sudo rm -rf /var/lib/man-db/auto-update &
-          
-          # Удаление больших пакетов параллельно
+          # Удаление больших пакетов параллельно (без apt команд)
           sudo rm -rf /usr/share/dotnet &
           sudo rm -rf /usr/local/lib/android &
           sudo rm -rf /opt/ghc &
@@ -57,14 +96,19 @@ jobs:
           sudo rm -rf /usr/share/swift &
           sudo rm -rf /usr/local/julia* &
           
-          # Установка зависимостей с оптимизацией
+          # Последовательные apt операции (избегаем конфликта блокировки)
+          sudo apt-mark hold firefox libc-bin
           sudo apt update
+          sudo apt purge man-db -y
+          sudo rm -rf /var/lib/man-db/auto-update
+          
+          # Установка зависимостей
           sudo apt-get install -y --no-install-recommends \
             curl bison flex make binutils git perl gcc python3 \
             python-is-python3 bc libssl-dev libelf-dev \
             bc aria2 zip unzip ccache
           
-          wait  # Ждем завершения параллельных операций
+          wait  # Ждем завершения параллельных операций удаления файлов
 
       - name: Setup Optimized SWAP
         run: |
