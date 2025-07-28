@@ -294,7 +294,7 @@ jobs:
           fi
 
           # SUSFS configuration settings
-          cat >> $DEFCONFIG << 'EOL'
+          cat >> "$DEFCONFIG" << 'EOL'
 CONFIG_KSU_SUSFS=y
 CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
 CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -398,8 +398,8 @@ EOL
               --lto=full \
               --jobs=$OPTIMAL_JOBS \
               --experimental_remote_cache_async \
-              --local_ram_resources=HOST_RAM*0.8 \
-              --local_cpu_resources=HOST_CPUS \
+              --local_ram_resources="HOST_RAM*0.8" \
+              --local_cpu_resources="HOST_CPUS" \
               $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
               $EXTRA_BAZEL_FLAGS || exit 1
           fi
