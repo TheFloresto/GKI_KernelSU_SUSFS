@@ -102,6 +102,28 @@ jobs:
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
+      - name: Restore ccache from previous builds
+        uses: actions/cache@v4
+        id: ccache-restore
+        with:
+          path: ~/.ccache
+          key: ccache-${{ env.CONFIG }}-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ env.CONFIG }}-${{ runner.os }}-
+            ccache-${{ env.CONFIG }}-
+            ccache-
+
+      - name: Restore Bazel cache from previous builds  
+        uses: actions/cache@v4
+        id: bazel-restore
+        with:
+          path: ~/.cache/bazel
+          key: bazel-${{ env.CONFIG }}-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            bazel-${{ env.CONFIG }}-${{ runner.os }}-
+            bazel-${{ env.CONFIG }}-
+            bazel-
+            
       - name: Install ccache and Setup Optimized Cache
         run: |
           sudo apt update && sudo apt install -y ccache
