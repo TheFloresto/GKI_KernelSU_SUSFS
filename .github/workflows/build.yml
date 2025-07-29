@@ -42,47 +42,18 @@ jobs:
       CCACHE_MAXSIZE: "5G"
 
     steps:
-      - name: Maximize Build Space and Setup Environment
-        run: |
-          # Ожидание завершения автоматических обновлений Ubuntu
-          echo "Waiting for automatic apt updates to complete..."
-          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-            echo "Waiting for dpkg lock to be released..."
-            sleep 5
-          done
-          
-          # Удаление больших пакетов параллельно (без apt команд)
-          sudo rm -rf /usr/share/dotnet &
-          sudo rm -rf /usr/local/lib/android &  
-          sudo rm -rf /opt/ghc &
-          sudo rm -rf /opt/hostedtoolcache/CodeQL &
-          sudo rm -rf /usr/share/swift &
-          sudo rm -rf /usr/local/julia* &
-          
-          # Ожидание освобождения блокировок apt перед началом работы
-          sudo systemctl stop unattended-upgrades || true
-          sudo killall -9 apt apt-get dpkg >/dev/null 2>&1 || true
-          
-          # Последовательные apt операции
-          echo "Setting package holds..."
-          sudo apt-mark hold firefox libc-bin
-          
-          echo "Updating package lists..."
-          sudo apt update
-          
-          echo "Removing unnecessary packages..."
-          sudo apt purge man-db -y
-          sudo rm -rf /var/lib/man-db/auto-update
-          
-          echo "Installing build dependencies..."
-          sudo apt-get install -y --no-install-recommends \
-            curl bison flex make binutils git perl gcc python3 \
-            python-is-python3 bc libssl-dev libelf-dev \
-            bc aria2 zip unzip ccache
-          
-          # Ждем завершения параллельных операций удаления файлов
-          wait
-          echo "Environment setup completed!"
+      - name: Maximize Build Space
+        uses: AdityaGarg8/remove-unwanted-software@v5
+        with:
+          remove-dotnet: 'true'          # Frees ~2 GB
+          remove-android: 'true'         # Frees ~9 GB
+          remove-haskell: 'true'         # Frees ~5.2 GB
+          remove-codeql: 'true'          # Frees ~5.4 GB
+          remove-docker-images: 'true'   # Frees ~3.2 GB
+          remove-large-packages: 'true'  # Frees ~3.1 GB
+          remove-swapfile: 'true'        # Frees ~4 GB
+          remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          verbose: 'true'                # Enable detailed logging
 
       - name: Setup SWAP
         run: |
