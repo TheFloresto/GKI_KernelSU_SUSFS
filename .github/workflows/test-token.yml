@@ -1,0 +1,104 @@
+name: Test Release Token
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Test Token Permissions
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          echo "🔍 Testing token permissions..."
+          
+          # Проверка базового доступа к API
+          echo "📡 Testing basic API access..."
+          curl -H "Authorization: token $GH_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/user | jq '.login'
+          
+          # Проверка доступа к репозиторию
+          echo "📁 Testing repository access..."
+          curl -H "Authorization: token $GH_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/repos/${{ github.repository }} | jq '.name, .permissions'
+          
+          # Проверка доступа к релизам
+          echo "🚀 Testing releases access..."
+          curl -H "Authorization: token $GH_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/repos/${{ github.repository }}/releases | jq 'length'
+          
+          # Тест создания черновика релиза
+          echo "✨ Testing release creation..."
+          RELEASE_RESPONSE=$(curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/releases \
+            -d '{
+              "tag_name": "test-token-v1.0.0",
+              "name": "Test Release - Delete Me",
+              "body": "This is a test release to verify token permissions. Please delete.",
+              "draft": true,
+              "prerelease": true
+            }')
+          
+          RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r '.id')
+          
+          if [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
+            echo "✅ SUCCESS: Release created with ID: $RELEASE_ID"
+            
+            # Удаляем тестовый релиз
+            echo "🗑️ Cleaning up test release..."
+            curl -X DELETE \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
+            echo "✅ Test release deleted"
+          else
+            echo "❌ FAILED: Could not create release"
+            echo "Response: $RELEASE_RESPONSE"
+            exit 1
+          fi
+          
+          echo "🎉 All token permissions are working correctly!"
+
+      - name: Test GitHub CLI
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          echo "🔧 Testing GitHub CLI..."
+          
+          # Установка GitHub CLI если не установлен
+          if ! command -v gh &> /dev/null; then
+            echo "📦 Installing GitHub CLI..."
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+          fi
+          
+          # Проверка аутентификации
+          echo "🔐 Testing GitHub CLI authentication..."
+          gh auth status
+          
+          # Тест создания релиза через CLI
+          echo "🚀 Testing release creation via GitHub CLI..."
+          gh release create test-cli-v1.0.0 \
+            --title "Test CLI Release - Delete Me" \
+            --notes "This is a test release via GitHub CLI. Please delete." \
+            --draft \
+            --prerelease
+          
+          echo "✅ GitHub CLI release created successfully!"
+          
+          # Удаляем тестовый релиз
+          echo "🗑️ Cleaning up CLI test release..."
+          gh release delete test-cli-v1.0.0 --yes
+          
+          echo "🎉 GitHub CLI test completed successfully!"
