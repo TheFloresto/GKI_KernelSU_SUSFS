@@ -1,4 +1,4 @@
-name: Build Script
+name: Build GKI
 permissions:
   contents: write
   actions: write 
@@ -102,6 +102,27 @@ jobs:
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
+      - name: Install ccache and Setup Optimized Cache
+        run: |
+          sudo apt update && sudo apt install -y ccache
+          
+          # Create cache directories
+          mkdir -p ~/.ccache ~/.cache/bazel
+          
+          # Optimized ccache settings
+          ccache --version
+          ccache --max-size="$CCACHE_MAXSIZE"
+          ccache --set-config=compression=true
+          ccache --set-config=compression_level=6
+          ccache --set-config=sloppiness=file_macro,locale,time_macros,include_file_mtime,include_file_ctime
+          ccache --set-config=hash_dir=false
+          ccache --set-config=hard_link=true
+          ccache --set-config=max_files=0
+          ccache --set-config=file_clone=true
+          
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "BAZEL_CACHE_DIR=$HOME/.cache/bazel" >> $GITHUB_ENV
+
       - name: Restore ccache from previous builds
         uses: actions/cache@v4
         id: ccache-restore
@@ -123,27 +144,6 @@ jobs:
             bazel-${{ env.CONFIG }}-${{ runner.os }}-
             bazel-${{ env.CONFIG }}-
             bazel-
-            
-      - name: Install ccache and Setup Optimized Cache
-        run: |
-          sudo apt update && sudo apt install -y ccache
-          
-          # Create cache directories
-          mkdir -p ~/.ccache ~/.cache/bazel
-          
-          # Optimized ccache settings
-          ccache --version
-          ccache --max-size="$CCACHE_MAXSIZE"
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          ccache --set-config=sloppiness=file_macro,locale,time_macros,include_file_mtime,include_file_ctime
-          ccache --set-config=hash_dir=false
-          ccache --set-config=hard_link=true
-          ccache --set-config=max_files=0
-          ccache --set-config=file_clone=true
-          
-          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
-          echo "BAZEL_CACHE_DIR=$HOME/.cache/bazel" >> $GITHUB_ENV
 
       - name: Download toolchain
         run: |
@@ -411,6 +411,20 @@ jobs:
               perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
 
+      - name: Clean old cache references
+        run: |
+          cd "$CONFIG"
+          # Удаляем старые ссылки на неправильные пути в кэше
+          if [ -d "out" ]; then
+            find out -type l -delete || true
+          fi
+          if [ -d "bazel-bin" ]; then
+            find bazel-bin -type l -delete || true
+          fi
+          if [ -d "bazel-out" ]; then
+            find bazel-out -type l -delete || true
+          fi
+
       - name: Build with Advanced Optimizations
         run : |
           set -e
@@ -450,6 +464,12 @@ jobs:
             build/build.sh || exit 1
           else
             echo "Building with Bazel (Android 14/15 - optimized)..."
+            
+            # Очистка старых bazel файлов если они есть
+            rm -rf bazel-* || true
+            
+            tools/bazel clean --expunge || true
+            
             tools/bazel build //common:kernel_aarch64_dist \
               --sandbox_writable_path="${{ env.CCACHE_DIR }}" \
               --sandbox_writable_path="${{ env.BAZEL_CACHE_DIR }}" \
