@@ -106,8 +106,14 @@ jobs:
         run: |
           sudo apt update && sudo apt install -y ccache
           
-          # Create cache directories
-          mkdir -p ~/.ccache ~/.cache/bazel
+          # Create ccache directory (always needed)
+          mkdir -p ~/.ccache
+          
+          # Create bazel cache directory only for Android 14/15
+          if [[ "${{ inputs.android_version }}" == "android14" || "${{ inputs.android_version }}" == "android15" ]]; then
+            mkdir -p ~/.cache/bazel
+            echo "BAZEL_CACHE_DIR=$HOME/.cache/bazel" >> $GITHUB_ENV
+          fi
           
           # Optimized ccache settings
           ccache --version
@@ -121,7 +127,6 @@ jobs:
           ccache --set-config=file_clone=true
           
           echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
-          echo "BAZEL_CACHE_DIR=$HOME/.cache/bazel" >> $GITHUB_ENV
 
       - name: Restore ccache from previous builds
         uses: actions/cache@v4
@@ -134,7 +139,8 @@ jobs:
             ccache-${{ env.CONFIG }}-
             ccache-
 
-      - name: Restore Bazel cache from previous builds  
+      - name: Restore Bazel cache from previous builds (Android 14/15 only)
+        if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
         uses: actions/cache@v4
         id: bazel-restore
         with:
