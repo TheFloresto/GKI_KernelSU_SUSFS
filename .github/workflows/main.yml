@@ -276,14 +276,15 @@ jobs:
           EOF
           
       - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          gh release create ${{ env.NEW_TAG }} \
-            --repo NerestKernels/GKI_KernelSU_SUSFS \
-            --title "${{ env.RELEASE_NAME }}" \
-            --notes-file release_body.md \
-            --prerelease ${{ inputs.release_type == 'Pre-Release' }}
+        with:
+          repository: NerestKernels/GKI_KernelSU_SUSFS
+          tag_name: ${{ env.NEW_TAG }}
+          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release_body.md
 
       - name: Upload Release Assets
         env:
@@ -294,7 +295,7 @@ jobs:
               continue
             fi
             echo "Uploading $file..."
-            gh release upload ${{ env.NEW_TAG }} "$file" --repo NerestKernels/GKI_KernelSU_SUSFS
+            gh release upload "${{ env.NEW_TAG }}" "$file" --repo NerestKernels/GKI_KernelSU_SUSFS
           done
 
       - name: Display Files Uploaded
