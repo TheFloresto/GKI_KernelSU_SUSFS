@@ -129,6 +129,7 @@ jobs:
           echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
       - name: Restore ccache from previous builds
+        if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
         uses: actions/cache@v4
         id: ccache-restore
         with:
