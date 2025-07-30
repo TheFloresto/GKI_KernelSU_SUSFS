@@ -76,8 +76,6 @@ jobs:
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
-          echo "CONFIG set to: $CONFIG"
-
       - name: Install ccache and Setup Optimized Cache
         run: |
           sudo apt update && sudo apt install -y ccache
