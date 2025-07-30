@@ -70,15 +70,21 @@ jobs:
           
       - name: Set CONFIG Environment Variable
         run: |
+          # Set CONFIG dynamically based on inputs values
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
+
+          # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
+
+          echo "CONFIG set to: $CONFIG"
 
       - name: Install ccache and Setup Optimized Cache
         run: |
           sudo apt update && sudo apt install -y ccache
-          
-          # Create ccache directory (always needed)
-          mkdir -p ~/.ccache
+
+           # Create ccache directory (always needed)
+           if [[ "${{ inputs.android_version }}" == "android12" || "${{ inputs.android_version }}" == "android13" ]]; then
+           mkdir -p ~/.ccache
           
           # Create bazel cache directory only for Android 14/15
           if [[ "${{ inputs.android_version }}" == "android14" || "${{ inputs.android_version }}" == "android15" ]]; then
@@ -96,8 +102,6 @@ jobs:
           ccache --set-config=hard_link=true
           ccache --set-config=max_files=0
           ccache --set-config=file_clone=true
-          
-          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
       - name: Restore ccache from previous builds
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
@@ -388,26 +392,13 @@ jobs:
               rm -rf ./common/android/abi_gki_protected_exports_*
               perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
-
-      - name: Clean old cache references
-        run: |
-          cd "$CONFIG"
-          # Удаляем старые ссылки на неправильные пути в кэше
-          if [ -d "out" ]; then
-            find out -type l -delete || true
-          fi
-          if [ -d "bazel-bin" ]; then
-            find bazel-bin -type l -delete || true
-          fi
-          if [ -d "bazel-out" ]; then
-            find bazel-out -type l -delete || true
-          fi
           
-      - name: Build with Advanced Optimizations
+      - name: Build
         run : |
           set -e
           set -x
           cd "$CONFIG"
+
 
           # Get CPU count and calculate optimal jobs (double the cores)
           CPU_COUNT=$(nproc --all)
@@ -416,41 +407,24 @@ jobs:
           echo "Detected $CPU_COUNT CPU cores, using $OPTIMAL_JOBS jobs"
           echo "GitHub Actions typically provides 2-4 cores, so using $OPTIMAL_JOBS parallel jobs"
 
-          # Use ccache in PATH for both build systems
-          export PATH="/usr/lib/ccache:$PATH"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          
-          echo "ccache status before build:"
-          ccache -s
-
-          if [ -f "build/build.sh" ]; then
-            echo "Building with legacy build system (Android 12/13)..."
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 \
-            CC="ccache clang" \
-            KCFLAGS="-O2 -pipe" \
-            JOBS=$OPTIMAL_JOBS \
-            build/build.sh || exit 1
+          echo "Checking kernel version..."
+          if [[ "$CONFIG" == *"6.6"* ]]; then
+            echo "Fetching .bazelrc with sm8635-polly-66 configuration (cortex-a76)..."
+            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc || exit 1
+            EXTRA_BAZEL_FLAGS="--config=sm8635-polly-66"
           else
-            echo "Building with Bazel (Android 14/15 - optimized)..."       
-            tools/bazel clean --expunge || true
-            
-            tools/bazel build //common:kernel_aarch64_dist \
-              --sandbox_writable_path="${{ env.CCACHE_DIR }}" \
-              --sandbox_writable_path="${{ env.BAZEL_CACHE_DIR }}" \
-              --disk_cache="${{ env.BAZEL_CACHE_DIR }}" \
-              --remote_download_outputs=minimal \
-              --config=fast \
-              --lto=full \
-              --jobs=$OPTIMAL_JOBS \
-              --experimental_remote_cache_async \
-              --local_ram_resources="HOST_RAM*0.8" \
-              --local_cpu_resources="HOST_CPUS" \
-              $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
-              || { echo "Bazel build failed"; exit 1; }
+            echo "Fetching .bazelrc with sm8635-polly configuration (cortex-a720)..."
+            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly.bazelrc -o .bazelrc || exit 1
+            EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
           fi
-          
-          echo "Build completed successfully! Final ccache statistics:"
-          ccache -s
+
+          echo "Building the kernel..."
+          if [ -f "build/build.sh" ]; then
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" JOBS=$OPTIMAL_JOBS || exit 1
+          else
+            tools/bazel build --sandbox_writable_path=/home/runner/.ccache --disk_cache=~/.cache/bazel --remote_download_outputs=minimal $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS --local_ram_resources="HOST_RAM*0.8" --local_cpu_resources="HOST_CPUS" //common:kernel_aarch64_dist
+          fi
+          ccache --show-stats
 
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
