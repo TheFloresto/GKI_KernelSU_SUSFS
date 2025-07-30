@@ -83,7 +83,6 @@ jobs:
           sudo apt update && sudo apt install -y ccache
 
            # Create ccache directory (always needed)
-           if [[ "${{ inputs.android_version }}" == "android12" || "${{ inputs.android_version }}" == "android13" ]]; then
            mkdir -p ~/.ccache
           
           # Create bazel cache directory only for Android 14/15
