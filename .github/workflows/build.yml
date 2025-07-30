@@ -42,18 +42,47 @@ jobs:
       CCACHE_MAXSIZE: "5G"
 
     steps:
-      - name: Maximize Build Space
-        uses: AdityaGarg8/remove-unwanted-software@v5
-        with:
-          remove-dotnet: 'true'          # Frees ~2 GB
-          remove-android: 'true'         # Frees ~9 GB
-          remove-haskell: 'true'         # Frees ~5.2 GB
-          remove-codeql: 'true'          # Frees ~5.4 GB
-          remove-docker-images: 'true'   # Frees ~3.2 GB
-          remove-large-packages: 'true'  # Frees ~3.1 GB
-          remove-swapfile: 'true'        # Frees ~4 GB
-          remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          verbose: 'false'                # Enable detailed logging
+      - name: Maximize Build Space and Setup Environment
+        run: |
+          # Ожидание завершения автоматических обновлений Ubuntu
+          echo "Waiting for automatic apt updates to complete..."
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for dpkg lock to be released..."
+            sleep 5
+          done
+          
+          # Удаление больших пакетов параллельно (без apt команд)
+          sudo rm -rf /usr/share/dotnet &
+          sudo rm -rf /usr/local/lib/android &  
+          sudo rm -rf /opt/ghc &
+          sudo rm -rf /opt/hostedtoolcache/CodeQL &
+          sudo rm -rf /usr/share/swift &
+          sudo rm -rf /usr/local/julia* &
+          
+          # Ожидание освобождения блокировок apt перед началом работы
+          sudo systemctl stop unattended-upgrades || true
+          sudo killall -9 apt apt-get dpkg >/dev/null 2>&1 || true
+          
+          # Последовательные apt операции
+          echo "Setting package holds..."
+          sudo apt-mark hold firefox libc-bin
+          
+          echo "Updating package lists..."
+          sudo apt update
+          
+          echo "Removing unnecessary packages..."
+          sudo apt purge man-db -y
+          sudo rm -rf /var/lib/man-db/auto-update
+          
+          echo "Installing build dependencies..."
+          sudo apt-get install -y --no-install-recommends \
+            curl bison flex make binutils git perl gcc python3 \
+            python-is-python3 bc libssl-dev libelf-dev \
+            bc aria2 zip unzip ccache
+          
+          # Ждем завершения параллельных операций удаления файлов
+          wait
+          echo "Environment setup completed!"
 
       - name: Setup SWAP
         run: |
@@ -77,13 +106,13 @@ jobs:
         run: |
           sudo apt update && sudo apt install -y ccache
           
-          # Create ccache directory with unique path for this build
-          mkdir -p ~/.ccache-${{ env.CONFIG || format('{0}-{1}-{2}', inputs.android_version, inputs.kernel_version, inputs.sub_level) }}
+          # Create ccache directory (always needed)
+          mkdir -p ~/.ccache
           
-          # Create bazel cache directory only for Android 14/15 with unique path
+          # Create bazel cache directory only for Android 14/15
           if [[ "${{ inputs.android_version }}" == "android14" || "${{ inputs.android_version }}" == "android15" ]]; then
-            mkdir -p ~/.cache/bazel-${{ env.CONFIG || format('{0}-{1}-{2}', inputs.android_version, inputs.kernel_version, inputs.sub_level) }}
-            echo "BAZEL_CACHE_DIR=$HOME/.cache/bazel-${{ env.CONFIG || format('{0}-{1}-{2}', inputs.android_version, inputs.kernel_version, inputs.sub_level) }}" >> $GITHUB_ENV
+            mkdir -p ~/.cache/bazel
+            echo "BAZEL_CACHE_DIR=$HOME/.cache/bazel" >> $GITHUB_ENV
           fi
           
           # Optimized ccache settings
@@ -97,29 +126,31 @@ jobs:
           ccache --set-config=max_files=0
           ccache --set-config=file_clone=true
           
-          echo "CCACHE_DIR=$HOME/.ccache-${{ env.CONFIG || format('{0}-{1}-{2}', inputs.android_version, inputs.kernel_version, inputs.sub_level) }}" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
       - name: Restore ccache from previous builds
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
         uses: actions/cache@v4
         id: ccache-restore
         with:
-          path: ~/.ccache-${{ env.CONFIG }}
+          path: ~/.ccache
           key: ccache-${{ env.CONFIG }}-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             ccache-${{ env.CONFIG }}-${{ runner.os }}-
             ccache-${{ env.CONFIG }}-
+            ccache-
 
       - name: Restore Bazel cache from previous builds (Android 14/15 only)
         if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
         uses: actions/cache@v4
         id: bazel-restore
         with:
-          path: ~/.cache/bazel-${{ env.CONFIG }}
+          path: ~/.cache/bazel
           key: bazel-${{ env.CONFIG }}-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             bazel-${{ env.CONFIG }}-${{ runner.os }}-
             bazel-${{ env.CONFIG }}-
+            bazel-
 
       - name: Download toolchain
         run: |
@@ -310,7 +341,9 @@ jobs:
 
       - name: Add Configuration Settings
         run: |
+          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
+          echo "Adding configuration settings to gki_defconfig..."
 
           # Add KSU configuration settings
           echo "CONFIG_KSU=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
@@ -321,6 +354,7 @@ jobs:
 
       - name: Add SUSFS Configuration Settings
         run: |
+          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
 
           # Add SUSFS configuration settings
@@ -384,30 +418,32 @@ jobs:
               perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
 
-      - name: Clean and Prepare Build Environment
+      - name: Clean old cache references
         run: |
           cd "$CONFIG"
-          
-          # Полная очистка старых кэшей Bazel
-          rm -rf bazel-* || true
-          rm -rf out/bazel || true
-          
-          # Очистка глобальных кэшей Bazel если они есть
-          rm -rf ~/.cache/bazel || true
-          
-          # Очистка временных файлов
-          find . -name "*.tmp" -delete || true
-          find . -name "*.cache" -delete || true
+          # Удаляем старые ссылки на неправильные пути в кэше
+          if [ -d "out" ]; then
+            find out -type l -delete || true
+          fi
+          if [ -d "bazel-bin" ]; then
+            find bazel-bin -type l -delete || true
+          fi
+          if [ -d "bazel-out" ]; then
+            find bazel-out -type l -delete || true
+          fi
           
       - name: Build with Advanced Optimizations
-        run: |
+        run : |
           set -e
           set -x
           cd "$CONFIG"
 
+          # Get CPU count and calculate optimal jobs (double the cores)
           CPU_COUNT=$(nproc --all)
           OPTIMAL_JOBS=$((CPU_COUNT * 2))
+          
           echo "Detected $CPU_COUNT CPU cores, using $OPTIMAL_JOBS jobs"
+          echo "GitHub Actions typically provides 2-4 cores, so using $OPTIMAL_JOBS parallel jobs"
 
           if [[ "$CONFIG" == *"6.6"* ]]; then
             echo "Fetching .bazelrc with sm8635-polly-66 configuration..."
@@ -419,16 +455,10 @@ jobs:
             EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
           fi
 
+          # Use ccache in PATH for both build systems
           export PATH="/usr/lib/ccache:$PATH"
-          export OUT_DIR="$(pwd)/out"
-          export DIST_DIR="$OUT_DIR/dist"
-          export SANDBOX_DIR="$OUT_DIR/bazel_sandbox"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export BAZEL_CACHE_DIR="${{ env.BAZEL_CACHE_DIR }}"
-
-          mkdir -p "$OUT_DIR" "$DIST_DIR" "$SANDBOX_DIR"
-          chmod 755 "$SANDBOX_DIR"
-
+          
           echo "ccache status before build:"
           ccache -s
 
@@ -440,14 +470,13 @@ jobs:
             JOBS=$OPTIMAL_JOBS \
             build/build.sh || exit 1
           else
-            echo "Building with Bazel (Android 14/15 - optimized)..."
-
+            echo "Building with Bazel (Android 14/15 - optimized)..."       
             tools/bazel clean --expunge || true
-
+            
             tools/bazel build //common:kernel_aarch64_dist \
-              --sandbox_writable_path="$CCACHE_DIR" \
-              --sandbox_writable_path="$BAZEL_CACHE_DIR" \
-              --disk_cache="$BAZEL_CACHE_DIR" \
+              --sandbox_writable_path="${{ env.CCACHE_DIR }}" \
+              --sandbox_writable_path="${{ env.BAZEL_CACHE_DIR }}" \
+              --disk_cache="${{ env.BAZEL_CACHE_DIR }}" \
               --remote_download_outputs=minimal \
               --config=fast \
               --lto=full \
@@ -455,11 +484,10 @@ jobs:
               --experimental_remote_cache_async \
               --local_ram_resources="HOST_RAM*0.8" \
               --local_cpu_resources="HOST_CPUS" \
-              --sandbox_base="$SANDBOX_DIR" \
               $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
               $EXTRA_BAZEL_FLAGS || exit 1
           fi
-
+          
           echo "Build completed successfully! Final ccache statistics:"
           ccache -s
 
@@ -567,4 +595,3 @@ jobs:
             *.zip
             *.img.gz
             *Image*
-            
