@@ -445,16 +445,6 @@ jobs:
           echo "Detected $CPU_COUNT CPU cores, using $OPTIMAL_JOBS jobs"
           echo "GitHub Actions typically provides 2-4 cores, so using $OPTIMAL_JOBS parallel jobs"
 
-          if [[ "$CONFIG" == *"6.6"* ]]; then
-            echo "Fetching .bazelrc with sm8635-polly-66 configuration..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc || exit 1
-            EXTRA_BAZEL_FLAGS="--config=sm8635-polly-66"
-          else
-            echo "Fetching .bazelrc with sm8635-polly configuration..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly.bazelrc -o .bazelrc || exit 1
-            EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
-          fi
-
           # Use ccache in PATH for both build systems
           export PATH="/usr/lib/ccache:$PATH"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
@@ -485,7 +475,7 @@ jobs:
               --local_ram_resources="HOST_RAM*0.8" \
               --local_cpu_resources="HOST_CPUS" \
               $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
-              $EXTRA_BAZEL_FLAGS || exit 1
+              || { echo "Bazel build failed"; exit 1; }
           fi
           
           echo "Build completed successfully! Final ccache statistics:"
