@@ -102,6 +102,8 @@ jobs:
           ccache --set-config=hard_link=true
           ccache --set-config=max_files=0
           ccache --set-config=file_clone=true
+          
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
       - name: Restore ccache from previous builds
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
