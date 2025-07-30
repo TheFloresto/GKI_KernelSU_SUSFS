@@ -53,7 +53,7 @@ jobs:
           remove-large-packages: 'true'  # Frees ~3.1 GB
           remove-swapfile: 'true'        # Frees ~4 GB
           remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          verbose: 'true'                # Enable detailed logging
+          verbose: 'false'                # Enable detailed logging
 
       - name: Setup SWAP
         run: |
