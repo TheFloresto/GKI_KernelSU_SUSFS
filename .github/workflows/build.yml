@@ -400,17 +400,14 @@ jobs:
           find . -name "*.cache" -delete || true
           
       - name: Build with Advanced Optimizations
-        run : |
+        run: |
           set -e
           set -x
           cd "$CONFIG"
 
-          # Get CPU count and calculate optimal jobs (double the cores)
           CPU_COUNT=$(nproc --all)
           OPTIMAL_JOBS=$((CPU_COUNT * 2))
-          
           echo "Detected $CPU_COUNT CPU cores, using $OPTIMAL_JOBS jobs"
-          echo "GitHub Actions typically provides 2-4 cores, so using $OPTIMAL_JOBS parallel jobs"
 
           if [[ "$CONFIG" == *"6.6"* ]]; then
             echo "Fetching .bazelrc with sm8635-polly-66 configuration..."
@@ -422,10 +419,16 @@ jobs:
             EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
           fi
 
-          # Use ccache in PATH for both build systems
           export PATH="/usr/lib/ccache:$PATH"
+          export OUT_DIR="$(pwd)/out"
+          export DIST_DIR="$OUT_DIR/dist"
+          export SANDBOX_DIR="$OUT_DIR/bazel_sandbox"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          
+          export BAZEL_CACHE_DIR="${{ env.BAZEL_CACHE_DIR }}"
+
+          mkdir -p "$OUT_DIR" "$DIST_DIR" "$SANDBOX_DIR"
+          chmod 755 "$SANDBOX_DIR"
+
           echo "ccache status before build:"
           ccache -s
 
@@ -438,31 +441,13 @@ jobs:
             build/build.sh || exit 1
           else
             echo "Building with Bazel (Android 14/15 - optimized)..."
-            
-            # Setup environment variables for Bazel
-            export OUT_DIR="$(pwd)/out"
-            export DIST_DIR="$OUT_DIR/dist"
-            export SANDBOX_DIR="$OUT_DIR/bazel_sandbox"
-            
-            # Clean with proper paths
+
             tools/bazel clean --expunge || true
-            
-            # Create all necessary directories including sandbox
-            mkdir -p "$OUT_DIR" "$DIST_DIR" "$SANDBOX_DIR"
-            
-            # Ensure sandbox directory has proper permissions
-            chmod 755 "$SANDBOX_DIR"
-            
-            echo "Created directories:"
-            echo "OUT_DIR: $OUT_DIR"
-            echo "DIST_DIR: $DIST_DIR" 
-            echo "SANDBOX_DIR: $SANDBOX_DIR"
-            ls -la "$OUT_DIR"
-            
+
             tools/bazel build //common:kernel_aarch64_dist \
-              --sandbox_writable_path="${{ env.CCACHE_DIR }}" \
-              --sandbox_writable_path="${{ env.BAZEL_CACHE_DIR }}" \
-              --disk_cache="${{ env.BAZEL_CACHE_DIR }}" \
+              --sandbox_writable_path="$CCACHE_DIR" \
+              --sandbox_writable_path="$BAZEL_CACHE_DIR" \
+              --disk_cache="$BAZEL_CACHE_DIR" \
               --remote_download_outputs=minimal \
               --config=fast \
               --lto=full \
@@ -474,7 +459,7 @@ jobs:
               $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
               $EXTRA_BAZEL_FLAGS || exit 1
           fi
-          
+
           echo "Build completed successfully! Final ccache statistics:"
           ccache -s
 
