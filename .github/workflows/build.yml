@@ -211,21 +211,13 @@ jobs:
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
-      - name: Clone dependencies in parallel
+      - name: Clone AnyKernel3 and Other Dependencies
         run: |
-          echo "Cloning dependencies in parallel..."
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-          
-          echo "Using branches - AnyKernel3: $ANYKERNEL_BRANCH, SUSFS: $SUSFS_BRANCH"
-          
-          # Параллельное клонирование
-          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH" --depth=1 &
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH" --depth=1 &
-          git clone https://github.com/TheFloresto/kernel_patches.git -b main --depth=1 &
-          
-          wait
-          echo "All repositories cloned successfully"
+          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://github.com/TheFloresto/kernel_patches.git -b main
 
       - name: Cache kernel source by branch
         uses: actions/cache@v4
