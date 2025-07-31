@@ -92,10 +92,10 @@ jobs:
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
           echo "CONFIG set to: $CONFIG"
 
-      - name: Install ccache with optimizations
+      - name: Install ccache and clang
         run: |
           sudo apt update
-          sudo apt install -y ccache aria2 parallel
+          sudo apt install -y ccache clang aria2 parallel
 
       - name: Set up ccache with advanced optimizations
         run: |
