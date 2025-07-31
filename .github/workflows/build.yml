@@ -401,8 +401,8 @@ jobs:
           cd "$CONFIG/common"
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch  ./
-            patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+            cp -v ../../kernel_patches/next/syscall_hooks.patch  ./
+            patch -p1 --forward -F 3 < syscall_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             cp -v ../../kernel_patches/wild/syscall_hooks.patch ./
             patch -p1 --forward -F 3 < syscall_hooks.patch
