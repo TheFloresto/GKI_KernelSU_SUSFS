@@ -1,4 +1,4 @@
-name: Build Script
+name: Build GKI
 permissions:
   contents: write
   actions: write 
@@ -458,6 +458,7 @@ jobs:
           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
           CONFIG_TMPFS_XATTR=y
           CONFIG_TMPFS_POSIX_ACL=y
           CONFIG_IP_NF_TARGET_TTL=y
