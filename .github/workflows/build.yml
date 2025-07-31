@@ -189,30 +189,21 @@ jobs:
             kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
 
       - name: Initialize and Sync Kernel Source
-        if: steps.kernel-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Cache miss - syncing kernel source..."
           echo "Creating folder for configuration: $CONFIG..."
           mkdir -p "$CONFIG"
           cd "$CONFIG"
-          
+          echo "Initializing and syncing kernel source..."
           FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-          echo "Initializing kernel source for branch: $FORMATTED_BRANCH"
-          
           $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
-          
-          # Проверка на deprecated ветку
           REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
           if grep -q deprecated <<< $REMOTE_BRANCH; then
             echo "Found deprecated branch: $FORMATTED_BRANCH"
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
-          
-          # Оптимизированная синхронизация
-          JOBS=$(($(nproc) + 2))
-          echo "Syncing with $JOBS parallel jobs..."
-          $REPO --trace sync -c -j$JOBS --no-tags --fail-fast --optimized-fetch --prune
+          $REPO --version
+          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
       - name: Determine the branch for KernelSU
         run: |
