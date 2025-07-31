@@ -138,52 +138,12 @@ jobs:
             echo "ccache starting fresh"
           fi
 
-      - name: Download toolchain and dependencies in parallel
+      - name: Download toolchain
         run: |
-          # Функция для параллельной загрузки с retry
-          download_with_retry() {
-            local url=$1
-            local output=$2
-            local desc=$3
-            echo "Downloading $desc..."
-            
-            for i in {1..3}; do
-              if aria2c -s16 -x16 -k1M --retry-wait=1 --max-tries=3 --connect-timeout=10 --timeout=30 "$url" -o "$output"; then
-                echo "Successfully downloaded $desc"
-                return 0
-              else
-                echo "Attempt $i failed for $desc, retrying..."
-                sleep 2
-              fi
-            done
-            
-            echo "Failed to download $desc after 3 attempts"
-            return 1
-          }
-          
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-build-2024
-          
-          # Создаем директории
-          mkdir -p kernel-build-tools mkbootimg
-          
-          # Параллельная загрузка
-          (
-            download_with_retry "$AOSP_MIRROR/kernel/prebuilts/build-tools/+archive/refs/heads/$BRANCH.tar.gz" "build-tools.tar.gz" "build-tools"
-            tar -xzf build-tools.tar.gz -C kernel-build-tools
-            rm build-tools.tar.gz
-          ) &
-          
-          (
-            download_with_retry "$AOSP_MIRROR/platform/system/tools/mkbootimg/+archive/refs/heads/$BRANCH.tar.gz" "mkbootimg.tar.gz" "mkbootimg"  
-            tar -xzf mkbootimg.tar.gz -C mkbootimg
-            rm mkbootimg.tar.gz
-          ) &
-          
-          # Ждем завершения всех загрузок
-          wait
-          
-          echo "All downloads completed successfully"
+          git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
+          git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
       - name: Set environment variables
         run: |
