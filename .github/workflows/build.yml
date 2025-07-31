@@ -551,9 +551,21 @@ jobs:
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
             # Традиционная сборка с оптимизациями
+            # Проверяем доступность компилятора
+            echo "Checking compiler availability..."
+            clang --version || (echo "ERROR: clang not found" && exit 1)
+            ccache --version || (echo "ERROR: ccache not found" && exit 1)
+            
+            # Устанавливаем переменные окружения для сборки
+            export CC="ccache clang"
+            export CXX="ccache clang++"
+            export HOSTCC="ccache clang"
+            export HOSTCXX="ccache clang++"
+            
+            # Запускаем сборку
             LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 \
             CCACHE_EXEC="/usr/bin/ccache" \
-            build/build.sh CC="ccache clang" -j$JOBS || exit 1
+            build/build.sh -j$JOBS || exit 1
           else
             # Bazel сборка с оптимизированными флагами
             BAZEL_FLAGS="
@@ -580,7 +592,10 @@ jobs:
           fi
           
           echo "Build completed successfully!"
-          ccache --show-stats
+          echo "ccache final statistics:"
+          ccache -s
+          echo "Disk space after build:"
+          df -h
 
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
