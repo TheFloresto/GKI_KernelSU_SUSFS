@@ -320,7 +320,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Wild KSU..."
+              echo "Applying SUSFS patches for Official KernelSU..."
               cd ./Wild_KSU
               ;;
             "KSU")
@@ -332,8 +332,29 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward < 0001-Susfs-1.5.9.patch
+              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+              
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
+              patch -p1 --forward < fix_apk_sign.c.patch
+              
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
+              patch -p1 --forward < fix_selinux.c.patch
+              
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
+              patch -p1 --forward < fix_ksud.c.patch
+
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
+              patch -p1 --forward < fix_rules.c.patch
+
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
+              patch -p1 --forward < fix_sucompat.c.patch
+
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
+              patch -p1 --forward < fix_kernel_compat.c.patch
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -348,10 +369,12 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
+              echo "Applying SUSFS patches for Official KernelSU..."
               cd ./Wild_KSU
               BASE_VERSION=10200
               ;;
             "KSU")
+              echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
               BASE_VERSION=10200
               ;;
@@ -360,8 +383,6 @@ jobs:
               BASE_VERSION=10200
               ;;
             "MKSU")
-              cd ./KernelSU
-              BASE_VERSION=10200
               ;;
           esac
           
