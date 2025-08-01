@@ -83,6 +83,7 @@ jobs:
           sudo apt-mark hold libc-bin
           sudo apt-mark hold man-db
           sudo rm -rf /var/lib/man-db/auto-update
+          sudo ln -sf /usr/bin/ccache /usr/lib/ccache/ccache
           sudo apt update
           sudo apt-get install -y --no-install-recommends \
             curl bison flex make binutils git perl gcc python3 \
