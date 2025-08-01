@@ -1,4 +1,4 @@
-name: Build Script
+name: Build GKI
 permissions:
   contents: write
   actions: write 
@@ -195,6 +195,10 @@ jobs:
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
+      - name: Ensure ccache directory exists before bazel execution
+        run: |         
+          mkdir -p "${{ env.CCACHE_DIR }}"
+
       - name: Determine the branch for KernelSU
         run: |
           case "${{ inputs.kernelsu_branch }}" in
@@ -210,7 +214,7 @@ jobs:
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
               fi
               ;;
-            "Other")
+            Other")
               if [[ -n "${{ inputs.kernelsu_branch_other }}" ]]; then
                 echo "BRANCH=-s ${{ inputs.kernelsu_branch_other }}" >> $GITHUB_ENV
               else
@@ -478,7 +482,7 @@ jobs:
             sudo rm -rf /usr/local/lib/android &
             sudo rm -rf /opt/ghc &
             sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="clang" || exit 1
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="ccache clang" || exit 1
           else
             # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
             sudo rm -rf /usr/share/dotnet &
