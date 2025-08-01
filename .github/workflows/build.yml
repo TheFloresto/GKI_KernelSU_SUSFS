@@ -268,13 +268,14 @@ jobs:
 
       - name: KernelSU-Next patch
         run: |
-          case "${{ inputs.kernelsu_variant }}" in
+         case "${{ inputs.kernelsu_variant }}" in
           "NEXT")
-          
-          echo "Changing to configuration directory: KernelSU-Next..."
-          cd ./KernelSU-Next
-          curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1
-
+           echo "Changing to configuration directory: KernelSU-Next..."
+           cd ./KernelSU-Next
+           curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1
+           ;;
+         esac
+         
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
           echo "Changing to configuration directory: $CONFIG..."
