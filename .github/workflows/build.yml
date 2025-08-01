@@ -36,11 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      CCACHE_COMPILERCHECK: "mtime"
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
-      CCACHE_DEPEND: "1"
-      CCACHE_DIRECT: "1"
 
     steps:
       - name: Maximize Build Space
@@ -56,86 +54,91 @@ jobs:
           remove-cached-tools: 'false'   # Avoid unless confirmed safe
           verbose: 'true'                # Enable detailed logging
 
-      - name: Optimize disk space and setup tmpfs
-        run: |
-          # Более агрессивная очистка в фоне
-          sudo apt-get clean &
-          sudo rm -rf /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL &
-          sudo rm -rf /usr/share/dotnet /usr/local/share/boost &
-          sudo rm -rf /var/lib/gems /usr/local/share/chromium &
-          
-          # Настройка tmpfs для временных файлов
-          sudo mount -t tmpfs -o size=3G tmpfs /tmp
-          
-          wait  # Ждем завершения очистки
-          echo "Available space after cleanup:"
-          df -h
-
-      - name: Setup optimized SWAP
+      - name: Setup SWAP
         run: |
          sudo swapoff -a
-         sudo fallocate -l 16G /swapfile
+         sudo fallocate -l 20G /swapfile
          sudo chmod 600 /swapfile
          sudo mkswap /swapfile
          sudo swapon -p 1 /swapfile
-         echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
          echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
          echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.dirty_ratio=15' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.dirty_background_ratio=5' | sudo tee -a /etc/sysctl.conf
          sudo sysctl -p
          free -h
-          
+
       - name: Set CONFIG Environment Variable
         run: |
+          # Set CONFIG dynamically based on inputs values
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
+
+          # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
+
           echo "CONFIG set to: $CONFIG"
 
-      - name: Install ccache and clang
+      - name: Install and configure dependencies
         run: |
+          sudo apt-mark hold firefox
+          sudo apt-mark hold libc-bin
+          sudo apt-mark hold man-db
+          sudo rm -rf /var/lib/man-db/auto-update
           sudo apt update
-          sudo apt install -y ccache clang aria2 parallel
+          sudo apt-get install -y --no-install-recommends \
+           curl bison flex make binutils git perl gcc python3 \
+           python-is-python3 bc libssl-dev libelf-dev \
+           bc aria2 zip unzip ccache
+          # Verify ccache installation
+          if ! command -v /usr/bin/ccache >/dev/null 2>&1; then
+            echo "ccache installation failed"
+            sudo apt-get install --reinstall ccache
+            exit 1
+          fi
+          echo "ccache found at: $(/usr/bin/ccache --version)"
 
-      - name: Set up ccache with advanced optimizations
+      - name: Configure ccache directory
         run: |
-          mkdir -p ~/.ccache ~/.cache/bazel
-          ccache --version
-          ccache --max-size=8G  # Увеличено с 5G
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          ccache --set-config=sloppiness=file_macro,locale,time_macros,include_file_mtime,include_file_ctime,pch_defines
-          ccache --set-config=hash_dir=false
-          ccache --set-config=hard_link=true
-          ccache --set-config=depend_mode=true
-          ccache --set-config=compiler_check=mtime
-          ccache --set-config=stats=true
-          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache_${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=5G" >> $GITHUB_ENV
+          echo "Current disk space:"
+          df -h
+          echo "Building kernel version: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
 
-      - name: Cache ccache and bazel with versioning
-        uses: actions/cache@v4
+      - name: Load current version kernel ccache cache
+        uses: actions/cache@v3
         id: ccache-restore
         with:
-          path: |
-            ${{ env.CCACHE_DIR }}
-            ~/.cache/bazel
-          key: ccache-v3-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ runner.os }}-${{ github.sha }}
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ runner.os }}-main
           restore-keys: |
-            ccache-v3-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ runner.os }}-
-            ccache-v3-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ runner.os }}-
-            ccache-v3-${{ inputs.android_version }}-${{ runner.os }}-
-            ccache-v3-${{ runner.os }}-
+            ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ runner.os }}-
+            ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-
 
-      - name: Show ccache stats and configure
+      - name: Initialize and configure ccache
         run: |
-          echo "Initial ccache status:"
+          # Set ccache environment variables
+          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
+          export CCACHE_NOHASHDIR="true"
+          export CCACHE_HARDLINK="true"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_MAXSIZE="${{ env.CCACHE_MAXSIZE }}"
+          
+          # Ensure ccache directory exists
+          mkdir -p "$CCACHE_DIR"
+          
+          # Reconfigure cache size every run
+          echo "Configuring ccache size to: $CCACHE_MAXSIZE"
+          ccache -M "$CCACHE_MAXSIZE"
+          ccache -o compression=true
+          
+          # Show initial cache state
+          echo "Initial ccache state:"
           ccache -s
           
+          # If cache restore hit, show detailed info
           if [ "${{ steps.ccache-restore.outputs.cache-hit }}" == 'true' ]; then
-            echo "ccache restored from cache"
+            echo "ccache cache hit details:"
             ccache -sv
-          else
-            echo "ccache starting fresh"
           fi
 
       - name: Download toolchain
@@ -173,20 +176,14 @@ jobs:
 
       - name: Clone AnyKernel3 and Other Dependencies
         run: |
+          echo "Cloning AnyKernel3 and other dependencies..."
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+          echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
+          echo "Using branch for SUSFS: $SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
-
-      - name: Cache kernel source by branch
-        uses: actions/cache@v4
-        id: kernel-cache
-        with:
-          path: ${{ env.CONFIG }}
-          key: kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}-v2
-          restore-keys: |
-            kernel-source-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
 
       - name: Initialize and Sync Kernel Source
         run: |
@@ -204,7 +201,7 @@ jobs:
           fi
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-
+      
       - name: Determine the branch for KernelSU
         run: |
           case "${{ inputs.kernelsu_branch }}" in
@@ -254,6 +251,30 @@ jobs:
               ;;
           esac
 
+      #- name: Apply WIFI Patches
+       # run: |
+        #  echo "Changing to configuration directory: $CONFIG..."
+         # cd "$CONFIG/common"
+          #if [ "${{ inputs.kernel_version }}" == "6.1" ]; then
+           #  echo "Applying WIFI patch for kernel 6.1..."
+            #if curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch | patch -p1 --forward --fuzz=3; then
+             # echo "WIFI patch applied successfully"
+           #else
+            # echo "Warning: WIFI patch failed to apply or download, but continuing..."
+            #fi
+          #else
+           #echo "Skipping WIFI patch - not kernel version 6.1"
+          #fi
+
+      - name: KernelSU-Next patch
+        run: |
+          case "${{ inputs.kernelsu_variant }}" in
+          "NEXT")
+          
+          echo "Changing to configuration directory: KernelSU-Next..."
+          cd ./KernelSU-Next
+          curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1
+
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -271,64 +292,45 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
+              echo "Applying SUSFS patches for Wild KSU..."
               cd ./Wild_KSU
               ;;
             "KSU")
+              echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch
               ;;
             "NEXT")
+              echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
               cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch
               ;;
             "MKSU")
+              echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
               ;;
           esac
-
-      - name: Getting KernelSU Version
-        run: |
-          cd "$CONFIG"
-          
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              cd ./Wild_KSU
-              BASE_VERSION=10200
-              ;;
-            "KSU")
-              cd ./KernelSU
-              BASE_VERSION=10200
-              ;;
-            "NEXT")
-              cd ./KernelSU-Next
-              BASE_VERSION=10200
-              ;;
-            "MKSU")
-              cd ./KernelSU
-              BASE_VERSION=10200
-              ;;
-          esac
-          
-          cd ./kernel
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
       - name: Apply Hide Stuff Patches
         run: |
+          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           cp -v ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 --forward -F 3 < 69_hide_stuff.patch
 
       - name: Apply Hooks Patches
         run: |
+          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
-            cp -v ../../kernel_patches/next/syscall_hooks.patch  ./
-            patch -p1 --forward -F 3 < syscall_hooks.patch
+            echo "Applying hooks for KernelSU-Next..."
+            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch  ./
+            patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+            echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/wild/syscall_hooks.patch ./
             patch -p1 --forward -F 3 < syscall_hooks.patch
           fi
@@ -371,43 +373,49 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
 
-          # Add SUSFS configuration settings in batch
-          cat >> ./common/arch/arm64/configs/gki_defconfig << 'EOF'
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          CONFIG_IP_NF_TARGET_TTL=y
-          CONFIG_IP6_NF_TARGET_HL=y
-          CONFIG_IP6_NF_MATCH_HL=y
-          CONFIG_TCP_CONG_ADVANCED=y
-          CONFIG_TCP_CONG_BBR=y
-          CONFIG_NET_SCH_FQ=y
-          CONFIG_TCP_CONG_BIC=n
-          CONFIG_TCP_CONG_WESTWOOD=n
-          CONFIG_TCP_CONG_HTCP=n
-          EOF
+          # Add SUSFS configuration settings
+          echo "CONFIG_KSU_SUSFS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           fi
 
+          # Add additional tmpfs config setting
+          echo "CONFIG_TMPFS_XATTR=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TMPFS_POSIX_ACL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+
+          # Add additional config setting
+          echo "CONFIG_IP_NF_TARGET_TTL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_TARGET_HL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_MATCH_HL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+
+          # Add BBR Config
+          echo "CONFIG_TCP_CONG_ADVANCED=y" | tee -a ./common/arch/arm64/configs/gki_defconfig 
+          echo "CONFIG_TCP_CONG_BBR=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NET_SCH_FQ=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_BIC=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_WESTWOOD=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_HTCP=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+
+          # Enable O2 optimization config
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
@@ -437,37 +445,24 @@ jobs:
               perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
 
-      - name: Pre-compile headers for faster builds
-        run: |
-          cd "$CONFIG"
-          
-          # Предкомпилируем часто используемые заголовки для ускорения
-          if [ -f "build/build.sh" ]; then
-            echo "Pre-compiling headers..."
-            export PATH="/usr/lib/ccache:$PATH"
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 \
-            CCACHE_EXEC="/usr/bin/ccache" \
-            build/build.sh CC="ccache clang" prepare -j$(nproc) || echo "Header pre-compilation failed, continuing..."
-          fi
-
-      - name: Build with optimized settings
+      - name: Build
         run : |
           set -e
           set -x
           cd "$CONFIG"
           
-          # Оптимизируем переменные окружения для ccache
-          export PATH="/usr/lib/ccache:$PATH"
-          export CCACHE_COMPILERCHECK=mtime
-          export CCACHE_DEPEND=1
-          export CCACHE_DIRECT=1
-          export CCACHE_STATS=1
-          
-          # Используем все доступные ядра + 2 для I/O операций
-          JOBS=$(($(nproc) + 2))
-          echo "Building with $JOBS parallel jobs..."
+          # Set ccache path in PATH
+          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
+          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
+          export CCACHE_NOHASHDIR="true"
+          export CCACHE_HARDLINK="true"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_MAXSIZE="5G"
+          /usr/bin/ccache -M "${{ env.CCACHE_MAXSIZE }}"
+          /usr/bin/ccache -o compression=true
+          /usr/bin/ccache -s      
 
-          echo "Checking kernel version for bazel configuration..."
+          echo "Checking kernel version..."
           if [[ "$CONFIG" == *"6.6"* ]]; then
             echo "Fetching .bazelrc with sm8635-polly-66 configuration (cortex-a76)..."
             curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc || exit 1
@@ -480,51 +475,24 @@ jobs:
 
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            # Традиционная сборка с оптимизациями
-            # Проверяем доступность компилятора
-            echo "Checking compiler availability..."
-            clang --version || (echo "ERROR: clang not found" && exit 1)
-            ccache --version || (echo "ERROR: ccache not found" && exit 1)
-            
-            # Устанавливаем переменные окружения для сборки
-            export CC="ccache clang"
-            export CXX="ccache clang++"
-            export HOSTCC="ccache clang"
-            export HOSTCXX="ccache clang++"
-            
-            # Запускаем сборку
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 \
-            CCACHE_EXEC="/usr/bin/ccache" \
-            build/build.sh -j$JOBS || exit 1
+            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
           else
-            # Bazel сборка с оптимизированными флагами
-            BAZEL_FLAGS="
-              --sandbox_writable_path=/home/runner/.ccache
-              --disk_cache=~/.cache/bazel
-              --config=fast
-              --lto=full
-              --jobs=$JOBS
-              --local_cpu_resources=$JOBS
-              --local_ram_resources=HOST_RAM*0.75
-              --experimental_multi_threaded_digest
-              --experimental_remote_merkle_tree_cache
-              --experimental_repository_cache_hardlinks
-              --experimental_worker_multiplex
-              $EXTRA_BAZEL_FLAGS
-            "
-            
-            # Убираем флаг для 6.6 если нужно
-            if [[ "${{ inputs.kernel_version }}" == "6.6" ]]; then
-              BAZEL_FLAGS=$(echo $BAZEL_FLAGS | sed 's/--experimental_multi_threaded_digest//')
-            fi
-            
-            tools/bazel build $BAZEL_FLAGS //common:kernel_aarch64_dist || exit 1
+            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS  //common:kernel_aarch64_dist
           fi
-          
-          echo "Build completed successfully!"
-          echo "ccache final statistics:"
+          echo "Kernel compilation completed!"
+          echo "ccache status:"
           ccache -s
-          echo "Disk space after build:"
+          echo "Space after compilation:"
           df -h
 
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
@@ -560,24 +528,24 @@ jobs:
           echo "Creating zip files for all formats..."
           cd ./AnyKernel3
           
-          # Create and upload zip for each format in parallel
-          create_zip() {
-            local format=$1
-            local image_file=$2
-            local zip_name="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3-${format}.zip"
-            
-            echo "Creating zip file: $zip_name..."
-            cp "../$image_file" "./$image_file"
-            zip -r "../$zip_name" ./* -q
-            rm "./$image_file"
-          }
+          # Create and upload zip for each format
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3.zip"
+          echo "Creating zip file: $ZIP_NAME..."
+          mv ../Image ./Image
+          zip -r "../$ZIP_NAME" ./*
+          rm ./Image
           
-          # Создаем zip файлы параллельно
-          create_zip "" "Image" &
-          create_zip "lz4" "Image.lz4" &  
-          create_zip "gz" "Image.gz" &
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3-lz4.zip"
+          echo "Creating zip file: $ZIP_NAME..."
+          mv ../Image.lz4 ./Image.lz4
+          zip -r "../$ZIP_NAME" ./*
+          rm ./Image.lz4
           
-          wait
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3-gz.zip"
+          echo "Creating zip file: $ZIP_NAME..."
+          mv ../Image.gz ./Image.gz
+          zip -r "../$ZIP_NAME" ./*
+          rm ./Image.gz
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
@@ -614,24 +582,20 @@ jobs:
           # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
           
-          # Функция для создания boot образов
-          create_boot_image() {
-            local kernel_image=$1
-            local output_name=$2
-            local suffix=$3
-            
-            echo "Building $output_name..."
-            $MKBOOTIMG --header_version 4 --kernel $kernel_image --output $output_name --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
-            $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image $output_name --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-            cp ./$output_name ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot${suffix}.img
-          }
+          echo "Building boot.img"
+          $MKBOOTIMG --header_version 4 --kernel Image --output boot.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+          cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
           
-          # Создаем boot образы параллельно
-          create_boot_image "Image" "boot.img" "" &
-          create_boot_image "Image.gz" "boot-gz.img" "-gz" &
-          create_boot_image "Image.lz4" "boot-lz4.img" "-lz4" &
+          echo "Building boot-gz.img"
+          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+          cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
           
-          wait
+          echo "Building boot-lz4.img"
+          $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+          cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
 
       - name: Android 13/14/15 boot image build script
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
@@ -641,32 +605,26 @@ jobs:
           # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
           
-          # Функция для создания boot образов
-          create_boot_image() {
-            local kernel_image=$1
-            local output_name=$2
-            local suffix=$3
-            
-            echo "Building $output_name..."
-            $MKBOOTIMG --header_version 4 --kernel $kernel_image --output $output_name
-            $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image $output_name --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-            cp ./$output_name ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot${suffix}.img
-          }
+          echo "Building boot.img"
+          $MKBOOTIMG --header_version 4 --kernel Image --output boot.img
+          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+          cp ./boot.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
           
-          # Создаем boot образы параллельно  
-          create_boot_image "Image" "boot.img" "" &
-          create_boot_image "Image.gz" "boot-gz.img" "-gz" &
-          create_boot_image "Image.lz4" "boot-lz4.img" "-lz4" &
+          echo "Building boot-gz.img"
+          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img
+          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+          cp ./boot-gz.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
           
-          wait
+          echo "Building boot-lz4.img"
+          $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
+          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
+          cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
           
       - name: Compress all img files with gzip
         run: |
-          # Параллельное сжатие всех img файлов
           for image in *.img; do
-            gzip -vnf9 "$image" &
+            gzip -vnf9 "$image"
           done
-          wait
   
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
@@ -676,11 +634,4 @@ jobs:
             *.zip
             *.img.gz
             *Image*
-
-      - name: Save ccache for next build
-        if: always()
-        run: |
-          echo "Final ccache statistics:"
-          ccache -s
-          echo "ccache directory size:"
-          du -sh $CCACHE_DIR
+            
