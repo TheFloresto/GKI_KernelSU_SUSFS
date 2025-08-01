@@ -85,9 +85,12 @@ jobs:
           sudo rm -rf /var/lib/man-db/auto-update
           sudo apt update
           sudo apt-get install -y --no-install-recommends \
-            curl bison flex make binutils git perl gcc python3 \
-            python-is-python3 bc libssl-dev libelf-dev \
-            bc aria2 zip unzip ccache
+           curl bison flex make binutils git perl gcc python3 \
+           python-is-python3 bc libssl-dev libelf-dev \
+           bc aria2 zip unzip ccache
+          # Verify ccache installation
+          which ccache || { echo "ccache not found"; exit 1; }
+          ccache --version
 
       - name: Configure ccache directory
         run: |
@@ -443,6 +446,9 @@ jobs:
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_MAXSIZE="5G"
           mkdir -p "${{ env.CCACHE_DIR }}"
+          ccache -M "${{ env.CCACHE_MAXSIZE }}"
+          ccache -o compression=true
+          ccache -s
 
           echo "Checking kernel version..."
           if [[ "$CONFIG" == *"6.6"* ]]; then
@@ -462,14 +468,14 @@ jobs:
             sudo rm -rf /usr/local/lib/android &
             sudo rm -rf /opt/ghc &
             sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="ccache clang" || exit 1
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="ccache clang" HOSTCC="ccache gcc" || exit 1
           else
             # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
             sudo rm -rf /usr/share/dotnet &
             sudo rm -rf /usr/local/lib/android &
             sudo rm -rf /opt/ghc &
             sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            tools/bazel build --sandbox_writable_path=/home/runner/.ccache --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS  //common:kernel_aarch64_dist
+            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS  //common:kernel_aarch64_dist
           fi
           echo "Kernel compilation completed!"
           echo "ccache status:"
