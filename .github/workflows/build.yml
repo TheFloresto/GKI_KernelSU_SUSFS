@@ -83,7 +83,6 @@ jobs:
           sudo apt-mark hold libc-bin
           sudo apt-mark hold man-db
           sudo rm -rf /var/lib/man-db/auto-update
-          sudo ln -sf /usr/bin/ccache /usr/lib/ccache/ccache
           sudo apt update
           sudo apt-get install -y --no-install-recommends \
             curl bison flex make binutils git perl gcc python3 \
@@ -479,7 +478,7 @@ jobs:
             sudo rm -rf /usr/local/lib/android &
             sudo rm -rf /opt/ghc &
             sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="ccache clang" || exit 1
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="clang" || exit 1
           else
             # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
             sudo rm -rf /usr/share/dotnet &
