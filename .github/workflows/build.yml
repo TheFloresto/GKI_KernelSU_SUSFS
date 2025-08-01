@@ -271,7 +271,6 @@ jobs:
          case "${{ inputs.kernelsu_variant }}" in
           "NEXT")
            echo "Changing to configuration directory: KernelSU-Next..."
-           cd ./KernelSU-Next
            curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1
            ;;
          esac
