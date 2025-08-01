@@ -199,7 +199,6 @@ jobs:
         run: |         
           mkdir -p "${{ env.CCACHE_DIR }}"
 
-
       - name: Determine the branch for KernelSU
         run: |
           case "${{ inputs.kernelsu_branch }}" in
