@@ -199,6 +199,7 @@ jobs:
         run: |         
           mkdir -p "${{ env.CCACHE_DIR }}"
 
+
       - name: Determine the branch for KernelSU
         run: |
           case "${{ inputs.kernelsu_branch }}" in
@@ -214,7 +215,7 @@ jobs:
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
               fi
               ;;
-            Other")
+            "Other")
               if [[ -n "${{ inputs.kernelsu_branch_other }}" ]]; then
                 echo "BRANCH=-s ${{ inputs.kernelsu_branch_other }}" >> $GITHUB_ENV
               else
@@ -225,7 +226,6 @@ jobs:
           esac
       
       - name: Add KernelSU
-        id: ksu_version
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -249,36 +249,20 @@ jobs:
               ;;
           esac
 
-      - name: Getting KernelSU Version
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
-          
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              cd ./Wild_KSU
-              BASE_VERSION=10200
-              ;;
-            "KSU")
-              cd ./KernelSU
-              BASE_VERSION=10200
-              ;;
-            "NEXT")
-              cd ./KernelSU-Next
-              BASE_VERSION=10200
-              ;;
-            "MKSU")
-              cd ./KernelSU
-              BASE_VERSION=10200
-              ;;
-          esac
-          
-          cd ./kernel
-          # Generate custom version number (based on commit count), fallback to 114514
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION 2>/dev/null || echo 114514)
-          # Store version number to GitHub environment variable
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
+      #- name: Apply WIFI Patches
+       # run: |
+        #  echo "Changing to configuration directory: $CONFIG..."
+         # cd "$CONFIG/common"
+          #if [ "${{ inputs.kernel_version }}" == "6.1" ]; then
+           #  echo "Applying WIFI patch for kernel 6.1..."
+            #if curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch | patch -p1 --forward --fuzz=3; then
+             # echo "WIFI patch applied successfully"
+           #else
+            # echo "Warning: WIFI patch failed to apply or download, but continuing..."
+            #fi
+          #else
+           #echo "Skipping WIFI patch - not kernel version 6.1"
+          #fi
 
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
