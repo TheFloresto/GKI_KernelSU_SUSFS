@@ -147,14 +147,6 @@ jobs:
           BRANCH=main-kernel-build-2024
           git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
           git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
-          # Verify clang availability
-          if [ -f "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/clang" ]; then
-           echo "Clang found in toolchain"
-           export PATH="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin:$PATH"
-          else
-           echo "Clang not found in toolchain"
-           exit 1
-          fi
 
       - name: Set environment variables
         run: |
