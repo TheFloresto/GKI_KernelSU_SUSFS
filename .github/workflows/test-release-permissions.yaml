@@ -1,0 +1,93 @@
+```yaml
+name: Test Release Permissions
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-permissions:
+    runs-on: ubuntu-latest
+    env:
+      PUBLIC_REPO: NerestKernels/GKI_KernelSU_SUSFS
+      TEST_TAG: test-release-permissions
+      RELEASE_NAME: Test Release Permissions
+    steps:
+      - name: Checkout Public Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PUBLIC_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check Contents Write Permission
+        run: |
+          set -e
+          echo "Checking if tag ${{ env.TEST_TAG }} already exists..."
+          if gh api repos/${{ env.PUBLIC_REPO }}/tags --jq '.[] | .name' | grep -Fx "${{ env.TEST_TAG }}"; then
+            echo "Tag ${{ env.TEST_TAG }} already exists. Deleting it..."
+            gh api -X DELETE repos/${{ env.PUBLIC_REPO }}/git/refs/tags/${{ env.TEST_TAG }} \
+              -H "Authorization: token ${{ secrets.RELEASE_TOKEN }}"
+          fi
+          echo "Creating test tag ${{ env.TEST_TAG }}..."
+          git tag "${{ env.TEST_TAG }}"
+          git push https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/${{ env.PUBLIC_REPO }} "${{ env.TEST_TAG }}" || {
+            echo "Error: Failed to push tag ${{ env.TEST_TAG }}. Check if RELEASE_TOKEN has 'contents: write' permission."
+            exit 1
+          }
+          echo "Tag ${{ env.TEST_TAG }} successfully created and pushed."
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Check Releases Write Permission
+        run: |
+          set -e
+          echo "Creating test release for tag ${{ env.TEST_TAG }}..."
+          echo "Test release for checking permissions" > test_release_body.md
+          gh release create "${{ env.TEST_TAG }}" \
+            --repo "${{ env.PUBLIC_REPO }}" \
+            --title "${{ env.RELEASE_NAME }}" \
+            --prerelease \
+            --notes-file test_release_body.md || {
+              echo "Error: Failed to create release for tag ${{ env.TEST_TAG }}. Check if RELEASE_TOKEN has 'releases: write' permission."
+              exit 1
+            }
+          echo "Test release successfully created."
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Cleanup Test Tag and Release
+        if: always()
+        run: |
+          echo "Cleaning up test tag and release..."
+          gh release delete "${{ env.TEST_TAG }}" --repo "${{ env.PUBLIC_REPO }}" --yes || {
+            echo "Warning: Failed to delete test release. It may not exist or RELEASE_TOKEN lacks permission."
+          }
+          gh api -X DELETE repos/${{ env.PUBLIC_REPO }}/git/refs/tags/${{ env.TEST_TAG }} \
+            -H "Authorization: token ${{ secrets.RELEASE_TOKEN }}" || {
+              echo "Warning: Failed to delete test tag. It may not exist or RELEASE_TOKEN lacks permission."
+            }
+          echo "Cleanup completed."
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Notify Success
+        run: |
+          echo "Permissions test completed successfully. RELEASE_TOKEN has sufficient 'contents: write' and 'releases: write' permissions."
+```
