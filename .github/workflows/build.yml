@@ -194,11 +194,7 @@ jobs:
           fi
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-
-      - name: Ensure ccache directory exists before bazel execution
-        run: |         
-          mkdir -p "${{ env.CCACHE_DIR }}"
-
+          
       - name: Determine the branch for KernelSU
         run: |
           case "${{ inputs.kernelsu_branch }}" in
@@ -446,6 +442,7 @@ jobs:
           export CCACHE_HARDLINK="true"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           export CCACHE_MAXSIZE="5G"
+          mkdir -p "${{ env.CCACHE_DIR }}"
 
           echo "Checking kernel version..."
           if [[ "$CONFIG" == *"6.6"* ]]; then
