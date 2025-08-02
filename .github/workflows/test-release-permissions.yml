@@ -1,15 +1,14 @@
 name: Test Release Permissions
 
-permissions:
-  contents: write
-  actions: write
-
 on:
   workflow_dispatch:
 
 jobs:
   test-permissions:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     env:
       PUBLIC_REPO: NerestKernels/GKI_KernelSU_SUSFS
       TEST_TAG: test-release-permissions
@@ -87,6 +86,6 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Notify Success
+        if: success()
         run: |
           echo "Permissions test completed successfully. RELEASE_TOKEN has sufficient 'contents: write' and 'releases: write' permissions."
-          
