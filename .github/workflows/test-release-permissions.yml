@@ -89,3 +89,4 @@ jobs:
       - name: Notify Success
         run: |
           echo "Permissions test completed successfully. RELEASE_TOKEN has sufficient 'contents: write' and 'releases: write' permissions."
+          
