@@ -62,7 +62,7 @@ jobs:
             -F message_thread_id="${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}" \
             -F text="
             🚀 Build started for Kernel! 
-            📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)
+            📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})
             🗂️ *Branch:* ${{ github.ref_name }}
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
             [🔗 View GitHub Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
@@ -140,7 +140,7 @@ jobs:
       - build-kernels-a14
       - build-kernels-a15
     env:
-      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
@@ -207,26 +207,24 @@ jobs:
             fi
             
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
+            
             echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
             echo "New tag: $NEW_TAG"
             echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
-            git tag $NEW_TAG
-            git push origin $NEW_TAG
+            
+            # Проверяем, существует ли тег в текущем репозитории
+            if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+              echo "Tag $NEW_TAG already exists in current repository, skipping creation"
+            else
+              git tag $NEW_TAG
+              git push origin $NEW_TAG
+              echo "Created and pushed tag $NEW_TAG"
+            fi
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./downloaded-artifacts
-
-      - name: Install GitHub CLI
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh -y
 
       - name: Set release body
         run: |
@@ -275,28 +273,24 @@ jobs:
             -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
-          
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
-          repository: NerestKernels/GKI_KernelSU_SUSFS
           tag_name: ${{ env.NEW_TAG }}
           prerelease: ${{ inputs.release_type == 'Pre-Release' }}
+          files: ""
           name: ${{ env.RELEASE_NAME }}
           body_path: release_body.md
 
       - name: Upload Release Assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           for file in ./downloaded-artifacts/*-kernel-*/*; do
             if [ -d "$file" ]; then
               continue
             fi
             echo "Uploading $file..."
-            gh release upload "${{ env.NEW_TAG }}" "$file" --repo NerestKernels/GKI_KernelSU_SUSFS
+            gh release upload ${{ env.NEW_TAG }} "$file"
           done
 
       - name: Display Files Uploaded
@@ -311,7 +305,7 @@ jobs:
             -F message_thread_id="${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}" \
             -F text="
             🌽 *New Kernel Release Uploaded*  
-            📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)
+            📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
             🗂️ *Branch:* ${{ github.ref_name }}  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
