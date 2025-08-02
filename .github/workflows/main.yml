@@ -201,25 +201,102 @@ jobs:
 
       - name: Generate and Create New Tag
         run: |
-            LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-            if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v1.5.9-r0"
-            fi
+          # Получаем последний тег из публичного репозитория NerestKernels
+          LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
+          
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.5.9-r0"
+          fi
+          
+          echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
+          
+          # Генерируем новый тег с увеличенным номером ревизии
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{
+            if (NF > 1) {
+              suffix = $NF + 1
+              gsub(/-r[0-9]+$/, "", $0)
+              printf "%s-r%d", $0, suffix
+            } else {
+              printf "%s-r1", $0
+            }
+          }')
+          
+          echo "Proposed new tag: $NEW_TAG"
+          
+          # Проверяем, существует ли тег в текущем (приватном) репозитории
+          # Сначала получаем все теги из remote
+          git fetch --tags 2>/dev/null || true
+          
+          # Проверяем локально и на remote
+          TAG_EXISTS_LOCAL=$(git tag -l "$NEW_TAG" | wc -l)
+          TAG_EXISTS_REMOTE=$(git ls-remote --tags origin "refs/tags/$NEW_TAG" 2>/dev/null | wc -l)
+          
+          if [ "$TAG_EXISTS_LOCAL" -gt 0 ] || [ "$TAG_EXISTS_REMOTE" -gt 0 ]; then
+            echo "Tag $NEW_TAG already exists in current repository, finding next available tag"
             
-            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+            # Находим следующий доступный тег
+            BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
             
-            echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
-            echo "New tag: $NEW_TAG"
-            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+            # Получаем базовый номер ревизии из последнего тега NerestKernels
+            BASE_REVISION=$(echo "$LATEST_TAG" | grep -o 'r[0-9]*$' | sed 's/r//' || echo "0")
+            COUNTER=$((BASE_REVISION + 1))
             
-            # Проверяем, существует ли тег в текущем репозитории
-            if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
-              echo "Tag $NEW_TAG already exists in current repository, skipping creation"
+            while true; do
+              CANDIDATE_TAG="${BASE_VERSION}-r${COUNTER}"
+              LOCAL_EXISTS=$(git tag -l "$CANDIDATE_TAG" | wc -l)
+              REMOTE_EXISTS=$(git ls-remote --tags origin "refs/tags/$CANDIDATE_TAG" 2>/dev/null | wc -l)
+              
+              if [ "$LOCAL_EXISTS" -eq 0 ] && [ "$REMOTE_EXISTS" -eq 0 ]; then
+                NEW_TAG="$CANDIDATE_TAG"
+                echo "Found available tag: $NEW_TAG"
+                break
+              fi
+              
+              COUNTER=$((COUNTER + 1))
+              
+              # Защита от бесконечного цикла
+              if [ "$COUNTER" -gt $((BASE_REVISION + 100)) ]; then
+                echo "Error: Could not find available tag after 100 attempts"
+                exit 1
+              fi
+            done
+          fi
+          
+          echo "Final new tag: $NEW_TAG"
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+          
+          # Создаем и пушим тег в текущий (приватный) репозиторий
+          git tag "$NEW_TAG"
+          
+          # Пытаемся запушить тег, если не получается - пробуем найти причину
+          if ! git push origin "$NEW_TAG"; then
+            echo "Normal push failed, checking if tag exists on remote..."
+            
+            # Двойная проверка - может тег появился между проверками
+            REMOTE_CHECK=$(git ls-remote --tags origin "refs/tags/$NEW_TAG" 2>/dev/null | wc -l)
+            
+            if [ "$REMOTE_CHECK" -gt 0 ]; then
+              echo "Tag $NEW_TAG appeared on remote, generating new one..."
+              # Увеличиваем счетчик и создаем новый тег
+              CURRENT_COUNTER=$(echo "$NEW_TAG" | grep -o 'r[0-9]*$' | sed 's/r//')
+              COUNTER=$((CURRENT_COUNTER + 1))
+              BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
+              NEW_TAG="${BASE_VERSION}-r${COUNTER}"
+              
+              # Удаляем старый локальный тег и создаем новый
+              git tag -d "$(echo "$NEW_TAG" | sed "s/r${COUNTER}/r${CURRENT_COUNTER}/")" 2>/dev/null || true
+              git tag "$NEW_TAG"
+              git push origin "$NEW_TAG"
+              
+              echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+              echo "Created and pushed new tag $NEW_TAG"
             else
-              git tag $NEW_TAG
-              git push origin $NEW_TAG
-              echo "Created and pushed tag $NEW_TAG"
+              echo "Push failed for unknown reason"
+              exit 1
             fi
+          else
+            echo "Successfully created and pushed tag $NEW_TAG"
+          fi
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -231,10 +308,10 @@ jobs:
           cat << 'EOF' > release_body.md
           
           Branch type for KSU: ${{ inputs.kernelsu_branch }}
-          Wild Current Kernel Tag: ${{ env.NEW_TAG }}
+          Nerest Current Kernel Tag: ${{ env.NEW_TAG }}
       
           Features:
-          -> Wild KSU Kernels & Others
+          -> Nerest KSU Kernels & Others
           -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
           -> SUSFS ඞ v1.5.9
           -> Scope-Minimized Manual hooks v1.5
