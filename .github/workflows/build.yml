@@ -99,7 +99,7 @@ jobs:
       - name: Configure ccache directory
         run: |
           echo "CCACHE_DIR=$HOME/.ccache_${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> $GITHUB_ENV
-          echo "CCACHE_MAXSIZE=5G" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
           echo "Current disk space:"
           df -h
           echo "Building kernel version: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
@@ -447,7 +447,7 @@ jobs:
           export CCACHE_NOHASHDIR="true"
           export CCACHE_HARDLINK="true"
           export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="5G"
+          export CCACHE_MAXSIZE="3G"
           /usr/bin/ccache -M "${{ env.CCACHE_MAXSIZE }}"
           /usr/bin/ccache -o compression=true
           /usr/bin/ccache -s      
