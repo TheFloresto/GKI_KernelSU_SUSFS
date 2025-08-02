@@ -201,13 +201,14 @@ jobs:
 
       - name: Generate and Create New Tag
         run: |
-            LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
+            LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
             if [ -z "$LATEST_TAG" ]; then
               LATEST_TAG="v1.5.9-r0"
             fi
             
             NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
     
+            echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
             echo "New tag: $NEW_TAG"
             echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
