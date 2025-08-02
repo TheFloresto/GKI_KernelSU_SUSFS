@@ -140,15 +140,12 @@ jobs:
       - build-kernels-a14
       - build-kernels-a15
     env:
-      PUBLIC_REPO: NerestKernels/GKI_KernelSU_SUSFS
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
+      RELEASE_BODY:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PUBLIC_REPO }}
-          token: ${{ secrets.RELEASE_TOKEN }}
-          fetch-depth: 0
 
       - name: Get commit hashes and generate commit URLs
         run: |
@@ -204,37 +201,18 @@ jobs:
 
       - name: Generate and Create New Tag
         run: |
-          set -e
-          set -x
+            LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
+            if [ -z "$LATEST_TAG" ]; then
+              LATEST_TAG="v1.5.9-r0"
+            fi
+            
+            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+    
+            echo "New tag: $NEW_TAG"
+            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-          # Fetch tags from public repository
-          LATEST_TAG=$(gh api repos/${{ env.PUBLIC_REPO }}/tags --jq '.[0].name')
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.5.9-r0"
-          fi
-
-          # Generate new tag
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-
-          # Check if the new tag already exists
-          echo "Checking if tag $NEW_TAG already exists..."
-          if gh api repos/${{ env.PUBLIC_REPO }}/tags --jq '.[] | .name' | grep -Fx "$NEW_TAG"; then
-            echo "Error: Tag $NEW_TAG already exists in the repository!"
-            exit 1
-          fi
-
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
-          # Configure git for tagging
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Create and push the new tag to public repository
-          git tag "$NEW_TAG"
-          git push https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/${{ env.PUBLIC_REPO }} "$NEW_TAG"
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+            git tag $NEW_TAG
+            git push origin $NEW_TAG
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -299,26 +277,26 @@ jobs:
           
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
-          repository: ${{ env.PUBLIC_REPO }}
+          repository: NerestKernels/GKI_KernelSU_SUSFS
           tag_name: ${{ env.NEW_TAG }}
           prerelease: ${{ inputs.release_type == 'Pre-Release' }}
           name: ${{ env.RELEASE_NAME }}
           body_path: release_body.md
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Upload Release Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           for file in ./downloaded-artifacts/*-kernel-*/*; do
             if [ -d "$file" ]; then
               continue
             fi
             echo "Uploading $file..."
-            gh release upload "${{ env.NEW_TAG }}" "$file" --repo ${{ env.PUBLIC_REPO }}
+            gh release upload "${{ env.NEW_TAG }}" "$file" --repo NerestKernels/GKI_KernelSU_SUSFS
           done
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Display Files Uploaded
         run: |
@@ -332,8 +310,9 @@ jobs:
             -F message_thread_id="${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}" \
             -F text="
             🌽 *New Kernel Release Uploaded*  
-            📦 *Repository:* [${{ env.PUBLIC_REPO }}](https://github.com/${{ env.PUBLIC_REPO }})
+            📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)
             🗂️ *Branch:* ${{ github.ref_name }}  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/${{ env.PUBLIC_REPO }}/releases/tag/${{ env.NEW_TAG }})" \
+            [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
+            
