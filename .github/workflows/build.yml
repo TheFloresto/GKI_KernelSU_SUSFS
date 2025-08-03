@@ -1,4 +1,4 @@
-name: Build Script
+name: Build GKI
 permissions:
   contents: write
   actions: write 
