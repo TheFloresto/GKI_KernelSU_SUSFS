@@ -1,4 +1,4 @@
-name: Build Script
+name: Build GKI
 permissions:
   contents: write
   actions: write 
@@ -82,20 +82,69 @@ jobs:
 
           echo "CONFIG set to: $CONFIG"
 
-      - name: Install ccache
-        run: sudo apt update && sudo apt install -y ccache
-
-      - name: Set up ccache
+      - name: Install and configure dependencies
         run: |
-          mkdir -p ~/.ccache ~/.cache/bazel
-          ccache --version
-          ccache --max-size=5G
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          ccache --set-config=sloppiness=file_macro,locale,time_macros,include_file_mtime,include_file_ctime
-          ccache --set-config=hash_dir=false
-          ccache --set-config=hard_link=true
-          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          sudo apt-mark hold firefox
+          sudo apt-mark hold libc-bin
+          sudo apt-mark hold man-db
+          sudo rm -rf /var/lib/man-db/auto-update
+          sudo apt update
+          sudo apt-get install -y --no-install-recommends \
+           curl bison flex make binutils git perl gcc python3 \
+           python-is-python3 bc libssl-dev libelf-dev \
+           bc aria2 zip unzip ccache
+          # Verify ccache installation
+          if ! command -v /usr/bin/ccache >/dev/null 2>&1; then
+            echo "ccache installation failed"
+            sudo apt-get install --reinstall ccache
+            exit 1
+          fi
+          echo "ccache found at: $(/usr/bin/ccache --version)"
+
+      - name: Configure ccache directory
+        run: |
+          echo "CCACHE_DIR=$HOME/.ccache_${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
+          echo "Current disk space:"
+          df -h
+          echo "Building kernel version: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
+
+      - name: Load current version kernel ccache cache
+        uses: actions/cache@v3
+        id: ccache-restore
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ runner.os }}-main
+          restore-keys: |
+            ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ runner.os }}-
+            ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-
+
+      - name: Initialize and configure ccache
+        run: |
+          # Set ccache environment variables
+          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
+          export CCACHE_NOHASHDIR="true"
+          export CCACHE_HARDLINK="true"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_MAXSIZE="${{ env.CCACHE_MAXSIZE }}"
+          
+          # Ensure ccache directory exists
+          mkdir -p "$CCACHE_DIR"
+          
+          # Reconfigure cache size every run
+          echo "Configuring ccache size to: $CCACHE_MAXSIZE"
+          ccache -M "$CCACHE_MAXSIZE"
+          ccache -o compression=true
+          
+          # Show initial cache state
+          echo "Initial ccache state:"
+          ccache -s
+          
+          # If cache restore hit, show detailed info
+          if [ "${{ steps.ccache-restore.outputs.cache-hit }}" == 'true' ]; then
+            echo "ccache cache hit details:"
+            ccache -sv
+          fi
 
       - name: Download toolchain
         run: |
@@ -137,9 +186,9 @@ jobs:
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
-          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
+          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://github.com/TheFloresto/SukiSU_patch.git -b main
 
       - name: Initialize and Sync Kernel Source
@@ -262,8 +311,7 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward < 0001-Susfs-1.5.9.patch
+              curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -295,12 +343,12 @@ jobs:
               cd ./KernelSU-Next
               BASE_VERSION=10200
               ;;
-            "MKSU")
-              ;;
             "SukiSU")
               cd ./KernelSU
-              BASE_VERSION=10700
+              BASE_VERSION=10200              
               ;;
+            "MKSU")
+              ;;            
           esac
           
           cd ./kernel
@@ -420,6 +468,9 @@ jobs:
           echo "CONFIG_TCP_CONG_WESTWOOD=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TCP_CONG_HTCP=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
 
+          # Enable O2 optimization config
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
@@ -450,10 +501,21 @@ jobs:
           fi
 
       - name: Build
-        run: |
+        run : |
           set -e
           set -x
           cd "$CONFIG"
+          
+          # Set ccache path in PATH
+          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
+          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
+          export CCACHE_NOHASHDIR="true"
+          export CCACHE_HARDLINK="true"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_MAXSIZE="3G"
+          /usr/bin/ccache -M "${{ env.CCACHE_MAXSIZE }}"
+          /usr/bin/ccache -o compression=true
+          /usr/bin/ccache -s      
 
           echo "Checking kernel version..."
           if [[ "$CONFIG" == *"6.6"* ]]; then
@@ -466,21 +528,27 @@ jobs:
             EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
           fi
 
-          echo "Setting LTO based on kpm_enable..."
-          LTO_FLAG="full"  # Default to full LTO
-          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            if [ "${{ inputs.kpm_enable }}" == "true" ]; then
-              LTO_FLAG="thin"
-            fi
-          fi
-
-          echo "Building the kernel with LTO=$LTO_FLAG..."
+          echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            LTO=$LTO_FLAG BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
+            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
           else
-            tools/bazel build --sandbox_writable_path=/home/runner/.ccache --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=$LTO_FLAG $EXTRA_BAZEL_FLAGS //common:kernel_aarch64_dist
+            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS  //common:kernel_aarch64_dist
           fi
-          ccache --show-stats
+          echo "Kernel compilation completed!"
+          echo "ccache status:"
+          ccache -s
+          echo "Space after compilation:"
+          df -h
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only)
         if: ${{ inputs.kpm_enable == 'true' && inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
