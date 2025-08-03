@@ -1,4 +1,4 @@
-name: Build GKI
+name: Build Script
 permissions:
   contents: write
   actions: write 
@@ -311,7 +311,7 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1
+              curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1 --forward
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -360,7 +360,7 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           cp -v ../../SukiSU_patch/69_hide_stuff.patch ./
-          patch -p1 --forward -F 3 < 69_hide_stuff.patch
+          patch -p1 --forward < 69_hide_stuff.patch
 
       - name: Apply Hooks Patches
         run: |
@@ -370,15 +370,15 @@ jobs:
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
             cp -v ../susfs4ksu/kernel_patches/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/wild/syscall_hooks.patch ./
-            patch -p1 --forward -F 3 < syscall_hooks.patch
+            patch -p1 --forward < syscall_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
             echo "Applying hooks for SukiSU..."
             cp -v ../../SukiSU_patch/hooks/0001-SUSFS-syscall-hooks.patch ./
-            patch -p1 -F 3 < 0001-SUSFS-syscall-hooks.patch
+            patch -p1 < 0001-SUSFS-syscall-hooks.patch
           fi
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
