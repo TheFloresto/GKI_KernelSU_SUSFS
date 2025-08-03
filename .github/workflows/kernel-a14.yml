@@ -17,10 +17,6 @@ on:
         required: false
         type: string
         default: ""
-      kpm_enable:
-        required: true
-        type: string
-        default: 'true'
 
 jobs:
   build-kernels-a14-5-15:
@@ -60,13 +56,16 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
-      kpm_enable: ${{ inputs.kpm_enable }}
 
   build-kernels-a14-6-1:
     strategy:
       fail-fast: true
       matrix:
         include:
+          #- sub_level: "25"
+          #  os_patch_level: "2023-10"
+          #- sub_level: "43"
+          #  os_patch_level: "2023-11"
           - sub_level: "57"
             os_patch_level: "2024-01"
           - sub_level: "68"
@@ -101,6 +100,8 @@ jobs:
             os_patch_level: "2025-06"
           - sub_level: "141"
             os_patch_level: "2025-07"
+          - sub_level: "145"
+            os_patch_level: "2025-08"
           - sub_level: "X"
             os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
@@ -113,5 +114,3 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
-      kpm_enable: ${{ inputs.kpm_enable }}
-      
