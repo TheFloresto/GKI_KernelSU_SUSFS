@@ -198,21 +198,66 @@ jobs:
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
           get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
-
-      - name: Generate and Create New Tag
+                 
+      - name: Generate New Tag
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-            LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
-            if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v1.5.9-r0"
-            fi
+          # Получаем последний тег из публичного репозитория NerestKernels
+          LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
+          
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.5.9-r0"
+          fi
+          
+          echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
+          
+          # Генерируем новый тег с увеличенным номером ревизии
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{
+            if (NF > 1) {
+              suffix = $NF + 1
+              gsub(/-r[0-9]+$/, "", $0)
+              printf "%s-r%d", $0, suffix
+            } else {
+              printf "%s-r1", $0
+            }
+          }')
+          
+          echo "Proposed new tag: $NEW_TAG"
+          
+          # Проверяем, существует ли тег в публичном репозитории NerestKernels
+          TAG_EXISTS=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$NEW_TAG\") | .name" 2>/dev/null || echo "")
+          
+          if [ -n "$TAG_EXISTS" ]; then
+            echo "Tag $NEW_TAG already exists in NerestKernels repository, finding next available tag"
             
-            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
-            echo "New tag: $NEW_TAG"
-            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
-            git tag $NEW_TAG
-            git push origin $NEW_TAG
+            # Находим следующий доступный тег
+            BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
+            BASE_REVISION=$(echo "$LATEST_TAG" | grep -o 'r[0-9]*$' | sed 's/r//' || echo "0")
+            COUNTER=$((BASE_REVISION + 1))
+            
+            while true; do
+              CANDIDATE_TAG="${BASE_VERSION}-r${COUNTER}"
+              TAG_CHECK=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$CANDIDATE_TAG\") | .name" 2>/dev/null || echo "")
+              
+              if [ -z "$TAG_CHECK" ]; then
+                NEW_TAG="$CANDIDATE_TAG"
+                echo "Found available tag: $NEW_TAG"
+                break
+              fi
+              
+              COUNTER=$((COUNTER + 1))
+              
+              # Защита от бесконечного цикла
+              if [ "$COUNTER" -gt $((BASE_REVISION + 100)) ]; then
+                echo "Error: Could not find available tag after 100 attempts"
+                exit 1
+              fi
+            done
+          fi
+          
+          echo "Final new tag: $NEW_TAG"
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -224,13 +269,11 @@ jobs:
           cat << 'EOF' > release_body.md
           
           Branch type for KSU: ${{ inputs.kernelsu_branch }}
-          Wild Current Kernel Tag: ${{ env.NEW_TAG }}
-      
-          Features:
-          -> Wild KSU Kernels & Others
+          Nerest Current Kernel Tag: ${{ env.NEW_TAG }}
+          
           -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.5
+          -> Scope-Minimized Manual hooks v1.4
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
@@ -267,24 +310,48 @@ jobs:
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.NEW_TAG }}
-          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
-          files: ""
-          name: ${{ env.RELEASE_NAME }}
-          body_path: release_body.md
-
-      - name: Upload Release Assets
+      - name: Create GitHub Release in NerestKernels Repository
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
+          # Собираем все файлы для загрузки
+          UPLOAD_FILES=()
           for file in ./downloaded-artifacts/*-kernel-*/*; do
-            if [ -d "$file" ]; then
-              continue
+            if [ ! -d "$file" ]; then
+              UPLOAD_FILES+=("$file")
             fi
-            echo "Uploading $file..."
-            gh release upload ${{ env.NEW_TAG }} "$file"
           done
+          
+          # Создаем релиз в публичном репозитории NerestKernels
+          if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
+            echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS..."
+            
+            # Создаем релиз с первым файлом
+            gh release create "$NEW_TAG" \
+              --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+              --title "$RELEASE_NAME" \
+              --notes-file release_body.md \
+              $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
+              "${UPLOAD_FILES[0]}"
+            
+            # Загружаем остальные файлы, если они есть
+            if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
+              echo "Uploading additional files..."
+              for i in "${!UPLOAD_FILES[@]}"; do
+                if [ $i -gt 0 ]; then
+                  echo "Uploading ${UPLOAD_FILES[$i]}..."
+                  gh release upload "$NEW_TAG" \
+                    --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+                    "${UPLOAD_FILES[$i]}"
+                fi
+              done
+            fi
+            
+            echo "Release created successfully!"
+          else
+            echo "No files found to upload!"
+            exit 1
+          fi
 
       - name: Display Files Uploaded
         run: |
@@ -301,5 +368,6 @@ jobs:
             📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
             🗂️ *Branch:* ${{ github.ref_name }}  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
+            [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
+            
