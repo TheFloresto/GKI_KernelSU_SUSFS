@@ -17,6 +17,10 @@ on:
         required: false
         type: string
         default: ""
+      kpm_enable:
+        required: true
+        type: string
+        default: 'true'
 
 jobs:
   build-kernels-a14-5-15:
