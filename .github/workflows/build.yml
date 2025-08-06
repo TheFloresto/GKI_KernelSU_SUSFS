@@ -345,7 +345,7 @@ jobs:
               ;;
             "SukiSU")
               cd ./KernelSU
-              BASE_VERSION=10200              
+              BASE_VERSION=13050              
               ;;
             "MKSU")
               ;;            
