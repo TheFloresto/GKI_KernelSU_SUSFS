@@ -447,26 +447,17 @@ jobs:
 
           # Get current date in the required format
           CURRENT_DATE=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
-          
-          # Get current git commit hash (full version, 12 characters like in bash script)
-          cd common
-          GIT_HASH=$(git rev-parse HEAD | cut -c1-12)
-          cd ..
-
-          # Remove -dirty tag (взято из bash скрипта)
-          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
           if [ -f "build/build.sh" ]; then
               perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-              # Modify setlocalversion to include git hash and your nick
-              sed -i '$s|echo "\$res"|echo "\$res-g'$GIT_HASH'-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
+              sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
               perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
           else
               # Remove -maybe-dirty
               perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
               
-              # Set Kernel Name with git hash and your nick
-              echo "CONFIG_LOCALVERSION=\"-g$GIT_HASH-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
+              # Set Kernel Name
+              echo "CONFIG_LOCALVERSION=\"-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
 
               # Set Kernel Timestamp
               perl -pi -e "s/build-timestamp = \\\$\(or \\\$\(KBUILD_BUILD_TIMESTAMP\), \\\$\(build-timestamp-auto\)\)/build-timestamp = \"$CURRENT_DATE\"/" ./common/init/Makefile
@@ -475,18 +466,6 @@ jobs:
               rm -rf ./common/android/abi_gki_protected_exports_*
               perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
-          
-          # Dynamic android version detection and cleanup
-          cd common
-          # Get current EXTRAVERSION and modify it dynamically
-          CURRENT_EXTRA=$(grep "EXTRAVERSION" Makefile | head -1 | cut -d'=' -f2 | tr -d ' ')
-          if [[ "$CURRENT_EXTRA" == *"-android"* ]]; then
-            # Extract android version and remove build number
-            ANDROID_VER=$(echo "$CURRENT_EXTRA" | sed 's/-android\([0-9]*\)-[0-9]/-android\1/')
-            sed -i "s/EXTRAVERSION = $CURRENT_EXTRA/EXTRAVERSION = $ANDROID_VER/" Makefile
-            echo "Modified EXTRAVERSION from $CURRENT_EXTRA to $ANDROID_VER"
-          fi
-          cd ..
 
       - name: Build
         run : |
