@@ -435,6 +435,9 @@ jobs:
           # Enable O2 optimization config
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           
+          # Add LTO Config (взято из bash скрипта)
+          echo "CONFIG_LTO_CLANG_FULL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
@@ -444,17 +447,26 @@ jobs:
 
           # Get current date in the required format
           CURRENT_DATE=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
+          
+          # Get current git commit hash (long version, first 12 characters)
+          cd common
+          GIT_HASH=$(git rev-parse HEAD | cut -c1-12)
+          cd ..
+
+          # Remove -dirty tag (взято из bash скрипта)
+          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
           if [ -f "build/build.sh" ]; then
               perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-              sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
+              # Modify setlocalversion to include git hash and your nick
+              sed -i '$s|echo "\$res"|echo "\$res-g'$GIT_HASH'-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
               perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
           else
               # Remove -maybe-dirty
               perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
               
-              # Set Kernel Name
-              echo "CONFIG_LOCALVERSION=\"-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
+              # Set Kernel Name with git hash and your nick
+              echo "CONFIG_LOCALVERSION=\"-g$GIT_HASH-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
 
               # Set Kernel Timestamp
               perl -pi -e "s/build-timestamp = \\\$\(or \\\$\(KBUILD_BUILD_TIMESTAMP\), \\\$\(build-timestamp-auto\)\)/build-timestamp = \"$CURRENT_DATE\"/" ./common/init/Makefile
@@ -499,14 +511,35 @@ jobs:
             sudo rm -rf /usr/local/lib/android &
             sudo rm -rf /opt/ghc &
             sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
+            # Используем LLVM_IAS и другие флаги из bash скрипта
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh \
+            LLVM_IAS=1 LLVM=1 ARCH=arm64 CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" \
+            CLANG_TRIPLE=./arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi/bin/arm-none-eabi- \
+            CROSS_COMPILE=./arm-gnu-toolchain-14.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu- \
+            LD=ld.lld HOSTLD=ld.lld || exit 1
           else
             # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
             sudo rm -rf /usr/share/dotnet &
             sudo rm -rf /usr/local/lib/android &
             sudo rm -rf /opt/ghc &
             sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS  //common:kernel_aarch64_dist
+            # Добавляем оптимизации из bash скрипта для bazel
+            tools/bazel build \
+              --sandbox_writable_path=${{ env.CCACHE_DIR }} \
+              --disk_cache=~/.cache/bazel \
+              $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") \
+              --config=fast \
+              --lto=full \
+              --action_env=LLVM_IAS=1 \
+              --action_env=LLVM=1 \
+              --action_env=ARCH=arm64 \
+              --action_env=CC="/usr/bin/ccache clang" \
+              --action_env=HOSTCC="/usr/bin/ccache clang" \
+              --action_env=LD=ld.lld \
+              --action_env=HOSTLD=ld.lld \
+              --jobs=$(nproc) \
+              $EXTRA_BAZEL_FLAGS \
+              //common:kernel_aarch64_dist
           fi
           echo "Kernel compilation completed!"
           echo "ccache status:"
