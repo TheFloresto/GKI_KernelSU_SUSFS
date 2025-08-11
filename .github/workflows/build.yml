@@ -296,7 +296,8 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              curl -LSs "https://github.com/infectedmushi/KernelSU-Next/commit/b6c9943497f10b372f7c8e00135f8cfa3d1aef7f.patch" | patch -p1 --forward
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
