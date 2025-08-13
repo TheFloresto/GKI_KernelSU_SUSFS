@@ -18,7 +18,7 @@ By flashing this kernel, **YOU** are choosing to make these modifications. If so
  
 [GKI](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
 [Sultan](https://github.com/WildKernels/Sultan_KernelSU_SUSFS)  
-[OnePlus](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS)  
+[OnePlus](https://github.com/NerestKernels/OnePlus_KernelSU_SUSFS)  
 
 ---
 
