@@ -277,6 +277,7 @@ jobs:
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
+          -> CONFIG_TMPFS_XATTR Support [Mountify Support]
           -> Wireguard Support
           -> BBR Support
           -> LTO = full
