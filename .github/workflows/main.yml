@@ -159,7 +159,7 @@ jobs:
       - build-kernels-a15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
+      RELEASE_NAME: "GKI Kernels With KernelKSU & SUSFS v1.5.9"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -318,7 +318,7 @@ jobs:
           -> backslashxx: https://github.com/backslashxx/KernelSU
       
           Commit Hashes (at the time of release):
-          -> Wild KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
+          -> Nerest KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> 5ec1cff: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
           -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
