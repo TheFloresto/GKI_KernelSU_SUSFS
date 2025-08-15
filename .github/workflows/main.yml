@@ -141,7 +141,7 @@ jobs:
       - build-kernels-a15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
+      RELEASE_NAME: "GKI Kernels With KernelKSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
       - name: Checkout code
@@ -271,7 +271,7 @@ jobs:
           Branch type for KSU: ${{ inputs.kernelsu_branch }}
           Nerest Current Kernel Tag: ${{ env.NEW_TAG }}
           
-          -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
+          -> Multi Manager Support for Nerest Kernels & Next Kernels (Not Recommended)
           -> SUSFS ඞ v1.5.9
           -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
@@ -283,14 +283,14 @@ jobs:
           -> LTO = full
       
           Notes:
-          -> Wild KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
-          -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/ or https://github.com/libxzr/HorizonKernelFlasher!
+          -> Nerest KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+          -> Official Kernel Flasher, try https://github.com/fatalcoder524/KernelFlasher/ or https://github.com/libxzr/HorizonKernelFlasher!
       
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
       
           Managers:
-          -> Wild KSU: https://github.com/WildKernels/Wild_KSU / https://t.me/NerestKernels
+          -> Nerest KSU: https://github.com/WildKernels/Wild_KSU / https://t.me/NerestKernels
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
           -> 5ec1cff's KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
           -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
@@ -298,7 +298,7 @@ jobs:
           -> backslashxx: https://github.com/backslashxx/KernelSU
       
           Commit Hashes (at the time of release):
-          -> Wild KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
+          -> Nerest KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> 5ec1cff: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
           -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
