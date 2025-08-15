@@ -298,7 +298,7 @@ jobs:
           -> backslashxx: https://github.com/backslashxx/KernelSU
       
           Commit Hashes (at the time of release):
-          -> Nerest KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
+          -> Wild KSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> 5ec1cff: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
           -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
