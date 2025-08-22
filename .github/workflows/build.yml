@@ -337,7 +337,6 @@ jobs:
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a ./arch/arm64/configs/gki_defconfig
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "CONFIG_KSU_SUSFS_SUS_SU=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
