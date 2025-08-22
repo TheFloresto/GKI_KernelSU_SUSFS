@@ -56,29 +56,73 @@ jobs:
 
       - name: Setup SWAP
         run: |
-         sudo swapoff -a
-         sudo fallocate -l 15G /swapfile
-         sudo chmod 600 /swapfile
-         sudo mkswap /swapfile
-         sudo swapon -p 1 /swapfile
-         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
-         sudo sysctl -p
-         free -h      
-          
+          sudo swapoff -a
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon -p 1 /swapfile
+          echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
+          echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+          echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
+          free -h      
+
       - name: Set CONFIG Environment Variable
         run: |
           # Set CONFIG dynamically based on inputs values
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
-
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
-
           echo "CONFIG set to: $CONFIG"
 
-      - name: Install ccache
-        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential
+      - name: Install ccache and dependencies
+        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache
+
+      - name: Set up ccache
+        run: |
+          mkdir -p ~/.cache/bazel
+          ccache --version
+          ccache --max-size=2G
+          ccache --set-config=compression=true
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+
+      - name: Download toolchain
+        run: |
+          AOSP_MIRROR=https://android.googlesource.com
+          BRANCH=main-kernel-build-2024
+          git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
+          git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
+
+      - name: Setup ZyCromerZ Clang Toolchain
+        run: |
+          echo "Downloading ZyCromerZ Clang 22.0.0..."
+          mkdir -p clang-zyc
+          cd clang-zyc
+          curl -LO https://github.com/ZyCromerZ/Clang/releases/download/22.0.0git-20250805-release/Clang-22.0.0git-20250805-release.tar.gz
+          tar -xzf Clang-22.0.0git-20250805-release.tar.gz
+          cd ..
+          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
+          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          echo "CLANG_VERSION=zyc-22.0.0" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+
+      - name: Set environment variables
+        run: |
+          echo "AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool" >> $GITHUB_ENV
+          echo "MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py" >> $GITHUB_ENV
+          echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
+
+      - name: Set boot sign key
+        env:
+          BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
+        run: |
+          if [ ! -z "$BOOT_SIGN_KEY" ]; then
+            echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
+            echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
+          else
+            echo "BOOT_SIGN_KEY is not set. Using AOSP sign key..."
+            echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
+          fi
 
       - name: Install Repo
         run: |
@@ -116,7 +160,7 @@ jobs:
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
 
-      - name: Fix Less Then 6.6.50 Builds
+      - name: Fix Less Than 6.6.50 Builds
         run: |
           cd "$CONFIG/common"
           if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
@@ -176,21 +220,6 @@ jobs:
               ;;
           esac
 
-      #- name: Apply WIFI Patches
-       # run: |
-        #  echo "Changing to configuration directory: $CONFIG..."
-         # cd "$CONFIG/common"
-          #if [ "${{ inputs.kernel_version }}" == "6.1" ]; then
-           #  echo "Applying WIFI patch for kernel 6.1..."
-            #if curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch | patch -p1 --forward --fuzz=3; then
-             # echo "WIFI patch applied successfully"
-           #else
-            # echo "Warning: WIFI patch failed to apply or download, but continuing..."
-            #fi
-          #else
-           #echo "Skipping WIFI patch - not kernel version 6.1"
-          #fi
-          
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -208,7 +237,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Applying SUSFS patches for Wild KSU..."
               cd ./Wild_KSU
               ;;
             "KSU")
@@ -257,27 +286,31 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Getting KernelSU version for Wild KSU..."
               cd ./Wild_KSU
               BASE_VERSION=10200
               ;;
             "KSU")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Getting KernelSU version for Official KernelSU..."
               cd ./KernelSU
               BASE_VERSION=10200
               ;;
             "NEXT")
+              echo "Getting KernelSU version for KernelSU Next..."
               cd ./KernelSU-Next
               BASE_VERSION=10200
               ;;
             "MKSU")
+              echo "Getting KernelSU version for MKSU..."
+              cd ./KernelSU
+              BASE_VERSION=10200
               ;;
           esac
           
           cd ./kernel
           KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV          
-          
+
       - name: Apply Hide Stuff Patches
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -319,7 +352,6 @@ jobs:
           cd drivers
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
-
 
       - name: Add Configuration Settings
         run: |
@@ -417,73 +449,32 @@ jobs:
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "./common/arch/arm64/configs/gki_defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "./common/arch/arm64/configs/gki_defconfig"
 
-      - name: Detect Clang Version from Configs
-        shell: bash
-        run: |
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          DEFCONFIG="$KERNEL_PATH/common/arch/arm64/configs/gki_defconfig"
-          BUILDCONFIG="$KERNEL_PATH/common/build.config.gki"
-          CONSTANTSCONFIG="$KERNEL_PATH/common/build.config.constants"
-          CLANG_VERSION=""
-          CLANG_BIN_PATH=""
-          if grep -q '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null; then
-            CLANG_VERSION=$(grep '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | tr -d '"' | xargs)
-          elif grep -q '^CLANG_VERSION=' "$BUILDCONFIG" 2>/dev/null; then
-            CLANG_VERSION=$(grep '^CLANG_VERSION=' "$BUILDCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | xargs)
-          elif grep -q '^CLANG_VERSION=' "$CONSTANTSCONFIG" 2>/dev/null; then
-            CLANG_VERSION=$(grep '^CLANG_VERSION=' "$CONSTANTSCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | xargs)
-            CLANG_VERSION="clang-$CLANG_VERSION"
-          else
-            echo "No clang version found in config, will auto-detect in prebuilts."
-          fi
-          if [ -z "$CLANG_VERSION" ]; then
-            if [ -d "$KERNEL_PATH/prebuilts/clang/host/linux-x86" ]; then
-              CLANG_VERSION=$(ls -d "$KERNEL_PATH"/prebuilts/clang/host/linux-x86/clang-r*/ | tail -n 1 | xargs basename)
-              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts/clang/host/linux-x86/$CLANG_VERSION/bin"
-            elif [ -d "$KERNEL_PATH/prebuilts-master/clang/host/linux-x86" ]; then
-              CLANG_VERSION=$(ls -d "$KERNEL_PATH"/prebuilts-master/clang/host/linux-x86/clang-r*/ | tail -n 1 | xargs basename)
-              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts-master/clang/host/linux-x86/$CLANG_VERSION/bin"
-            else
-              CLANG_VERSION="clang"
-              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts/clang/host/linux-x86/$CLANG_VERSION/bin" # dummy
-            fi
-          else
-            if [ -d "$KERNEL_PATH/prebuilts/clang/host/linux-x86" ]; then
-              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts/clang/host/linux-x86/$CLANG_VERSION/bin"
-            else
-              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts-master/clang/host/linux-x86/$CLANG_VERSION/bin"
-            fi
-          fi
-          echo "Detected CLANG_VERSION: $CLANG_VERSION"
-          echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
-          echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
-
       - name: Build Kernel
         shell: bash
         run: |
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           CLANG_BIN_PATH="${{ env.CLANG_BIN_PATH }}"
-          CLANG_VERSION="${{ env.CLANG_VERSION }}"
+          
           if [ -d "$CLANG_BIN_PATH" ] && [ -x "$CLANG_BIN_PATH/clang" ]; then
             echo "Adding Clang to PATH: $CLANG_BIN_PATH"
             export PATH="$CLANG_BIN_PATH:$PATH"
             SELECTED_CLANG="$CLANG_BIN_PATH/clang"
-          elif command -v clang >/dev/null 2>&1; then
-            SELECTED_CLANG="$(command -v clang)"
-            echo "Using system Clang: $SELECTED_CLANG"
-            exit 1
           else
-            echo "Error: No valid Clang binary found"
+            echo "Error: No valid ZyCromerZ Clang binary found"
             exit 1
           fi
+          
           echo "Using Clang version: $($SELECTED_CLANG --version | head -n1)"
-          LLVM_TOOLS="clang ld.lld llvm-ar llvm-objcopy llvm-objdump llvm-nm"
+          
+          # Install missing LLVM tools if needed
+          LLVM_TOOLS="ld.lld llvm-ar llvm-objcopy llvm-objdump llvm-nm"
           MISSING_TOOLS=""
           for tool in $LLVM_TOOLS; do
             if ! command -v $tool >/dev/null 2>&1; then
               MISSING_TOOLS="$MISSING_TOOLS $tool"
             fi
           done
+          
           if [ -n "$MISSING_TOOLS" ]; then
             echo "Installing missing LLVM tools:$MISSING_TOOLS"
             sudo apt-get update
@@ -495,21 +486,27 @@ jobs:
               fi
             done
           fi
+          
           KERNEL_VERSION="${{ inputs.kernel_version }}"
           if [[ "$KERNEL_VERSION" == "5.10" ]]; then
             USE_LLVM_IAS=true
           fi
+          
           cd "$KERNEL_PATH/common" || exit 1
-          MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- \
-            RUSTC=$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc \
-            PAHOLE=$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole \
-            LD=ld.lld HOSTLD=ld.lld"
+          
+          echo "Building with ZyCromerZ Clang optimizations..."
+          MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
+            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip"
+          
           if [[ -v USE_LLVM_IAS ]]; then
             MAKE_ARGS="LLVM_IAS=1 $MAKE_ARGS"
           fi
           
           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" gki_defconfig || exit 1
           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" || exit 1
+          
+          echo "Kernel build completed successfully!"
 
       - name: Create Bootimgs Folder and Copy Images
         run: |
@@ -639,4 +636,3 @@ jobs:
             *.zip
             *.img.gz
             *Image*
-            
