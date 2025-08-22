@@ -57,7 +57,7 @@ jobs:
       - name: Setup SWAP
         run: |
          sudo swapoff -a
-         sudo fallocate -l 20G /swapfile
+         sudo fallocate -l 15G /swapfile
          sudo chmod 600 /swapfile
          sudo mkswap /swapfile
          sudo swapon -p 1 /swapfile
@@ -500,7 +500,7 @@ jobs:
           KERNEL_PATH="$CONFIG_DIR"
           cp "$KERNEL_PATH/common/out/arch/arm64/boot/Image" "$GITHUB_WORKSPACE/AnyKernel3/Image"
           cd "$GITHUB_WORKSPACE/AnyKernel3"
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3.zip"
           echo "Creating zip file $ZIP_NAME in $ARTIFACTS_DIR..."
           zip -r "../$ZIP_NAME" ./*
   
