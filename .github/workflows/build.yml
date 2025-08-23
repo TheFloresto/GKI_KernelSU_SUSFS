@@ -76,7 +76,7 @@ jobs:
           echo "CONFIG set to: $CONFIG"
 
       - name: Install ccache and dependencies
-        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache dwarves
+        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache dwarves lz4
 
       - name: Set up ccache
         run: |
@@ -524,62 +524,55 @@ jobs:
           
           echo "Kernel build completed successfully!"
           
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13
-        if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
+      - name: Create Bootimgs Folder and Copy Images
         run: |
-          mkdir bootimgs
+          mkdir -p bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
+          CONFIG_DIR="$GITHUB_WORKSPACE/$CONFIG"
+          KERNEL_PATH="$CONFIG_DIR"
+          
+          # Copy kernel images
+          cp "$KERNEL_PATH/common/out/arch/arm64/boot/Image" ./bootimgs/
+          cp "$KERNEL_PATH/common/out/arch/arm64/boot/Image" ./
+          
+          # Create compressed versions
+          echo "Creating compressed versions..."
+          lz4 -9 -f ./Image ./Image.lz4
+          gzip -n -k -f -9 ./Image
+          
+          # Copy to bootimgs folder
+          cp ./Image.lz4 ./bootimgs/
+          cp ./Image.gz ./bootimgs/
 
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-
-      - name: Create Bootimgs Folder and Copy Images for Android 14/15
-        if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
+      - name: Create AnyKernel3 ZIP Files for Different Formats
         run: |
-          mkdir bootimgs
-
-          echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-
-      - name: Create ZIP Files for Different Formats
-        run: |
-          echo "Creating zip files for all formats..."
+          echo "Creating AnyKernel3 zip files for all formats..."
           cd ./AnyKernel3
           
           # Create and upload zip for each format
           ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3.zip"
           echo "Creating zip file: $ZIP_NAME..."
-          mv ../Image ./Image
+          cp ../Image ./Image
           zip -r "../$ZIP_NAME" ./*
           rm ./Image
           
           ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3-lz4.zip"
           echo "Creating zip file: $ZIP_NAME..."
-          mv ../Image.lz4 ./Image.lz4
+          cp ../Image.lz4 ./Image.lz4
           zip -r "../$ZIP_NAME" ./*
           rm ./Image.lz4
           
           ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3-gz.zip"
           echo "Creating zip file: $ZIP_NAME..."
-          mv ../Image.gz ./Image.gz
+          cp ../Image.gz ./Image.gz
           zip -r "../$ZIP_NAME" ./*
           rm ./Image.gz
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
         run: |
-          echo "Changing to configuration directory: $CONFIG..."
+          echo "Building Android 12 boot images..."
           cd bootimgs
           
           GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-"${{ inputs.os_patch_level }}"_"${{ inputs.revision }}".zip
@@ -608,9 +601,6 @@ jobs:
           echo "Running unpack_bootimg.py..."
           $UNPACK_BOOTIMG --boot_img="$FULL_PATH"
           
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-          
           echo "Building boot.img"
           $MKBOOTIMG --header_version 4 --kernel Image --output boot.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
@@ -630,9 +620,6 @@ jobs:
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
         run: |
           cd bootimgs
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
           
           echo "Building boot.img"
           $MKBOOTIMG --header_version 4 --kernel Image --output boot.img
@@ -652,7 +639,9 @@ jobs:
       - name: Compress all img files with gzip
         run: |
           for image in *.img; do
-            gzip -vnf9 "$image"
+            if [ -f "$image" ]; then
+              gzip -vnf9 "$image"
+            fi
           done
   
       - name: Upload Build Artifacts
@@ -662,4 +651,3 @@ jobs:
           path: |
             *.zip
             *.img.gz
-            *image*         
