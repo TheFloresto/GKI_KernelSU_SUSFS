@@ -397,29 +397,63 @@ jobs:
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
       - name: Change Kernel Name
+        shell: bash
         run: |
+          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-
-          # Get current date in the required format
-          CURRENT_DATE=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
-
-          if [ -f "build/build.sh" ]; then
-              perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-              sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
-              perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
+          echo "Running kernel naming commands..."
+          tac ./common/scripts/setlocalversion | sed '0,/echo "\$res"/s//res="-@NoFloresto"\;echo "\$res"\;/' | tac > ./common/scripts/setlocalversion.tmp && mv ./common/scripts/setlocalversion.tmp ./common/scripts/setlocalversion
+          
+          # Handle msm-kernel and external/dtc if they exist
+          if [ -d ./msm-kernel/scripts ]; then
+            tac ./msm-kernel/scripts/setlocalversion | sed '0,/echo "\$res"/s//res="-@NoFloresto"\;echo "\$res"\;/' | tac > ./msm-kernel/scripts/setlocalversion.tmp && mv ./msm-kernel/scripts/setlocalversion.tmp ./msm-kernel/scripts/setlocalversion
+            chmod +x ./msm-kernel/scripts/setlocalversion
+          fi
+          
+          if [ -d ./external/dtc/scripts ]; then
+            tac ./external/dtc/scripts/setlocalversion | sed '0,/echo "\$res"/s//res="-@NoFloresto"\;echo "\$res"\;/' | tac > ./external/dtc/scripts/setlocalversion.tmp && mv ./external/dtc/scripts/setlocalversion.tmp ./external/dtc/scripts/setlocalversion
+            chmod +x ./external/dtc/scripts/setlocalversion
+          fi
+          
+          sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "-@NoFloresto"/' ./common/scripts/setlocalversion
+          
+          if [ -d ./msm-kernel/scripts ]; then
+            sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "-@NoFloresto"/' ./msm-kernel/scripts/setlocalversion
+          fi
+          
+          if [ -d ./external/dtc/scripts ]; then
+            sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "-@NoFloresto"/' ./external/dtc/scripts/setlocalversion
+          fi
+          
+          chmod +x ./common/scripts/setlocalversion
+          
+          if [ -f ./build/kernel/kleaf/impl/stamp.bzl ]; then
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
           else
-              # Remove -maybe-dirty
-              perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-              
-              # Set Kernel Name
-              echo "CONFIG_LOCALVERSION=\"-@NoFloresto\"" >> ./common/arch/arm64/configs/gki_defconfig
-
-              # Set Kernel Timestamp
-              perl -pi -e "s/build-timestamp = \\\$\(or \\\$\(KBUILD_BUILD_TIMESTAMP\), \\\$\(build-timestamp-auto\)\)/build-timestamp = \"$CURRENT_DATE\"/" ./common/init/Makefile
-
-              # Remove Abi Exports and Error
-              rm -rf ./common/android/abi_gki_protected_exports_*
-              perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+            echo "No stamp.bzl!"
+          fi
+          
+          sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          
+          if [ -d ./msm-kernel/scripts ]; then
+            sed -i 's/-dirty//' ./msm-kernel/scripts/setlocalversion
+          fi
+          
+          if [ -d ./external/dtc/scripts ]; then
+            sed -i 's/-dirty//' ./external/dtc/scripts/setlocalversion
+          fi
+          
+          if [ -f ./build/kernel/kleaf/workspace_status_stamp.py ]; then
+            sed -i 's/-dirty//' ./build/kernel/kleaf/workspace_status_stamp.py
+          else
+            echo "No workspace_status_stamp.py!"
+          fi
+          
+          DATESTR=$(date -u)
+          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT '"$DATESTR"'"}' ./common/scripts/mkcompile_h
+          
+          if [ -d ./msm-kernel/scripts ]; then
+            perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT '"$DATESTR"'"}' ./msm-kernel/scripts/mkcompile_h
           fi
 
       - name: Add Build based configs
