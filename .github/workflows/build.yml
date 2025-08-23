@@ -158,7 +158,11 @@ jobs:
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
           $REPO --version
-          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast --recurse-submodules
+          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+
+          # Синхронизируем submodules во всех проектах
+          echo "Syncing submodules..."
+          $REPO forall -c 'git submodule update --init --recursive --depth=1 || true'
 
       - name: Fix Less Than 6.6.50 Builds
         run: |
