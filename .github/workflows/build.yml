@@ -158,7 +158,7 @@ jobs:
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
           $REPO --version
-          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast --recurse-submodules
 
       - name: Fix Less Than 6.6.50 Builds
         run: |
