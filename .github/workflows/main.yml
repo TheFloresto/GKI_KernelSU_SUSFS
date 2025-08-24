@@ -316,7 +316,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Собираем все файлы для загрузки с переименованием
+          # Собираем все файлы для загрузки без переименования
           UPLOAD_FILES=()
           TEMP_DIR=$(mktemp -d)
           
@@ -327,21 +327,15 @@ jobs:
               ARTIFACT_NAME=$(basename "$artifact_dir")
               echo "Processing artifact: $ARTIFACT_NAME"
               
-              # Извлекаем версию из имени (например, android12-5.10-168)
-              VERSION_PART=$(echo "$ARTIFACT_NAME" | grep -o 'android[0-9]*-[0-9]*\.[0-9]*-[0-9]*' || echo "")
-              if [ -z "$VERSION_PART" ]; then
-                VERSION_PART="$ARTIFACT_NAME"
-              fi
-              
               for file in "$artifact_dir"/*; do
                 if [ ! -d "$file" ]; then
                   FILENAME=$(basename "$file")
-                  # Создаем новое имя с префиксом версии
-                  NEW_FILENAME="${VERSION_PART}-${FILENAME}"
+                  # Используем оригинальное имя файла без переименования
+                  NEW_FILENAME="$FILENAME"
                   
-                  echo "Renaming: $FILENAME -> $NEW_FILENAME"
+                  echo "Using original filename: $FILENAME"
                   
-                  # Копируем файл с новым именем во временную директорию
+                  # Копируем файл с оригинальным именем во временную директорию
                   cp "$file" "$TEMP_DIR/$NEW_FILENAME"
                   UPLOAD_FILES+=("$TEMP_DIR/$NEW_FILENAME")
                 fi
@@ -384,7 +378,7 @@ jobs:
             echo "No files found to upload!"
             exit 1
           fi
-
+          
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
@@ -402,4 +396,4 @@ jobs:
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
-            
+        
