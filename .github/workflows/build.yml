@@ -495,7 +495,7 @@ jobs:
           else
               # Remove -maybe-dirty
               perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-              sed -i.bak '/if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/,/echo \$scmversion/ s/^/            # /' ./stamp.bzl
+              sed -i.bak '/if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/,/echo \$scmversion/ s/^/            # /' ./build/kernel/kleaf/impl/stamp.bzl
               
               # Set Kernel Name
               echo "CONFIG_LOCALVERSION=\"-@NoFloresto\"" >> ./common/arch/arm64/configs/gki_defconfig
