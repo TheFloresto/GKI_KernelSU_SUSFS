@@ -475,6 +475,17 @@ jobs:
             sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
           fi
 
+          # Update modules list to remove ZRAM/ZSMALLOC entries since they're now built-in
+          MODULES_LIST="$CONFIG/common/android/gki_aarch64_modules"
+          if [ -f "$MODULES_LIST" ]; then
+            echo "Updating modules list to remove ZRAM and ZSMALLOC entries..."
+            # Remove zram and zsmalloc module entries
+            sed -i '/mm\/zsmalloc\.ko/d' "$MODULES_LIST"
+            sed -i '/drivers\/block\/zram\/zram\.ko/d' "$MODULES_LIST"
+            echo "Updated modules list:"
+            cat "$MODULES_LIST" || echo "Modules list is now empty"
+          fi
+
           # Для Android 14/15 с Bazel убираем модули из списка, т.к. они теперь встроены
           if [ "${{ inputs.android_version }}" = "android14" ] || [ "${{ inputs.android_version }}" = "android15" ]; then
             sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$CONFIG/common/modules.bzl"
@@ -807,4 +818,3 @@ jobs:
             *.zip
             *.img.gz
             *Image*
-            
