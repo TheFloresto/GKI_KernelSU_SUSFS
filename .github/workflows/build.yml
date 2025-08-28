@@ -420,7 +420,7 @@ jobs:
           cd "$CONFIG"
 
           # Add SUSFS configuration settings 
-          echo 'CONFIG_LOCALVERSION_AUTO=n' | tee -a ./arch/arm64/configs/gki_defconfig
+          echo 'CONFIG_LOCALVERSION_AUTO=n' | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
