@@ -487,7 +487,7 @@ jobs:
               perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
               sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
               perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
-              sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
+              sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
               # Задаем кастомного пользователя и хост
               perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
