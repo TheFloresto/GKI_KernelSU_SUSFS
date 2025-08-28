@@ -489,9 +489,9 @@ jobs:
               perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
               sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
-              # Задаем кастомного пользователя и хост
-              perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
-              perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
+              # Fix user and host
+              sed -i "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
+              sed -i "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
           else
               # Remove -maybe-dirty
               perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
@@ -503,9 +503,25 @@ jobs:
               # Set Kernel Timestamp
               perl -pi -e "s/build-timestamp = \\\$\(or \\\$\(KBUILD_BUILD_TIMESTAMP\), \\\$\(build-timestamp-auto\)\)/build-timestamp = \"$CURRENT_DATE\"/" ./common/init/Makefile
 
-              # Устанавливаем пользователя и хост для сборки Bazel
-              echo "CONFIG_BUILD_USER=\"${{ env.BUILD_USER }}\"" >> ./common/arch/arm64/configs/gki_defconfig
-              echo "CONFIG_BUILD_HOST=\"${{ env.BUILD_HOST }}\"" >> ./common/arch/arm64/configs/gki_defconfig
+              # Try to find and replace user/host in all possible locations
+              find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
+               xargs sed -i "s/\$(shell whoami)/${{ env.BUILD_USER }}/g" 2>/dev/null || true
+             find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
+               xargs sed -i "s/\$(shell hostname)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
+             find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
+               xargs sed -i "s/\$(shell uname -n)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
+               
+               # Alternative: modify init/Makefile directly if it exists
+            if [ -f "./common/init/Makefile" ]; then
+               sed -i "s/build-user = .*/build-user = ${{ env.BUILD_USER }}/" ./common/init/Makefile
+               sed -i "s/build-host = .*/build-host = ${{ env.BUILD_HOST }}/" ./common/init/Makefile
+             fi
+             
+               # Last resort: modify mkcompile_h if it exists
+             if [ -f "./common/scripts/mkcompile_h" ]; then
+              sed -i "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
+              sed -i "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
+            fi
           fi
     
       - name: Add Build based configs
