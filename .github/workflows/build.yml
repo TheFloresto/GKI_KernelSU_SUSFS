@@ -79,7 +79,7 @@ jobs:
 
       - name: Install ccache and dependencies
         shell: bash
-        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache dwarves lz4
+        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache dwarves lz4 python3 git curl
 
       - name: Configure ccache directory
         run: |
@@ -174,6 +174,8 @@ jobs:
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"      
           git clone https://github.com/TheFloresto/kernel_patches.git -b main       
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          # Clone SukiSU patch repository for ZRAM LZ4KD support
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
 
       - name: Initialize and Sync Kernel Source
         shell: bash
@@ -264,21 +266,6 @@ jobs:
               ;;
           esac
 
-      #- name: Apply WIFI Patches
-       # run: |
-        #  echo "Changing to configuration directory: $CONFIG..."
-         # cd "$CONFIG/common"
-          #if [ "${{ inputs.kernel_version }}" == "6.1" ]; then
-           #  echo "Applying WIFI patch for kernel 6.1..."
-            #if curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch | patch -p1 --forward --fuzz=3; then
-             # echo "WIFI patch applied successfully"
-           #else
-            # echo "Warning: WIFI patch failed to apply or download, but continuing..."
-            #fi
-          #else
-           #echo "Skipping WIFI patch - not kernel version 6.1"
-          #fi
-
       - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
@@ -320,6 +307,30 @@ jobs:
               cd ./KernelSU
               ;;
           esac
+
+      - name: Copy LZ4KD source files and apply ZRAM patches
+        shell: bash
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          echo "Copying LZ4KD source files..."
+          # Copy LZ4KD source files - это дополнительные алгоритмы сжатия для ZRAM
+          cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
+          cp -r ../../SukiSU_patch/other/zram/lz4k_oplus ./lib/
+
+          echo "Applying LZ4KD patches to existing ZRAM implementation..."
+          # Применяем патчи к существующей ZRAM реализации для добавления LZ4KD поддержки
+          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
+          echo "Applying lz4kd patch to ZRAM driver..."
+          patch -p1 -F 3 < lz4kd.patch || true
+          echo 'LZ4KD patch completed - added LZ4KD compression support to ZRAM'
+
+          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
+          echo "Applying lz4k_oplus patch to ZRAM driver..."
+          patch -p1 -F 3 < lz4k_oplus.patch || true
+          echo 'lz4k_oplus patch completed - added LZ4K_OPLUS compression support to ZRAM'
 
       - name: Getting KernelSU Version
         shell: bash
@@ -413,6 +424,60 @@ jobs:
            echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           fi                   
 
+      - name: Add ZRAM and LZ4KD Configuration Settings
+        shell: bash
+        run: |
+          set -x
+          set -e
+          echo "Configuring ZRAM with LZ4KD compression support..."
+          CONFIG_FILE="$CONFIG/common/arch/arm64/configs/gki_defconfig"
+
+          # ZRAM уже присутствует в ядре как модуль, мы меняем конфигурацию для статической сборки
+          if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
+            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+            echo "CONFIG_ZRAM=y" >> "$CONFIG_FILE"
+            echo "CONFIG_MODULE_SIG=n" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZO=y" >> "$CONFIG_FILE"
+            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" >> "$CONFIG_FILE"
+          fi
+
+          if [ "${{ inputs.kernel_version }}" != "6.6" ] && [ "${{ inputs.kernel_version }}" != "5.10" ]; then
+            # Меняем ZRAM с модуля (=m) на встроенный (=y) 
+            if grep -q "CONFIG_ZSMALLOC" -- "$CONFIG_FILE"; then
+                echo "Found CONFIG_ZSMALLOC in $CONFIG_FILE, changing from module to built-in"
+                sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "$CONFIG_FILE"
+            else
+                echo "CONFIG_ZSMALLOC not found in $CONFIG_FILE, adding built-in support"
+                echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+            fi
+
+            # Меняем ZRAM с модуля на встроенный
+            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
+          fi
+
+          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
+          fi
+
+          # Для Android 14/15 с Bazel убираем модули из списка, т.к. они теперь встроены
+          if [ "${{ inputs.android_version }}" = "android14" ] || [ "${{ inputs.android_version }}" = "android15" ]; then
+            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$CONFIG/common/modules.bzl"
+            echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
+            echo 'Android14/15 Bazel: Removed zram & zsmalloc from module list (now built-in)'
+          fi
+
+          # Добавляем поддержку дополнительных алгоритмов сжатия для ZRAM
+          if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
+            echo "Adding additional compression algorithms for ZRAM..."
+            echo "CONFIG_CRYPTO_LZ4HC=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4K=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4KD=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_842=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$CONFIG_FILE"
+            echo "CONFIG_ZRAM_WRITEBACK=y" >> "$CONFIG_FILE"
+          fi
+
       - name: Add SUSFS Configuration Settings
         shell: bash
         run: |
@@ -485,7 +550,7 @@ jobs:
 
           if [ -f "build/build.sh" ]; then
               perl -pi -e 's/-dirty//g' ./common/scripts/setlocalversion
-              sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
+              sed -i '$s|echo "\$res"|echo "\$res-GKI-@NoFloresto"|' ./common/scripts/setlocalversion
               perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $CURRENT_DATE\"}" ./common/scripts/mkcompile_h
               sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
@@ -498,7 +563,7 @@ jobs:
               sed -i.bak '/if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/,/echo \$scmversion/ s/^/            # /' ./build/kernel/kleaf/impl/stamp.bzl
               
               # Set Kernel Name
-              echo "CONFIG_LOCALVERSION=\"-@NoFloresto\"" >> ./common/arch/arm64/configs/gki_defconfig
+              echo "CONFIG_LOCALVERSION=\"-GKI-@NoFloresto\"" >> ./common/arch/arm64/configs/gki_defconfig
 
               # Set Kernel Timestamp
               perl -pi -e "s/build-timestamp = \\\$\(or \\\$\(KBUILD_BUILD_TIMESTAMP\), \\\$\(build-timestamp-auto\)\)/build-timestamp = \"$CURRENT_DATE\"/" ./common/init/Makefile
@@ -727,5 +792,4 @@ jobs:
             *.zip
             *.img.gz
             *Image*
-            
             
