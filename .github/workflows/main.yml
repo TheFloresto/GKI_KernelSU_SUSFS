@@ -141,7 +141,7 @@ jobs:
       - build-kernels-a15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
+      RELEASE_NAME: "GKI Kernels With KernelKSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
       - name: Checkout code
@@ -275,7 +275,7 @@ jobs:
           -> Wild KSU Kernels & Others
           -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.4
+          -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
@@ -381,6 +381,5 @@ jobs:
             📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
             🗂️ *Branch:* ${{ github.ref_name }}  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown"
-            
+            [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
+            -F parse_mode="Markdown"        
