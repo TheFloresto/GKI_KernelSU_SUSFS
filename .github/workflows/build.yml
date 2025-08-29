@@ -250,7 +250,7 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
               echo "Adding Wild KSU..."
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              curl -LSs "https://raw.githubusercontent.com/TheWildJames/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
             "KSU")
               echo "Adding KernelSU Official..."
@@ -357,7 +357,7 @@ jobs:
             "WILD")
               echo "Getting KernelSU version for Wild KSU..."
               cd ./Wild_KSU
-              BASE_VERSION=10200
+              BASE_VERSION=‭11005
               ;;
             "KSU")
               echo "Getting KernelSU version for Official KernelSU..."
@@ -400,8 +400,8 @@ jobs:
             patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
-            cp -v ../../kernel_patches/wild/syscall_hooks.patch ./
-            patch -p1 --forward < syscall_hooks.patch
+            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
           fi
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
