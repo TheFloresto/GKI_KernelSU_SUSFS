@@ -281,6 +281,7 @@ jobs:
           -> Wireguard Support
           -> BBR Support
           -> LTO = full
+          -> lz4kd/lz4 zram on
       
           Notes:
           -> Nerest KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
