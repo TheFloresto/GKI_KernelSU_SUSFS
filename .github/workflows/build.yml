@@ -300,7 +300,12 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
               echo "Applying SUSFS patches for Wild KSU..."
-              cd ./Wild_KSU
+              cd ./KernelSU-Next
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch
+
+              cp -v ../../kernel_patches/next/0001-james.patch ./
+              patch -p1 --forward < 0001-james.patch            
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
@@ -356,7 +361,7 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
               echo "Getting KernelSU version for Wild KSU..."
-              cd ./Wild_KSU
+              cd ./KernelSU-Next
               BASE_VERSION=‭11005
               ;;
             "KSU")
