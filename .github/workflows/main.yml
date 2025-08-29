@@ -296,7 +296,7 @@ jobs:
           -> Wireguard Support
           -> BBR Support
           -> LTO = full
-          -> lz4kd/lz4 zram off
+          -> lz4kd/lz4 zram on
           -> KPM = off
       
           Notes:
