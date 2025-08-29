@@ -141,7 +141,7 @@ jobs:
       - build-kernels-a15
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With KernelKSU & SUSFS v1.5.9"
+      RELEASE_NAME: "GKI Kernels With WildKSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
       - name: Checkout code
@@ -198,7 +198,7 @@ jobs:
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
           get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
-                 
+
       - name: Generate New Tag
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -269,29 +269,30 @@ jobs:
           cat << 'EOF' > release_body.md
           
           Branch type for KSU: ${{ inputs.kernelsu_branch }}
-          Nerest Current Kernel Tag: ${{ env.NEW_TAG }}
-          
-          -> Multi Manager Support for Nerest Kernels & Next Kernels (Not Recommended)
+          Wild Current Kernel Tag: ${{ env.NEW_TAG }}
+      
+          Features:
+          -> Wild KSU Kernels & Others
+          -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.5
+          -> Scope-Minimized Manual hooks v1.4
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
-          -> CONFIG_TMPFS_XATTR Support [Mountify Support]
           -> Wireguard Support
           -> BBR Support
           -> LTO = full
-          -> lz4kd/lz4 zram on
+          -> lz4kd/lz4 zram off
       
           Notes:
-          -> Nerest KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
-          -> Official Kernel Flasher, try https://github.com/fatalcoder524/KernelFlasher/ or https://github.com/libxzr/HorizonKernelFlasher!
+          -> Wild KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+          -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/ or https://github.com/libxzr/HorizonKernelFlasher!
       
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
       
           Managers:
-          -> Nerest KSU: https://github.com/WildKernels/Wild_KSU / https://t.me/NerestKernels
+          -> Wild KSU: https://github.com/WildKernels/Wild_KSU / https://t.me/NerestKernels
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
           -> 5ec1cff's KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
           -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
@@ -355,6 +356,16 @@ jobs:
             exit 1
           fi
 
+      - name: Upload Release Assets
+        run: |
+          for file in ./downloaded-artifacts/*-kernel-*/*; do
+            if [ -d "$file" ]; then
+              continue
+            fi
+            echo "Uploading $file..."
+            gh release upload ${{ env.NEW_TAG }} "$file"
+          done
+
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
@@ -370,6 +381,6 @@ jobs:
             📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
             🗂️ *Branch:* ${{ github.ref_name }}  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
+            [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
             
