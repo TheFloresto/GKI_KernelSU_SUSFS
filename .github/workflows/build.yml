@@ -33,8 +33,8 @@ on:
       kpm_enable:
         required: true
         type: string
-        default: 'true
-
+        default: 'true'
+        
 jobs:
   build-gki:
     runs-on: ubuntu-latest
