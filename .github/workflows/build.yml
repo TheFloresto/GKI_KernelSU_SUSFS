@@ -171,7 +171,7 @@ jobs:
         shell: bash
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
-          ANYKERNEL_BRANCH="gki-2.0"
+          ANYKERNEL_BRANCH="sukisu"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
