@@ -30,17 +30,12 @@ on:
         description: 'Include NEXT?'
         required: true
         type: boolean
-        default: false
+        default: true
       include_mksu:
         description: 'Include MKSU?'
         required: true
         type: boolean
         default: false
-      include_sukisu:
-        description: 'Include SukiSU?'
-        required: true
-        type: boolean
-        default: true
       kernelsu_branch:
         description: "Choose ksu branch"
         required: true
@@ -62,7 +57,7 @@ on:
         default: 'true'
         options:
           - 'true'
-          - 'false'
+          - 'false'      
 
 jobs:
   notify:
@@ -94,7 +89,7 @@ jobs:
           [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
-          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")       
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-kernels-a12:
@@ -160,6 +155,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Kernels With KernelKSU & SUSFS v1.5.9"
+      RELEASE_BODY:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -287,33 +283,35 @@ jobs:
           cat << 'EOF' > release_body.md
           
           Branch type for KSU: ${{ inputs.kernelsu_branch }}
-          Nerest Current Kernel Tag: ${{ env.NEW_TAG }}
+          Wild Current Kernel Tag: ${{ env.NEW_TAG }}
       
           Features:
-          -> Nerest KSU Kernels & Others
-          -> Multi Manager Support for Nerest Kernels & Next Kernels (Not Recommended)
+          -> Wild KSU Kernels & Others
+          -> Multi Manager Support for Wild Kernels & Next Kernels (Not Recommended)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Syscall hooks
+          -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
           -> Wireguard Support
           -> BBR Support
-          $([[ "${{ inputs.kpm_enable }}" == "true" ]] && echo "-> KPM support")
+          -> LTO = full
+          -> lz4kd/lz4 zram off
+          -> KPM = off
       
           Notes:
-          -> Nerest KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
+          -> Wild KSU & KernelSU-Next, SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/ or https://github.com/libxzr/HorizonKernelFlasher!
       
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
       
           Managers:
-          -> Nerest KSU: https://github.com/WildKernels/Wild_KSU / https://t.me/NerestKernels
+          -> Wild KSU: https://github.com/WildKernels/Wild_KSU / https://t.me/NerestKernels
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
           -> 5ec1cff's KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci
           -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
-          -> SukiSU: https://github.com/SukiSU-Ultra/SukiSU-Ultra / https://t.me/Sukiksu
+          -> SukiSU: https://github.com/SukiSU-Ultra/SukiSU-Ultra / https://t.me/Sukiksu      
           -> rsuntk: https://github.com/rsuntk/KernelSU / https://t.me/rsukrnlsu
           -> backslashxx: https://github.com/backslashxx/KernelSU
       
@@ -322,7 +320,7 @@ jobs:
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> 5ec1cff: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
           -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
-          -> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})
+          -> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})        
           -> SUSFS4KSU: 
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
             -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
@@ -375,6 +373,16 @@ jobs:
             exit 1
           fi
 
+      - name: Upload Release Assets
+        run: |
+          for file in ./downloaded-artifacts/*-kernel-*/*; do
+            if [ -d "$file" ]; then
+              continue
+            fi
+            echo "Uploading $file..."
+            gh release upload ${{ env.NEW_TAG }} "$file"
+          done
+
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
@@ -391,5 +399,5 @@ jobs:
             🗂️ *Branch:* ${{ github.ref_name }}  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown"
+            -F parse_mode="Markdown"        
             
