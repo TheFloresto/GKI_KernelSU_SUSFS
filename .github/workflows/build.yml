@@ -55,6 +55,7 @@ jobs:
           verbose: 'true'                # Enable detailed logging
 
       - name: Setup SWAP
+        shell: bash
         run: |
           sudo swapoff -a
           sudo fallocate -l 15G /swapfile
@@ -68,6 +69,7 @@ jobs:
           free -h      
 
       - name: Set CONFIG Environment Variable
+        shell: bash
         run: |
           # Set CONFIG dynamically based on inputs values
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
@@ -76,9 +78,11 @@ jobs:
           echo "CONFIG set to: $CONFIG"
 
       - name: Install ccache and dependencies
+        shell: bash
         run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache dwarves lz4
 
       - name: Set up ccache
+        shell: bash
         run: |
           mkdir -p ~/.cache/bazel
           ccache --version
@@ -87,6 +91,7 @@ jobs:
           echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
       - name: Download toolchain
+        shell: bash
         run: |
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-build-2024
@@ -94,6 +99,7 @@ jobs:
           git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
       - name: Setup ZyCromerZ Clang Toolchain
+        shell: bash  
         run: |
           echo "Downloading ZyCromerZ Clang 22.0.0..."
           mkdir -p clang-zyc
@@ -107,12 +113,14 @@ jobs:
           echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
 
       - name: Set environment variables
+        shell: bash
         run: |
           echo "AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool" >> $GITHUB_ENV
           echo "MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py" >> $GITHUB_ENV
           echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
 
       - name: Set boot sign key
+        shell: bash
         env:
           BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
         run: |
@@ -125,6 +133,7 @@ jobs:
           fi
 
       - name: Install Repo
+        shell: bash
         run: |
           mkdir -p ./git-repo
           echo "Downloading repo tool..."
@@ -133,6 +142,7 @@ jobs:
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Other Dependencies
+        shell: bash
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
           ANYKERNEL_BRANCH="gki-2.0"
@@ -144,6 +154,7 @@ jobs:
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
 
       - name: Initialize and Sync Kernel Source
+        shell: bash
         run: |
           echo "Creating folder for configuration: $CONFIG..."
           mkdir -p "$CONFIG"
@@ -159,8 +170,17 @@ jobs:
           fi
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-
+          
+      - name: Clean Up ABI Protected Exports
+        shell: bash
+        run: |
+         cd "$CONFIG"
+         rm -rf ./common/android/abi_gki_protected_exports_*
+         perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+         df -h
+         
       - name: Fix Less Than 6.6.50 Builds
+        shell: bash
         run: |
           cd "$CONFIG/common"
           if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
@@ -172,6 +192,7 @@ jobs:
           fi
 
       - name: Determine the branch for KernelSU
+        shell: bash
         run: |
           case "${{ inputs.kernelsu_branch }}" in
             "Stable")
@@ -197,6 +218,7 @@ jobs:
           esac
       
       - name: Add KernelSU
+        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -221,6 +243,7 @@ jobs:
           esac
 
       - name: Apply SUSFS Patches for KernelSU Variants
+        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -262,6 +285,7 @@ jobs:
           esac
 
       - name: Getting KernelSU Version
+        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -294,13 +318,15 @@ jobs:
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV          
 
       - name: Apply Hide Stuff Patches
+        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           cp -v ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 --forward -F 3 < 69_hide_stuff.patch
+          patch -p1 --forward < 69_hide_stuff.patch
 
       - name: Apply Hooks Patches
+        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
@@ -308,15 +334,16 @@ jobs:
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/wild/syscall_hooks.patch ./
-            patch -p1 --forward -F 3 < syscall_hooks.patch
+            patch -p1 --forward < syscall_hooks.patch
           fi
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
         if: ${{ ( inputs.kernel_version == '6.6' ) }}
+        shell: bash
         run: |
           echo "[+] Adding Samsung KDP exported symbols to abi_gki_aarch64_galaxy"
           SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
@@ -336,6 +363,7 @@ jobs:
           echo "obj-y += min_kdp.o" >> Makefile
 
       - name: Add Configuration Settings
+        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -349,11 +377,12 @@ jobs:
           fi                   
 
       - name: Add SUSFS Configuration Settings
+        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
 
-          # Add SUSFS configuration settings
+          # Add SUSFS configuration settings          
           echo "CONFIG_KSU_SUSFS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
@@ -392,105 +421,126 @@ jobs:
           echo "CONFIG_TCP_CONG_BIC=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TCP_CONG_WESTWOOD=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_TCP_CONG_HTCP=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NET_SCH_FQ=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NET_SCH_FQ_CODEL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
 
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
+      - name: Set Build Info Environment Variables
+        shell: bash
+        run: |
+          # Получаем текущую дату в UTC формате
+          BUILD_DATE=$(date -u '+%a %b %d %H:%M:%S UTC %Y')
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          
+          # Задаем информацию о пользователе и хосте
+          BUILD_USER="TheFloresto"
+          BUILD_HOST="thefloresto-labs" 
+          echo "BUILD_USER=$BUILD_USER" >> $GITHUB_ENV
+          echo "BUILD_HOST=$BUILD_HOST" >> $GITHUB_ENV
+
       - name: Change Kernel Name
+        shell: bash
+        run: |
+          cd "$CONFIG"
+          
+          # Проверяем какая система сборки используется
+          if [ -f "build/build.sh" ]; then
+              echo "Using legacy build system for kernel ${{ inputs.kernel_version }}"
+              
+              # Для старых версий ядра - модифицируем setlocalversion напрямую
+              perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
+              perl -pi -e 's|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
+              
+              # Также добавляем в defconfig для двойной гарантии
+              echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> ./common/arch/arm64/configs/gki_defconfig
+              echo 'CONFIG_LOCALVERSION_AUTO=n' >> ./common/arch/arm64/configs/gki_defconfig
+              
+              # Устанавливаем кастомную дату сборки
+              perl -pi -e "s{UTS_VERSION=\"\\\$\\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\\)\"}{UTS_VERSION=\"#1 SMP PREEMPT ${{ env.BUILD_DATE }}\"}g" ./common/scripts/mkcompile_h
+              
+              # Задаем кастомного пользователя и хост
+              perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
+              perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
+              
+          else
+              echo "Using Bazel build system for kernel ${{ inputs.kernel_version }}"
+              
+              # Remove -maybe-dirty
+              perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
+              perl -pi.bak -e 's/^/            # / if /if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/ .. /echo \$scmversion/' ./build/kernel/kleaf/impl/stamp.bzl
+              
+              # Set Kernel Name для Bazel
+              echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> ./common/arch/arm64/configs/gki_defconfig
+              echo 'CONFIG_LOCALVERSION_AUTO=n' >> ./common/arch/arm64/configs/gki_defconfig
+              
+              # Set Kernel Timestamp
+              perl -pi -e "s/build-timestamp = \\\$\\(or \\\$\\(KBUILD_BUILD_TIMESTAMP\\), \\\$\\(build-timestamp-auto\\)\\)/build-timestamp = \"${{ env.BUILD_DATE }}\"/" ./common/init/Makefile
+              
+              # Установим пользователя и хост для bazel сборки
+              echo "CONFIG_BUILD_USER=\"${{ env.BUILD_USER }}\"" >> ./common/arch/arm64/configs/gki_defconfig
+              echo "CONFIG_BUILD_HOST=\"${{ env.BUILD_HOST }}\"" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
+          
+          # Проверяем что изменения применились
+          echo "=== Checking setlocalversion modifications ==="
+          if [ -f "./common/scripts/setlocalversion" ]; then
+              grep -A3 -B3 "@NoFloresto" ./common/scripts/setlocalversion || echo "No @NoFloresto found in setlocalversion"
+          fi
+          
+          echo "=== Checking defconfig modifications ==="
+          grep "LOCALVERSION" ./common/arch/arm64/configs/gki_defconfig || echo "No LOCALVERSION found in defconfig"
+    
+      - name: Add Build based configs
         shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-          echo "Running kernel naming commands..."
-          tac ./common/scripts/setlocalversion | sed '0,/echo "\$res"/s//res="-@NoFloresto"\;echo "\$res"\;/' | tac > ./common/scripts/setlocalversion.tmp && mv ./common/scripts/setlocalversion.tmp ./common/scripts/setlocalversion
-          
-          # Handle msm-kernel and external/dtc if they exist
-          if [ -d ./msm-kernel/scripts ]; then
-            tac ./msm-kernel/scripts/setlocalversion | sed '0,/echo "\$res"/s//res="-@NoFloresto"\;echo "\$res"\;/' | tac > ./msm-kernel/scripts/setlocalversion.tmp && mv ./msm-kernel/scripts/setlocalversion.tmp ./msm-kernel/scripts/setlocalversion
-            chmod +x ./msm-kernel/scripts/setlocalversion
-          fi
-          
-          if [ -d ./external/dtc/scripts ]; then
-            tac ./external/dtc/scripts/setlocalversion | sed '0,/echo "\$res"/s//res="-@NoFloresto"\;echo "\$res"\;/' | tac > ./external/dtc/scripts/setlocalversion.tmp && mv ./external/dtc/scripts/setlocalversion.tmp ./external/dtc/scripts/setlocalversion
-            chmod +x ./external/dtc/scripts/setlocalversion
-          fi
-          
-          sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "-@NoFloresto"/' ./common/scripts/setlocalversion
-          
-          if [ -d ./msm-kernel/scripts ]; then
-            sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "-@NoFloresto"/' ./msm-kernel/scripts/setlocalversion
-          fi
-          
-          if [ -d ./external/dtc/scripts ]; then
-            sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "-@NoFloresto"/' ./external/dtc/scripts/setlocalversion
-          fi
-          
-          chmod +x ./common/scripts/setlocalversion
-          
-          if [ -f ./build/kernel/kleaf/impl/stamp.bzl ]; then
-            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-          else
-            echo "No stamp.bzl!"
-          fi
-          
-          sed -i 's/-dirty//' ./common/scripts/setlocalversion
-          
-          if [ -d ./msm-kernel/scripts ]; then
-            sed -i 's/-dirty//' ./msm-kernel/scripts/setlocalversion
-          fi
-          
-          if [ -d ./external/dtc/scripts ]; then
-            sed -i 's/-dirty//' ./external/dtc/scripts/setlocalversion
-          fi
-          
-          if [ -f ./build/kernel/kleaf/workspace_status_stamp.py ]; then
-            sed -i 's/-dirty//' ./build/kernel/kleaf/workspace_status_stamp.py
-          else
-            echo "No workspace_status_stamp.py!"
-          fi
-          
-          DATESTR=$(date -u)
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT '"$DATESTR"'"}' ./common/scripts/mkcompile_h
-          
-          if [ -d ./msm-kernel/scripts ]; then
-            perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT '"$DATESTR"'"}' ./msm-kernel/scripts/mkcompile_h
-          fi
+          echo "CONFIG_LTO_CLANG_THIN=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_LTO_CLANG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" | tee -a "./common/arch/arm64/configs/gki_defconfig"
 
-      - name: Add Build based configs
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          # Ativar ccache
+          echo "CONFIG_CCACHE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+
+      - name: Override Clang Detection for ZyC
+        shell: bash
         run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
-          echo "CONFIG_LTO_CLANG_THIN=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_LTO_CLANG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "./common/arch/arm64/configs/gki_defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "./common/arch/arm64/configs/gki_defconfig"
+         # Force use ZyC Clang instead of auto-detection
+         echo "Forcing ZyC Clang usage..."
+         echo "CLANG_VERSION=zyc-22.0.0" >> $GITHUB_ENV
+         echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+         echo "Using ZyC Clang: $GITHUB_WORKSPACE/clang-zyc/bin/clang"
 
       - name: Build Kernel
         shell: bash
         run: |
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           CLANG_BIN_PATH="${{ env.CLANG_BIN_PATH }}"
-          
+          CLANG_VERSION="${{ env.CLANG_VERSION }}"
           if [ -d "$CLANG_BIN_PATH" ] && [ -x "$CLANG_BIN_PATH/clang" ]; then
             echo "Adding Clang to PATH: $CLANG_BIN_PATH"
             export PATH="$CLANG_BIN_PATH:$PATH"
             SELECTED_CLANG="$CLANG_BIN_PATH/clang"
+          elif command -v clang >/dev/null 2>&1; then
+            SELECTED_CLANG="$(command -v clang)"
+            echo "Using system Clang: $SELECTED_CLANG"
+            exit 1
           else
-            echo "Error: No valid ZyCromerZ Clang binary found"
+            echo "Error: No valid Clang binary found"
             exit 1
           fi
-          
           echo "Using Clang version: $($SELECTED_CLANG --version | head -n1)"
-          
-          # Install missing LLVM tools if needed
-          LLVM_TOOLS="ld.lld llvm-ar llvm-objcopy llvm-objdump llvm-nm"
+          LLVM_TOOLS="clang ld.lld llvm-ar llvm-objcopy llvm-objdump llvm-nm"
           MISSING_TOOLS=""
           for tool in $LLVM_TOOLS; do
             if ! command -v $tool >/dev/null 2>&1; then
               MISSING_TOOLS="$MISSING_TOOLS $tool"
             fi
           done
-          
           if [ -n "$MISSING_TOOLS" ]; then
             echo "Installing missing LLVM tools:$MISSING_TOOLS"
             sudo apt-get update
@@ -502,29 +552,39 @@ jobs:
               fi
             done
           fi
-          
           KERNEL_VERSION="${{ inputs.kernel_version }}"
           if [[ "$KERNEL_VERSION" == "5.10" ]]; then
             USE_LLVM_IAS=true
           fi
-          
           cd "$KERNEL_PATH/common" || exit 1
           
-          echo "Building with ZyCromerZ Clang optimizations..."
-          MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
-            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip"
+          # Устанавливаем переменные окружения для кастомной информации о сборке
+          export KBUILD_BUILD_USER="${{ env.BUILD_USER }}"
+          export KBUILD_BUILD_HOST="${{ env.BUILD_HOST }}"
+          export KBUILD_BUILD_TIMESTAMP="${{ env.BUILD_DATE }}"
           
+          MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- \
+            RUSTC=$GITHUB_WORKSPACE/clang-zyc/bin/rustc \
+            PAHOLE=$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole \
+            LD=ld.lld HOSTLD=ld.lld"
           if [[ -v USE_LLVM_IAS ]]; then
             MAKE_ARGS="LLVM_IAS=1 $MAKE_ARGS"
           fi
+
+          if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+           KCFLAGS_EXTRA="-Wno-error -O2 -flto=thin -fno-stack-protector"
+          else
+            KCFLAGS_EXTRA="-Wno-error -O2 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections"
+          fi
           
-          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" gki_defconfig || exit 1
-          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" || exit 1
+          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="$KCFLAGS_EXTRA" gki_defconfig || exit 1
+          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="$KCFLAGS_EXTRA" || exit 1
+
           
           echo "Kernel build completed successfully!"
           
       - name: Create Bootimgs Folder and Copy Images
+        shell: bash
         run: |
           mkdir -p bootimgs
 
@@ -546,6 +606,7 @@ jobs:
           cp ./Image.gz ./bootimgs/
 
       - name: Create AnyKernel3 ZIP Files for Different Formats
+        shell: bash
         run: |
           echo "Creating AnyKernel3 zip files for all formats..."
           cd ./AnyKernel3
@@ -571,6 +632,7 @@ jobs:
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
+        shell: bash   
         run: |
           echo "Building Android 12 boot images..."
           cd bootimgs
@@ -618,6 +680,7 @@ jobs:
 
       - name: Android 13/14/15 boot image build script
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
+        shell: bash
         run: |
           cd bootimgs
           
@@ -637,6 +700,7 @@ jobs:
           cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
           
       - name: Compress all img files with gzip
+        shell: bash
         run: |
           for image in *.img; do
             if [ -f "$image" ]; then
@@ -651,3 +715,4 @@ jobs:
           path: |
             *.zip
             *.img.gz
+            
