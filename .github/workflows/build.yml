@@ -140,6 +140,7 @@ jobs:
           git clone https://github.com/TheFloresto/kernel_patches.git -b main   
           git clone https://github.com/TheFloresto/SukiSU_patch.git -b main
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          fi
 
       - name: Initialize and Sync Kernel Source
         shell: bash     
