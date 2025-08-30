@@ -151,8 +151,10 @@ jobs:
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"      
           git clone https://github.com/TheFloresto/kernel_patches.git -b main       
-          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-
+          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"          
+          # Clone SukiSU patch repository for ZRAM LZ4KD support
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+          
       - name: Initialize and Sync Kernel Source
         shell: bash
         run: |
@@ -226,7 +228,7 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
               echo "Adding Wild KSU..."
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              curl -LSs "https://raw.githubusercontent.com/TheWildJames/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
             "KSU")
               echo "Adding KernelSU Official..."
@@ -284,6 +286,30 @@ jobs:
               ;;
           esac
 
+      - name: Copy LZ4KD source files and apply ZRAM patches
+        shell: bash
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          echo "Copying LZ4KD source files..."
+          # Copy LZ4KD source files - это дополнительные алгоритмы сжатия для ZRAM
+          cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
+          cp -r ../../SukiSU_patch/other/zram/lz4k_oplus ./lib/
+
+          echo "Applying LZ4KD patches to existing ZRAM implementation..."
+          # Применяем патчи к существующей ZRAM реализации для добавления LZ4KD поддержки
+          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
+          echo "Applying lz4kd patch to ZRAM driver..."
+          patch -p1 -F 3 < lz4kd.patch || true
+          echo 'LZ4KD patch completed - added LZ4KD compression support to ZRAM'
+
+          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
+          echo "Applying lz4k_oplus patch to ZRAM driver..."
+          patch -p1 -F 3 < lz4k_oplus.patch || true
+          echo 'lz4k_oplus patch completed - added LZ4K_OPLUS compression support to ZRAM'
+
       - name: Getting KernelSU Version
         shell: bash
         run: |
@@ -293,8 +319,8 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
               echo "Getting KernelSU version for Wild KSU..."
-              cd ./Wild_KSU
-              BASE_VERSION=10200
+              cd ./KernelSU-Next
+              BASE_VERSION=11005
               ;;
             "KSU")
               echo "Getting KernelSU version for Official KernelSU..."
@@ -376,13 +402,79 @@ jobs:
            echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           fi                   
 
+      - name: Add ZRAM and LZ4KD Configuration Settings
+        shell: bash
+        run: |
+          set -x
+          set -e
+          echo "Configuring ZRAM with LZ4KD compression support..."
+          CONFIG_FILE="$CONFIG/common/arch/arm64/configs/gki_defconfig"
+
+          # ZRAM уже присутствует в ядре как модуль, мы меняем конфигурацию для статической сборки
+          if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
+            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+            echo "CONFIG_ZRAM=y" >> "$CONFIG_FILE"
+            echo "CONFIG_MODULE_SIG=n" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZO=y" >> "$CONFIG_FILE"
+            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" >> "$CONFIG_FILE"
+          fi
+
+          if [ "${{ inputs.kernel_version }}" != "6.6" ] && [ "${{ inputs.kernel_version }}" != "5.10" ]; then
+            # Меняем ZRAM с модуля (=m) на встроенный (=y) 
+            if grep -q "CONFIG_ZSMALLOC" -- "$CONFIG_FILE"; then
+                echo "Found CONFIG_ZSMALLOC in $CONFIG_FILE, changing from module to built-in"
+                sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "$CONFIG_FILE"
+            else
+                echo "CONFIG_ZSMALLOC not found in $CONFIG_FILE, adding built-in support"
+                echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+            fi
+
+            # Меняем ZRAM с модуля на встроенный
+            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
+          fi
+
+          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
+          fi
+
+          # Update modules list to remove ZRAM/ZSMALLOC entries since they're now built-in
+          MODULES_LIST="$CONFIG/common/android/gki_aarch64_modules"
+          if [ -f "$MODULES_LIST" ]; then
+            echo "Updating modules list to remove ZRAM and ZSMALLOC entries..."
+            # Remove zram and zsmalloc module entries
+            sed -i '/mm\/zsmalloc\.ko/d' "$MODULES_LIST"
+            sed -i '/drivers\/block\/zram\/zram\.ko/d' "$MODULES_LIST"
+            echo "Updated modules list:"
+            cat "$MODULES_LIST" || echo "Modules list is now empty"
+          fi
+
+          # Для Android 14/15 с Bazel убираем модули из списка, т.к. они теперь встроены
+          if [ "${{ inputs.android_version }}" = "android14" ] || [ "${{ inputs.android_version }}" = "android15" ]; then
+            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$CONFIG/common/modules.bzl"
+            echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
+            echo 'Android14/15 Bazel: Removed zram & zsmalloc from module list (now built-in)'
+          fi
+
+          # Добавляем поддержку дополнительных алгоритмов сжатия для ZRAM
+          if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
+            echo "Adding additional compression algorithms for ZRAM..."
+            echo "CONFIG_CRYPTO_LZ4HC=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4K=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4KD=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_842=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$CONFIG_FILE"
+            echo "CONFIG_ZRAM_WRITEBACK=y" >> "$CONFIG_FILE"
+          fi
+
       - name: Add SUSFS Configuration Settings
         shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
 
-          # Add SUSFS configuration settings          
+          # Add SUSFS configuration settings 
+          echo 'CONFIG_LOCALVERSION_AUTO=n' | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
@@ -430,68 +522,61 @@ jobs:
 
       - name: Set Build Info Environment Variables
         shell: bash
-        run: |
-          # Получаем текущую дату в UTC формате
-          BUILD_DATE=$(date -u '+%a %b %d %H:%M:%S UTC %Y')
-          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
-          
+        run: |          
           # Задаем информацию о пользователе и хосте
           BUILD_USER="TheFloresto"
           BUILD_HOST="thefloresto-labs" 
           echo "BUILD_USER=$BUILD_USER" >> $GITHUB_ENV
-          echo "BUILD_HOST=$BUILD_HOST" >> $GITHUB_ENV
+          echo "BUILD_HOST=$BUILD_HOST" >> $GITHUB_ENV          
 
       - name: Change Kernel Name
         shell: bash
         run: |
           cd "$CONFIG"
-          
-          # Проверяем какая система сборки используется
+
+          # Get current date in the required format
+          CURRENT_DATE=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
+
           if [ -f "build/build.sh" ]; then
-              echo "Using legacy build system for kernel ${{ inputs.kernel_version }}"
-              
-              # Для старых версий ядра - модифицируем setlocalversion напрямую
-              perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-              perl -pi -e 's|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
-              
-              # Также добавляем в defconfig для двойной гарантии
-              echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> ./common/arch/arm64/configs/gki_defconfig
-              echo 'CONFIG_LOCALVERSION_AUTO=n' >> ./common/arch/arm64/configs/gki_defconfig
-              
-              # Устанавливаем кастомную дату сборки
-              perl -pi -e "s{UTS_VERSION=\"\\\$\\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\\)\"}{UTS_VERSION=\"#1 SMP PREEMPT ${{ env.BUILD_DATE }}\"}g" ./common/scripts/mkcompile_h
-              
-              # Задаем кастомного пользователя и хост
-              perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
-              perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
-              
+              perl -pi -e 's/-maybe-dirty//g' ./common/scripts/setlocalversion
+              sed -i '$s|echo "\$res"|echo "\$res-GKI-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
+              perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
+              sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
+
+              # Fix user and host
+              sed -i "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
+              sed -i "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
           else
-              echo "Using Bazel build system for kernel ${{ inputs.kernel_version }}"
-              
               # Remove -maybe-dirty
               perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-              perl -pi.bak -e 's/^/            # / if /if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/ .. /echo \$scmversion/' ./build/kernel/kleaf/impl/stamp.bzl
+              sed -i.bak '/if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/,/echo \$scmversion/ s/^/            # /' ./build/kernel/kleaf/impl/stamp.bzl
               
-              # Set Kernel Name для Bazel
-              echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> ./common/arch/arm64/configs/gki_defconfig
-              echo 'CONFIG_LOCALVERSION_AUTO=n' >> ./common/arch/arm64/configs/gki_defconfig
-              
+              # Set Kernel Name
+              echo "CONFIG_LOCALVERSION=\"-GKI-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
+
               # Set Kernel Timestamp
-              perl -pi -e "s/build-timestamp = \\\$\\(or \\\$\\(KBUILD_BUILD_TIMESTAMP\\), \\\$\\(build-timestamp-auto\\)\\)/build-timestamp = \"${{ env.BUILD_DATE }}\"/" ./common/init/Makefile
+              perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
               
-              # Установим пользователя и хост для bazel сборки
-              echo "CONFIG_BUILD_USER=\"${{ env.BUILD_USER }}\"" >> ./common/arch/arm64/configs/gki_defconfig
-              echo "CONFIG_BUILD_HOST=\"${{ env.BUILD_HOST }}\"" >> ./common/arch/arm64/configs/gki_defconfig
+              # Try to find and replace user/host in all possible locations
+              find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
+               xargs sed -i "s/\$(shell whoami)/${{ env.BUILD_USER }}/g" 2>/dev/null || true
+             find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
+               xargs sed -i "s/\$(shell hostname)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
+             find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
+               xargs sed -i "s/\$(shell uname -n)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
+               
+               # Alternative: modify init/Makefile directly if it exists
+            if [ -f "./common/init/Makefile" ]; then
+               sed -i "s/build-user = .*/build-user = ${{ env.BUILD_USER }}/" ./common/init/Makefile
+               sed -i "s/build-host = .*/build-host = ${{ env.BUILD_HOST }}/" ./common/init/Makefile
+             fi
+             
+               # Last resort: modify mkcompile_h if it exists
+             if [ -f "./common/scripts/mkcompile_h" ]; then
+              sed -i "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
+              sed -i "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
+            fi
           fi
-          
-          # Проверяем что изменения применились
-          echo "=== Checking setlocalversion modifications ==="
-          if [ -f "./common/scripts/setlocalversion" ]; then
-              grep -A3 -B3 "@NoFloresto" ./common/scripts/setlocalversion || echo "No @NoFloresto found in setlocalversion"
-          fi
-          
-          echo "=== Checking defconfig modifications ==="
-          grep "LOCALVERSION" ./common/arch/arm64/configs/gki_defconfig || echo "No LOCALVERSION found in defconfig"
     
       - name: Add Build based configs
         shell: bash
