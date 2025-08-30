@@ -6,6 +6,9 @@ permissions:
 on:
   workflow_call:
     inputs:
+      use_make:
+        required: true
+        type: boolean
       android_version:
         required: true
         type: string
@@ -34,7 +37,7 @@ on:
 jobs:
   build-gki:
     runs-on: ubuntu-latest
-    timeout-minutes: 200
+    timeout-minutes: 120
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
@@ -53,81 +56,29 @@ jobs:
           remove-swapfile: 'true'        # Frees ~4 GB
           remove-cached-tools: 'false'   # Avoid unless confirmed safe
           verbose: 'true'                # Enable detailed logging
-
-      - name: Setup SWAP
-        shell: bash
-        run: |
-          sudo swapoff -a
-          sudo fallocate -l 15G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon -p 1 /swapfile
-          echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
-          echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
-          echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
-          sudo sysctl -p
-          free -h      
-
+          
       - name: Set CONFIG Environment Variable
-        shell: bash
         run: |
           # Set CONFIG dynamically based on inputs values
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
+
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
+
           echo "CONFIG set to: $CONFIG"
 
-      - name: Install ccache and dependencies
-        shell: bash
-        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache dwarves lz4 python3 git curl
+      - name: Install ccache
+        run: sudo apt update && sudo apt install -y ccache libelf-dev libssl-dev build-essential
 
-      - name: Configure ccache directory
+      - name: Set up ccache
         run: |
-          echo "CCACHE_DIR=$HOME/.ccache_${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> $GITHUB_ENV
-          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
-          echo "Current disk space:"
-          df -h
-          echo "Building kernel version: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
-
-      - name: Load current version kernel ccache cache
-        uses: actions/cache@v3
-        id: ccache-restore
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ runner.os }}-main
-          restore-keys: |
-            ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ runner.os }}-
-            ccache-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-
-
-      - name: Initialize and configure ccache
-        run: |
-          # Set ccache environment variables
-          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="${{ env.CCACHE_MAXSIZE }}"
-          
-          # Ensure ccache directory exists
-          mkdir -p "$CCACHE_DIR"
-          
-          # Reconfigure cache size every run
-          echo "Configuring ccache size to: $CCACHE_MAXSIZE"
-          ccache -M "$CCACHE_MAXSIZE"
-          ccache -o compression=true
-          
-          # Show initial cache state
-          echo "Initial ccache state:"
-          ccache -s
-          
-          # If cache restore hit, show detailed info
-          if [ "${{ steps.ccache-restore.outputs.cache-hit }}" == 'true' ]; then
-            echo "ccache cache hit details:"
-            ccache -sv
-          fi
+          mkdir -p ~/.cache/bazel
+          ccache --version
+          ccache --max-size=2G
+          ccache --set-config=compression=true
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
       - name: Download toolchain
-        shell: bash
         run: |
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-build-2024
@@ -135,14 +86,12 @@ jobs:
           git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
       - name: Set environment variables
-        shell: bash
         run: |
           echo "AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool" >> $GITHUB_ENV
           echo "MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py" >> $GITHUB_ENV
           echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
 
       - name: Set boot sign key
-        shell: bash
         env:
           BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
         run: |
@@ -155,7 +104,6 @@ jobs:
           fi
 
       - name: Install Repo
-        shell: bash
         run: |
           mkdir -p ./git-repo
           echo "Downloading repo tool..."
@@ -164,21 +112,17 @@ jobs:
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Other Dependencies
-        shell: bash
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"      
-          git clone https://github.com/TheFloresto/kernel_patches.git -b main       
-          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-          # Clone SukiSU patch repository for ZRAM LZ4KD support
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+          git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://github.com/WildPlusKernel/kernel_patches.git
 
       - name: Initialize and Sync Kernel Source
-        shell: bash
         run: |
           echo "Creating folder for configuration: $CONFIG..."
           mkdir -p "$CONFIG"
@@ -194,17 +138,8 @@ jobs:
           fi
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-          
-      - name: Clean Up ABI Protected Exports
-        shell: bash
-        run: |
-         cd "$CONFIG"
-         rm -rf ./common/android/abi_gki_protected_exports_*
-         perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
-         df -h
-         
-      - name: Fix Less Than 6.6.50 Builds
-        shell: bash
+
+      - name: Fix Less Then 6.6.50 Builds
         run: |
           cd "$CONFIG/common"
           if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
@@ -216,7 +151,6 @@ jobs:
           fi
 
       - name: Determine the branch for KernelSU
-        shell: bash
         run: |
           case "${{ inputs.kernelsu_branch }}" in
             "Stable")
@@ -242,7 +176,6 @@ jobs:
           esac
       
       - name: Add KernelSU
-        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -250,7 +183,7 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
               echo "Adding Wild KSU..."
-              curl -LSs "https://raw.githubusercontent.com/TheWildJames/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
             "KSU")
               echo "Adding KernelSU Official..."
@@ -265,24 +198,8 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
           esac
-
-      #- name: Apply WIFI Patches
-       # run: |
-        #  echo "Changing to configuration directory: $CONFIG..."
-         # cd "$CONFIG/common"
-          #if [ "${{ inputs.kernel_version }}" == "6.1" ]; then
-           #  echo "Applying WIFI patch for kernel 6.1..."
-            #if curl -LSs https://github.com/OnePlus-12-Development/android_kernel_qcom_sm8650/commit/3e0cb08.patch | patch -p1 --forward --fuzz=3; then
-             # echo "WIFI patch applied successfully"
-           #else
-            # echo "Warning: WIFI patch failed to apply or download, but continuing..."
-            #fi
-          #else
-           #echo "Skipping WIFI patch - not kernel version 6.1"
-          #fi
-
+          
       - name: Apply SUSFS Patches for KernelSU Variants
-        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -290,128 +207,117 @@ jobs:
           echo "Applying SUSFS patches..."
           
           # Copy SUSFS patches
-          cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
           cd common
           patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
           cd ..
-          cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
-          cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+          cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
+          cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Wild KSU..."
-              cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward < 0001-Susfs-1.5.9.patch
+               echo "Applying SUSFS patches for Wild KSU..."
+              cd ./Wild_KSU
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+              
+              cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              
+              cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
+              patch -p1 --forward < fix_rules.c.patch
 
-              cp -v ../../kernel_patches/next/0001-james.patch ./
-              patch -p1 --forward < 0001-james.patch            
+              cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
+              patch -p1 --forward < fix_sucompat.c.patch
+
+              cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
+              patch -p1 --forward < fix_kernel_compat.c.patch
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward < 0001-Susfs-1.5.9.patch
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
+              patch -p1 --forward < fix_apk_sign.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
+              patch -p1 --forward < fix_rules.c.patch
 
-              cp -v ../../kernel_patches/next/0001-james.patch ./
-              patch -p1 --forward < 0001-james.patch
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
+              patch -p1 --forward < fix_sucompat.c.patch
+
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
+              patch -p1 --forward < fix_kernel_compat.c.patch
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
-              cd ./KernelSU
+              cd ./KernelS
               ;;
           esac
 
-      - name: Copy LZ4KD source files and apply ZRAM patches
-        shell: bash
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
-          echo "Copying LZ4KD source files..."
-          # Copy LZ4KD source files - это дополнительные алгоритмы сжатия для ZRAM
-          cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
-          cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
-          cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
-          cp -r ../../SukiSU_patch/other/zram/lz4k_oplus ./lib/
-
-          echo "Applying LZ4KD patches to existing ZRAM implementation..."
-          # Применяем патчи к существующей ZRAM реализации для добавления LZ4KD поддержки
-          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
-          echo "Applying lz4kd patch to ZRAM driver..."
-          patch -p1 -F 3 < lz4kd.patch || true
-          echo 'LZ4KD patch completed - added LZ4KD compression support to ZRAM'
-
-          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
-          echo "Applying lz4k_oplus patch to ZRAM driver..."
-          patch -p1 -F 3 < lz4k_oplus.patch || true
-          echo 'lz4k_oplus patch completed - added LZ4K_OPLUS compression support to ZRAM'
-
       - name: Getting KernelSU Version
-        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Getting KernelSU version for Wild KSU..."
-              cd ./KernelSU-Next
-              BASE_VERSION=‭11005
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./Wild_KSU
+              BASE_VERSION=10200
               ;;
             "KSU")
-              echo "Getting KernelSU version for Official KernelSU..."
+              echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
               BASE_VERSION=10200
               ;;
             "NEXT")
-              echo "Getting KernelSU version for KernelSU Next..."
               cd ./KernelSU-Next
               BASE_VERSION=10200
               ;;
             "MKSU")
-              echo "Getting KernelSU version for MKSU..."
-              cd ./KernelSU
-              BASE_VERSION=10200
               ;;
           esac
           
           cd ./kernel
           KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV          
-
-      - name: Apply Hide Stuff Patches
-        shell: bash
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
-          cp -v ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 --forward < 69_hide_stuff.patch
-
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          
       - name: Apply Hooks Patches
-        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
+            cp ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
+            patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
+            cp ../../kernel_patches/wild/hooks/scope_min_manual_hooks_v1.4.patch ./
+            patch -p1 --forward -F 3 < syscall_hooks.patch
           fi
+
+      - name: Apply Hide Stuff Patches
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          cp ../../kernel_patches/69_hide_stuff.patch ./
+          patch -p1 --forward -F 3 < 69_hide_stuff.patch
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
         if: ${{ ( inputs.kernel_version == '6.6' ) }}
-        shell: bash
         run: |
           echo "[+] Adding Samsung KDP exported symbols to abi_gki_aarch64_galaxy"
           SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
@@ -430,262 +336,106 @@ jobs:
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
 
+
       - name: Add Configuration Settings
-        shell: bash
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
           echo "Adding configuration settings to gki_defconfig..."
 
           # Add KSU configuration settings
-          echo "CONFIG_KSU=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-           echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          fi                   
-
-      - name: Add ZRAM and LZ4KD Configuration Settings
-        shell: bash
-        run: |
-          set -x
-          set -e
-          echo "Configuring ZRAM with LZ4KD compression support..."
-          CONFIG_FILE="$CONFIG/common/arch/arm64/configs/gki_defconfig"
-
-          # ZRAM уже присутствует в ядре как модуль, мы меняем конфигурацию для статической сборки
-          if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
-            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
-            echo "CONFIG_ZRAM=y" >> "$CONFIG_FILE"
-            echo "CONFIG_MODULE_SIG=n" >> "$CONFIG_FILE"
-            echo "CONFIG_CRYPTO_LZO=y" >> "$CONFIG_FILE"
-            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" >> "$CONFIG_FILE"
+            echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
           fi
-
-          if [ "${{ inputs.kernel_version }}" != "6.6" ] && [ "${{ inputs.kernel_version }}" != "5.10" ]; then
-            # Меняем ZRAM с модуля (=m) на встроенный (=y) 
-            if grep -q "CONFIG_ZSMALLOC" -- "$CONFIG_FILE"; then
-                echo "Found CONFIG_ZSMALLOC in $CONFIG_FILE, changing from module to built-in"
-                sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "$CONFIG_FILE"
-            else
-                echo "CONFIG_ZSMALLOC not found in $CONFIG_FILE, adding built-in support"
-                echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
-            fi
-
-            # Меняем ZRAM с модуля на встроенный
-            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
-          fi
-
-          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
-            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
-          fi
-
-          # Update modules list to remove ZRAM/ZSMALLOC entries since they're now built-in
-          MODULES_LIST="$CONFIG/common/android/gki_aarch64_modules"
-          if [ -f "$MODULES_LIST" ]; then
-            echo "Updating modules list to remove ZRAM and ZSMALLOC entries..."
-            # Remove zram and zsmalloc module entries
-            sed -i '/mm\/zsmalloc\.ko/d' "$MODULES_LIST"
-            sed -i '/drivers\/block\/zram\/zram\.ko/d' "$MODULES_LIST"
-            echo "Updated modules list:"
-            cat "$MODULES_LIST" || echo "Modules list is now empty"
-          fi
-
-          # Для Android 14/15 с Bazel убираем модули из списка, т.к. они теперь встроены
-          if [ "${{ inputs.android_version }}" = "android14" ] || [ "${{ inputs.android_version }}" = "android15" ]; then
-            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$CONFIG/common/modules.bzl"
-            echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
-            echo 'Android14/15 Bazel: Removed zram & zsmalloc from module list (now built-in)'
-          fi
-
-          # Добавляем поддержку дополнительных алгоритмов сжатия для ZRAM
-          if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
-            echo "Adding additional compression algorithms for ZRAM..."
-            echo "CONFIG_CRYPTO_LZ4HC=y" >> "$CONFIG_FILE"
-            echo "CONFIG_CRYPTO_LZ4K=y" >> "$CONFIG_FILE"
-            echo "CONFIG_CRYPTO_LZ4KD=y" >> "$CONFIG_FILE"
-            echo "CONFIG_CRYPTO_842=y" >> "$CONFIG_FILE"
-            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$CONFIG_FILE"
-            echo "CONFIG_ZRAM_WRITEBACK=y" >> "$CONFIG_FILE"
-          fi
-
-      - name: Add SUSFS Configuration Settings
-        shell: bash
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
-
-          # Add SUSFS configuration settings 
-          echo 'CONFIG_LOCALVERSION_AUTO=n' | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          fi
-
+                    
           # Add additional tmpfs config setting
-          echo "CONFIG_TMPFS_XATTR=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TMPFS_POSIX_ACL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
 
           # Add additional config setting
-          echo "CONFIG_IP_NF_TARGET_TTL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IP6_NF_TARGET_HL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IP6_NF_MATCH_HL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
 
           # Add BBR Config
-          echo "CONFIG_TCP_CONG_ADVANCED=y" | tee -a ./common/arch/arm64/configs/gki_defconfig 
-          echo "CONFIG_TCP_CONG_BBR=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_NET_SCH_FQ=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_BIC=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_WESTWOOD=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_HTCP=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_NET_SCH_FQ=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_NET_SCH_FQ_CODEL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig 
+          echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig 
 
           # Remove check_defconfig
-          sed -i '2s/check_defconfig//' ./common/build.config.gki
+          sed -i 's/check_defconfig//' ./common/build.config.gki
 
-      - name: Set Build Info Environment Variables
-        shell: bash
-        run: |          
-          # Задаем информацию о пользователе и хосте
-          BUILD_USER="TheFloresto"
-          BUILD_HOST="thefloresto-labs" 
-          echo "BUILD_USER=$BUILD_USER" >> $GITHUB_ENV
-          echo "BUILD_HOST=$BUILD_HOST" >> $GITHUB_ENV          
-
-      - name: Change Kernel Name
-        shell: bash
-        run: |
-          cd "$CONFIG"
-
-          # Get current date in the required format
-          CURRENT_DATE=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
-
-          if [ -f "build/build.sh" ]; then
-              perl -pi -e 's/-maybe-dirty//g' ./common/scripts/setlocalversion
-              sed -i '$s|echo "\$res"|echo "\$res-GKI-@NoFloresto+@mr_vokintos"|' ./common/scripts/setlocalversion
-              perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
-              sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
-
-              # Fix user and host
-              sed -i "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
-              sed -i "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
-          else
-              # Remove -maybe-dirty
-              perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-              sed -i.bak '/if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/,/echo \$scmversion/ s/^/            # /' ./build/kernel/kleaf/impl/stamp.bzl
-              
-              # Set Kernel Name
-              echo "CONFIG_LOCALVERSION=\"-GKI-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
-
-              # Set Kernel Timestamp
-              perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
-              
-              # Try to find and replace user/host in all possible locations
-              find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
-               xargs sed -i "s/\$(shell whoami)/${{ env.BUILD_USER }}/g" 2>/dev/null || true
-             find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
-               xargs sed -i "s/\$(shell hostname)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
-             find . -type f -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" | \
-               xargs sed -i "s/\$(shell uname -n)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
-               
-               # Alternative: modify init/Makefile directly if it exists
-            if [ -f "./common/init/Makefile" ]; then
-               sed -i "s/build-user = .*/build-user = ${{ env.BUILD_USER }}/" ./common/init/Makefile
-               sed -i "s/build-host = .*/build-host = ${{ env.BUILD_HOST }}/" ./common/init/Makefile
-             fi
-             
-               # Last resort: modify mkcompile_h if it exists
-             if [ -f "./common/scripts/mkcompile_h" ]; then
-              sed -i "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
-              sed -i "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h
-            fi
-          fi
-    
-      - name: Add Build based configs
-        shell: bash
+      - name: Add SUSFS Configuration Settings
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-          echo "CONFIG_LTO_CLANG_FULL=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_LTO_CLANG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" | tee -a "./common/arch/arm64/configs/gki_defconfig"
 
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
-          # Ativar ccache
-          echo "CONFIG_CCACHE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          # Add SUSFS configuration settings
+          echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
+
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+          else
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
+
+      - name: Change Kernel Name
+        run: |
+          cd "$CONFIG"
+          if [ -f "build/build.sh" ]; then
+              perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
+              perl -0777 -pi -e 's/(.*)(echo "\$res")/$1echo "\$res-Next-v\$KSUVER-SUSFS-v1.5.9-Wild"/s' ./common/scripts/setlocalversion
+              perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
+          else
+              #Remove -maybe-dirty
+              perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
+              
+              #Set Kernel Name
+              echo "CONFIG_LOCALVERSION=\"-NEXT-v$KSUVER-SUSFS-v1.5.9-Wild\"" >> ./common/arch/arm64/configs/gki_defconfig
+
+              #Set Kernel Timestamp
+              perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Sun Apr 20 04:20:00 UTC 2025"/' ./common/init/Makefile
+
+              #Remove Abi Exports and Error
+              rm -rf ./common/android/abi_gki_protected_exports_*
+              perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+          fi
 
       - name: Build
-        shell: bash
+        if: ${{ inputs.use_make == 'false' }}
         run : |
           set -e
           set -x
           cd "$CONFIG"
-          
-          # Set ccache path in PATH
-          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
-          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="3G"
-          /usr/bin/ccache -M "${{ env.CCACHE_MAXSIZE }}"
-          /usr/bin/ccache -o compression=true
-          /usr/bin/ccache -s      
-
-          echo "Checking kernel version..."
-          if [[ "$CONFIG" == *"6.6"* ]]; then
-            echo "Fetching .bazelrc with sm8635-polly-66 configuration (cortex-a76)..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc || exit 1
-            EXTRA_BAZEL_FLAGS="--config=sm8635-polly-66"
-          else
-            echo "Fetching .bazelrc with sm8635-polly configuration (cortex-a720)..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly.bazelrc -o .bazelrc || exit 1
-            EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
-          fi
-
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
+            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
           else
-            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS  //common:kernel_aarch64_dist
+            tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
           fi
-          echo "Kernel compilation completed!"
-          echo "ccache status:"
-          ccache -s
-          echo "Space after compilation:"
-          df -h
-          
+          ccache --show-stats
+
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
-        if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
+        if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && inputs.use_make == 'false' }}
         run: |
           mkdir bootimgs
 
@@ -699,7 +449,7 @@ jobs:
           gzip -n -k -f -9 ./Image > ./Image.gz
 
       - name: Create Bootimgs Folder and Copy Images for Android 14/15
-        if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
+        if: ${{ (inputs.android_version == 'android14' || inputs.android_version == 'android15') && inputs.use_make == 'false' }}
         run: |
           mkdir bootimgs
 
@@ -713,31 +463,32 @@ jobs:
           gzip -n -k -f -9 ./Image > ./Image.gz
 
       - name: Create ZIP Files for Different Formats
+        if: ${{ inputs.use_make == 'false' }}
         run: |
           echo "Creating zip files for all formats..."
           cd ./AnyKernel3
           
           # Create and upload zip for each format
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3.zip"
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
           echo "Creating zip file: $ZIP_NAME..."
           mv ../Image ./Image
           zip -r "../$ZIP_NAME" ./*
           rm ./Image
           
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3-lz4.zip"
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3-lz4.zip"
           echo "Creating zip file: $ZIP_NAME..."
           mv ../Image.lz4 ./Image.lz4
           zip -r "../$ZIP_NAME" ./*
           rm ./Image.lz4
           
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3-gz.zip"
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3-gz.zip"
           echo "Creating zip file: $ZIP_NAME..."
           mv ../Image.gz ./Image.gz
           zip -r "../$ZIP_NAME" ./*
           rm ./Image.gz
 
       - name: Android 12 boot image build script
-        if: ${{ inputs.android_version == 'android12' }}
+        if: ${{ inputs.android_version == 'android12' && inputs.use_make == 'false' }}
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd bootimgs
@@ -787,7 +538,7 @@ jobs:
           cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
 
       - name: Android 13/14/15 boot image build script
-        if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
+        if: ${{ (inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15') && inputs.use_make == 'false' }}
         run: |
           cd bootimgs
 
@@ -810,10 +561,125 @@ jobs:
           cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
           
       - name: Compress all img files with gzip
+        if: ${{ inputs.use_make == 'false' }}
         run: |
           for image in *.img; do
             gzip -vnf9 "$image"
           done
+
+      - name: Add Build based configs
+        if: ${{ github.event.inputs.use_make == 'true' }}
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG"
+          echo "CONFIG_LTO_CLANG_THIN=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_LTO_CLANG=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "./common/arch/arm64/configs/gki_defconfig"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "./common/arch/arm64/configs/gki_defconfig"
+
+      - name: Detect Clang Version from Configs
+        if: ${{ github.event.inputs.use_make == 'true' }}
+        shell: bash
+        run: |
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          DEFCONFIG="$KERNEL_PATH/common/arch/arm64/configs/gki_defconfig"
+          BUILDCONFIG="$KERNEL_PATH/common/build.config.gki"
+          CONSTANTSCONFIG="$KERNEL_PATH/common/build.config.constants"
+          CLANG_VERSION=""
+          CLANG_BIN_PATH=""
+          if grep -q '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null; then
+            CLANG_VERSION=$(grep '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | tr -d '"' | xargs)
+          elif grep -q '^CLANG_VERSION=' "$BUILDCONFIG" 2>/dev/null; then
+            CLANG_VERSION=$(grep '^CLANG_VERSION=' "$BUILDCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | xargs)
+          elif grep -q '^CLANG_VERSION=' "$CONSTANTSCONFIG" 2>/dev/null; then
+            CLANG_VERSION=$(grep '^CLANG_VERSION=' "$CONSTANTSCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | xargs)
+            CLANG_VERSION="clang-$CLANG_VERSION"
+          else
+            echo "No clang version found in config, will auto-detect in prebuilts."
+          fi
+          if [ -z "$CLANG_VERSION" ]; then
+            if [ -d "$KERNEL_PATH/prebuilts/clang/host/linux-x86" ]; then
+              CLANG_VERSION=$(ls -d "$KERNEL_PATH"/prebuilts/clang/host/linux-x86/clang-r*/ | tail -n 1 | xargs basename)
+              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts/clang/host/linux-x86/$CLANG_VERSION/bin"
+            elif [ -d "$KERNEL_PATH/prebuilts-master/clang/host/linux-x86" ]; then
+              CLANG_VERSION=$(ls -d "$KERNEL_PATH"/prebuilts-master/clang/host/linux-x86/clang-r*/ | tail -n 1 | xargs basename)
+              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts-master/clang/host/linux-x86/$CLANG_VERSION/bin"
+            else
+              CLANG_VERSION="clang"
+              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts/clang/host/linux-x86/$CLANG_VERSION/bin" # dummy
+            fi
+          else
+            if [ -d "$KERNEL_PATH/prebuilts/clang/host/linux-x86" ]; then
+              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts/clang/host/linux-x86/$CLANG_VERSION/bin"
+            else
+              CLANG_BIN_PATH="$KERNEL_PATH/prebuilts-master/clang/host/linux-x86/$CLANG_VERSION/bin"
+            fi
+          fi
+          echo "Detected CLANG_VERSION: $CLANG_VERSION"
+          echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
+
+      - name: Build Kernel
+        if: ${{ github.event.inputs.use_make == 'true' }}  
+        shell: bash
+        run: |
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          CLANG_BIN_PATH="${{ env.CLANG_BIN_PATH }}"
+          CLANG_VERSION="${{ env.CLANG_VERSION }}"
+          if [ -d "$CLANG_BIN_PATH" ] && [ -x "$CLANG_BIN_PATH/clang" ]; then
+            echo "Adding Clang to PATH: $CLANG_BIN_PATH"
+            export PATH="$CLANG_BIN_PATH:$PATH"
+            SELECTED_CLANG="$CLANG_BIN_PATH/clang"
+          elif command -v clang >/dev/null 2>&1; then
+            SELECTED_CLANG="$(command -v clang)"
+            echo "Using system Clang: $SELECTED_CLANG"
+            exit 1
+          else
+            echo "Error: No valid Clang binary found"
+            exit 1
+          fi
+          echo "Using Clang version: $($SELECTED_CLANG --version | head -n1)"
+          LLVM_TOOLS="clang ld.lld llvm-ar llvm-objcopy llvm-objdump llvm-nm"
+          MISSING_TOOLS=""
+          for tool in $LLVM_TOOLS; do
+            if ! command -v $tool >/dev/null 2>&1; then
+              MISSING_TOOLS="$MISSING_TOOLS $tool"
+            fi
+          done
+          if [ -n "$MISSING_TOOLS" ]; then
+            echo "Installing missing LLVM tools:$MISSING_TOOLS"
+            sudo apt-get update
+            sudo apt-get install -yq --no-install-recommends llvm
+            for tool in $MISSING_TOOLS; do
+              if ! command -v $tool >/dev/null 2>&1; then
+                echo "Error: Failed to install $tool"
+                exit 1
+              fi
+            done
+          fi
+          KERNEL_VERSION="${{ inputs.kernel_version }}"
+          if [[ "$KERNEL_VERSION" == "5.10" ]]; then
+            USE_LLVM_IAS=true
+          fi
+          cd "$KERNEL_PATH/common" || exit 1
+          MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- \
+            RUSTC=$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc \
+            PAHOLE=$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole \
+            LD=ld.lld HOSTLD=ld.lld"
+          if [[ -v USE_LLVM_IAS ]]; then
+            MAKE_ARGS="LLVM_IAS=1 $MAKE_ARGS"
+          fi
+          
+          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" gki_defconfig || exit 1
+          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" || exit 1
+
+      - name: Create Kernel ZIP
+        if: ${{ github.event.inputs.use_make == 'true' }}
+        run: |
+          cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image
+          cd AnyKernel3
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
+          zip -r "../$ZIP_NAME" ./*
   
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
