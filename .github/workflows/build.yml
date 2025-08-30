@@ -118,6 +118,7 @@ jobs:
           fi
 
       - name: Install Repo
+        shell: bash      
         run: |
           mkdir -p ./git-repo
           echo "Downloading repo tool..."
@@ -126,17 +127,22 @@ jobs:
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Other Dependencies
+        shell: bash     
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
           ANYKERNEL_BRANCH="gki-2.0"
+          if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
+          ANYKERNEL_BRANCH="sukisu"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"      
-          git clone https://github.com/TheFloresto/kernel_patches.git -b main       
+          git clone https://github.com/TheFloresto/kernel_patches.git -b main   
+          git clone https://github.com/TheFloresto/SukiSU_patch.git -b main
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
 
       - name: Initialize and Sync Kernel Source
+        shell: bash     
         run: |
           echo "Creating folder for configuration: $CONFIG..."
           mkdir -p "$CONFIG"
@@ -162,6 +168,7 @@ jobs:
          df -h
          
       - name: Fix Less Then 6.6.50 Builds
+        shell: bash      
         run: |
           cd "$CONFIG/common"
           if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
@@ -173,16 +180,23 @@ jobs:
           fi
 
       - name: Determine the branch for KernelSU
+        shell: bash     
         run: |
           case "${{ inputs.kernelsu_branch }}" in
             "Stable")
+              if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
+                echo "BRANCH=-s susfs-main" >> $GITHUB_ENV
+            else
               echo "BRANCH=-" >> $GITHUB_ENV
+             fi
               ;;
             "Dev")
               if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
                 echo "BRANCH=-s main" >> $GITHUB_ENV
               elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
                 echo "BRANCH=-s next" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
+                echo "BRANCH=-s susfs-test" >> $GITHUB_ENV      
               elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
               fi
@@ -198,6 +212,7 @@ jobs:
           esac
       
       - name: Add KernelSU
+        shell: bash     
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -214,6 +229,10 @@ jobs:
             "NEXT")
               echo "Adding KernelSU Next..."
               curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
+            "SukiSU")
+              echo "Adding KernelSU SukiSU..."
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
             "MKSU")
               echo "Adding KernelSU MKSU..."
@@ -237,6 +256,7 @@ jobs:
           #fi
           
       - name: Apply SUSFS Patches for KernelSU Variants
+        shell: bash      
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -297,6 +317,10 @@ jobs:
               cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
               patch -p1 --forward < fix_kernel_compat.c.patch
               ;;
+            "SukiSU")
+              echo "Applying SUSFS patches for SukiSU..."
+              cd ./KernelSU           
+              ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
@@ -304,6 +328,7 @@ jobs:
           esac
 
       - name: Getting KernelSU Version
+        shell: bash      
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -323,6 +348,10 @@ jobs:
               cd ./KernelSU-Next
               BASE_VERSION=10200
               ;;
+            "SukiSU")
+              cd ./KernelSU
+              BASE_VERSION=13050            
+              ;;
             "MKSU")
               ;;
           esac
@@ -332,6 +361,7 @@ jobs:
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
       - name: Apply Hide Stuff Patches
+        shell: bash      
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
@@ -339,6 +369,7 @@ jobs:
           patch -p1 --forward < 69_hide_stuff.patch
           
       - name: Apply Hooks Patches
+        shell: bash      
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
@@ -351,10 +382,15 @@ jobs:
             echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/wild/hooks/scope_min_manual_hooks_v1.4.patch ./
             patch -p1 --forward < syscall_hooks.patch
+          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
+            echo "Applying hooks for SukiSU..."
+            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+            patch -p1 < 60_scope-minimized_manual_hooks.patch        
           fi
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
         if: ${{ ( inputs.kernel_version == '6.6' ) }}
+        shell: bash        
         run: |
           echo "[+] Adding Samsung KDP exported symbols to abi_gki_aarch64_galaxy"
           SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
@@ -375,6 +411,7 @@ jobs:
 
 
       - name: Add Configuration Settings
+        shell: bash      
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -382,12 +419,19 @@ jobs:
 
           # Add KSU configuration settings
           echo "CONFIG_KSU=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+
+          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
+            echo "CONFIG_KPM=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
+            fi
+            echo "CONFIG_KSU_MANUAL_HOOK=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          fi
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a ./common/arch/arm64/configs/gki_defconfig
           fi
                     
       - name: Add SUSFS Configuration Settings
+        shell: bash      
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -439,7 +483,17 @@ jobs:
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
+      - name: Set Build Info Environment Variables
+        shell: bash
+        run: |          
+          # Задаем информацию о пользователе и хосте
+          BUILD_USER="TheFloresto"
+          BUILD_HOST="thefloresto-labs" 
+          echo "BUILD_USER=$BUILD_USER" >> $GITHUB_ENV
+          echo "BUILD_HOST=$BUILD_HOST" >> $GITHUB_ENV        
+
       - name: Change Kernel Name
+        shell: bash      
         run: |
           cd "$CONFIG"
           if [ -f "build/build.sh" ]; then
@@ -535,6 +589,7 @@ jobs:
 
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && inputs.use_make == 'false' }}
+        shell: bash        
         run: |
           mkdir bootimgs
 
@@ -549,6 +604,7 @@ jobs:
 
       - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ (inputs.android_version == 'android14' || inputs.android_version == 'android15') && inputs.use_make == 'false' }}
+        shell: bash       
         run: |
           mkdir bootimgs
 
@@ -563,6 +619,7 @@ jobs:
 
       - name: Create ZIP Files for Different Formats
         if: ${{ inputs.use_make == 'false' }}
+        shell: bash        
         run: |
           echo "Creating zip files for all formats..."
           cd ./AnyKernel3
@@ -588,6 +645,7 @@ jobs:
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' && inputs.use_make == 'false' }}
+        shell: bash       
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd bootimgs
@@ -638,6 +696,7 @@ jobs:
 
       - name: Android 13/14/15 boot image build script
         if: ${{ (inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15') && inputs.use_make == 'false' }}
+        shell: bash        
         run: |
           cd bootimgs
 
@@ -661,13 +720,15 @@ jobs:
           
       - name: Compress all img files with gzip
         if: ${{ inputs.use_make == 'false' }}
+        shell: bash        
         run: |
           for image in *.img; do
             gzip -vnf9 "$image"
           done
 
       - name: Add Build based configs
-        if: ${{ github.event.inputs.use_make == 'true' }}
+        if: ${{ github.event.inputs.use_make == 'true' }}       
+        shell: bash       
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
@@ -777,10 +838,11 @@ jobs:
 
       - name: Create Kernel ZIP
         if: ${{ github.event.inputs.use_make == 'true' }}
+        shell: bash      
         run: |
           cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image
           cd AnyKernel3
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AK3.zip"
           zip -r "../$ZIP_NAME" ./*
   
       - name: Upload Build Artifacts
