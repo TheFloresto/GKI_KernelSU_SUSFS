@@ -16,7 +16,9 @@ on:
       kernelsu_branch_other:
         required: false
         type: string
-        default: ""
+      use_make:
+        required: true
+        type: boolean
 
 jobs:
   build-kernels-a13-5-10:
@@ -56,6 +58,7 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+      use_make: ${{ inputs.use_make }}
 
   build-kernels-a13-5-15:
     strategy:
@@ -96,3 +99,4 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+      use_make: ${{ inputs.use_make }}
