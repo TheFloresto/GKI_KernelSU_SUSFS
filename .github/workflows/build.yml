@@ -362,7 +362,7 @@ jobs:
             "WILD")
               echo "Getting KernelSU version for Wild KSU..."
               cd ./KernelSU-Next
-              BASE_VERSION=‭10200
+              BASE_VERSION=‭11005
               ;;
             "KSU")
               echo "Getting KernelSU version for Official KernelSU..."
