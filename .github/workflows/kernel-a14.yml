@@ -16,7 +16,9 @@ on:
       kernelsu_branch_other:
         required: false
         type: string
-        default: ""
+      use_make:
+        required: true
+        type: boolean
 
 jobs:
   build-kernels-a14-5-15:
@@ -56,16 +58,17 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
+      use_make: ${{ inputs.use_make }}
 
   build-kernels-a14-6-1:
     strategy:
       fail-fast: true
       matrix:
         include:
-          #- sub_level: "25"
-          #  os_patch_level: "2023-10"
-          #- sub_level: "43"
-          #  os_patch_level: "2023-11"
+          - sub_level: "25"
+            os_patch_level: "2023-10"
+          - sub_level: "43"
+            os_patch_level: "2023-11"
           - sub_level: "57"
             os_patch_level: "2024-01"
           - sub_level: "68"
@@ -100,8 +103,6 @@ jobs:
             os_patch_level: "2025-06"
           - sub_level: "141"
             os_patch_level: "2025-07"
-          - sub_level: "145"
-            os_patch_level: "2025-08"
           - sub_level: "X"
             os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
@@ -112,5 +113,6 @@ jobs:
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      use_make: ${{ inputs.use_make }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
