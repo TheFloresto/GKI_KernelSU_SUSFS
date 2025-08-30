@@ -424,7 +424,7 @@ jobs:
             patch -p1 --forward < syscall_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
             echo "Applying hooks for SukiSU..."
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks ./
+            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
             patch -p1 < 60_scope-minimized_manual_hooks.patch
           fi
 
