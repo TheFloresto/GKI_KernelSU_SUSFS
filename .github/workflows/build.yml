@@ -520,6 +520,71 @@ jobs:
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
+      - name: Add POCO F6 Optimizations
+        shell: bash
+        run: |
+          cd "$CONFIG"
+          CONFIG_FILE="./common/arch/arm64/configs/gki_defconfig"
+
+          # Garante CPUs do Tensor G3
+          grep -q "CONFIG_ARM64_CORTEX_X3=y" "$CONFIG_FILE" || echo "CONFIG_ARM64_CORTEX_X3=y" >> "$CONFIG_FILE"
+          grep -q "CONFIG_ARM64_CORTEX_A715=y" "$CONFIG_FILE" || echo "CONFIG_ARM64_CORTEX_A715=y" >> "$CONFIG_FILE"
+          grep -q "CONFIG_ARM64_CORTEX_A510=y" "$CONFIG_FILE" || echo "CONFIG_ARM64_CORTEX_A510=y" >> "$CONFIG_FILE"
+
+          
+          echo "Applying POCO F6 (Snapdragon 8s Gen 3) optimizations..."
+          
+          # Snapdragon 8s Gen 3 CPU optimizations
+          poco_opts=(
+          "CONFIG_ARM64_VA_BITS=48"
+          "CONFIG_ARM64_PA_BITS=48"
+          "CONFIG_ARM64_TAGGED_ADDR_ABI=y"
+          "CONFIG_ARM64_SVE=y"           # Scalable Vector Extension for Tensor G3
+          "CONFIG_ARM64_BTI=y"           # Branch Target Identification
+          "CONFIG_ARM64_PTR_AUTH=y"      # Pointer Authentication
+          # Scheduler optimizations for Tensor G3 (Cortex-X3, A715, A510 cores)
+          "CONFIG_SCHED_MC=y"            # Multi-core scheduling
+          "CONFIG_SCHED_CORE=y"          # Core scheduling for performance
+          "CONFIG_ENERGY_MODEL=y"        # Energy-aware scheduling
+          "CONFIG_UCLAMP_TASK=y"         # Utilization clamping for task placement
+          "CONFIG_UCLAMP_TASK_GROUP=y"   # Utilization clamping for task groups
+          "CONFIG_SCHEDUTIL=y"           # Schedutil governor for CPU freq
+          # CPU Frequency (aligned with Tensor G3)
+          "CONFIG_CPU_FREQ=y"
+          "CONFIG_CPUFREQ_DT=y"
+          "CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y"
+          "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y"
+          "CONFIG_OPP=y"                 # Operating Performance Points
+          # CPU Idle (for power efficiency)
+          "CONFIG_CPU_IDLE=y"
+          "CONFIG_ARM_PSCI_CPUIDLE=y"
+          # Thermal management (generic, avoids device-specific thermal configs)
+          "CONFIG_THERMAL=y"
+          "CONFIG_CPU_THERMAL=y"
+          "CONFIG_DEVFREQ_THERMAL=y"
+          "CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y"
+          "CONFIG_THERMAL_GOV_STEP_WISE=y"
+          "CONFIG_THERMAL_GOV_FAIR_SHARE=y"
+          "CONFIG_THERMAL_EMULATION=y"
+          "CONFIG_THERMAL_WRITABLE_TRIPS=y"
+          "CONFIG_POWER_CAP=y"           # Power capping for thermal control
+          # Additional Tensor G3-safe optimizations
+          "CONFIG_PERF_EVENTS=y"         # Performance events for profiling
+          "CONFIG_ARM64_SME=y"           # Scalable Matrix Extension (if supported)
+          "CONFIG_NUMA_BALANCING=y"      # NUMA balancing for memory efficiency
+          "CONFIG_CMA=y"                 # Contiguous Memory Allocator for Tensor G3
+          "CONFIG_CMA_AREAS=7"          # Adjust CMA areas for Tensor G3 memory needs
+          )
+          
+          # Apply POCO F6 optimizations
+          for opt in "${poco_opts[@]}"; do
+            if ! grep -q "^$opt" "$CONFIG_FILE"; then
+              echo "$opt" >> "$CONFIG_FILE"
+            fi
+          done
+          
+          echo "POCO F6 optimizations applied successfully!"
+
       - name: Set Build Info Environment Variables
         shell: bash
         run: |          
