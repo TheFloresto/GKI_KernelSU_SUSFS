@@ -82,7 +82,7 @@ jobs:
           echo "CONFIG set to: $CONFIG"
 
       - name: Install ccache
-        run: sudo apt update && sudo apt install -y ccache libelf-dev libssl-dev build-essential
+        run: sudo apt update && sudo apt install -y ccache libelf-dev libssl-dev build-essential ccache dwarves lz4
 
       - name: Set up ccache
         run: |
