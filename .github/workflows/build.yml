@@ -537,7 +537,7 @@ jobs:
           echo "CONFIG_CCACHE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
 
       - name: Build
-        if: ${{ inputs.use_make == 'false' }}
+        if: ${{ github.event.inputs.use_make == 'false' }}  
         shell: bash
         run : |
           set -e
