@@ -274,7 +274,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-               echo "Applying SUSFS patches for Wild KSU..."
+              echo "Applying SUSFS patches for Wild KSU..."
               cd ./Wild_KSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
@@ -484,6 +484,64 @@ jobs:
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
+      - name: Add POCO F6 Optimizations
+        shell: bash
+        run: |
+         cd "$CONFIG"
+         CONFIG_FILE="./common/arch/arm64/configs/gki_defconfig"
+
+         # POCO F6 specific optimizations
+         opts=(
+         # Memory and address space (already in AOSP gki_defconfig, ensure for Snapdragon 8s Gen 3)
+         "CONFIG_ARM64_VA_BITS=48"
+         "CONFIG_ARM64_PA_BITS=48"
+         "CONFIG_ARM64_TAGGED_ADDR_ABI=y"
+         "CONFIG_ARM64_SVE=y"           # Scalable Vector Extension
+         "CONFIG_ARM64_BTI=y"           # Branch Target Identification
+         "CONFIG_ARM64_PTR_AUTH=y"      # Pointer Authentication
+         # Scheduler optimizations for Snapdragon 8s Gen 3 (Cortex-X4, A720, A520 cores)
+         "CONFIG_SCHED_MC=y"            # Multi-core scheduling
+         "CONFIG_SCHED_CORE=y"          # Core scheduling for performance
+         "CONFIG_ENERGY_MODEL=y"        # Energy-aware scheduling
+         "CONFIG_UCLAMP_TASK=y"         # Utilization clamping for task placement
+         "CONFIG_UCLAMP_TASK_GROUP=y"   # Utilization clamping for task groups
+         "CONFIG_SCHEDUTIL=y"           # Schedutil governor for CPU freq
+          # CPU Frequency (aligned with Snapdragon 8s Gen 3)
+          "CONFIG_CPU_FREQ=y"
+          "CONFIG_CPUFREQ_DT=y"
+          "CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y"
+          "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y"
+          "CONFIG_OPP=y"                 # Operating Performance Points
+          # CPU Idle (for power efficiency)
+          "CONFIG_CPU_IDLE=y"
+          "CONFIG_ARM_PSCI_CPUIDLE=y"
+          # Thermal management (generic, avoids device-specific thermal configs)
+          "CONFIG_THERMAL=y"
+          "CONFIG_CPU_THERMAL=y"
+          "CONFIG_DEVFREQ_THERMAL=y"
+          "CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y"
+          "CONFIG_THERMAL_GOV_STEP_WISE=y"
+          "CONFIG_THERMAL_GOV_FAIR_SHARE=y"
+          "CONFIG_THERMAL_EMULATION=y"
+          "CONFIG_THERMAL_WRITABLE_TRIPS=y"
+          "CONFIG_POWER_CAP=y"           # Power capping for thermal control
+          # Additional Snapdragon 8s Gen 3-safe optimizations
+          "CONFIG_PERF_EVENTS=y"         # Performance events for profiling
+          "CONFIG_ARM64_SME=y"           # Scalable Matrix Extension (if supported)
+          "CONFIG_NUMA_BALANCING=y"      # NUMA balancing for memory efficiency
+          "CONFIG_CMA=y"                 # Contiguous Memory Allocator
+          "CONFIG_CMA_AREAS=7"          # Adjust CMA areas for memory needs
+          )
+          
+         # Apply POCO F6 optimizations
+         for opt in "${opts[@]}"; do
+         if ! grep -q "^$opt" "$CONFIG_FILE"; then
+         echo "$opt" >> "$CONFIG_FILE"
+         fi
+         done
+         
+         echo "POCO F6 optimizations applied successfully!"
+
       - name: Set Build Info Environment Variables
         shell: bash
         run: |          
@@ -539,54 +597,23 @@ jobs:
       - name: Build
         if: ${{ github.event.inputs.use_make == 'false' }}  
         shell: bash
-        run : |
+        run: |
           set -e
           set -x
           cd "$CONFIG"
-          
-          # Set ccache path in PATH
-          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
-          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="3G"
-          /usr/bin/ccache -M "${{ env.CCACHE_MAXSIZE }}"
-          /usr/bin/ccache -o compression=true
-          /usr/bin/ccache -s      
-
-          echo "Checking kernel version..."
-          if [[ "$CONFIG" == *"6.6"* ]]; then
-            echo "Fetching .bazelrc with sm8635-polly-66 configuration (cortex-a76)..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly-66.bazelrc -o .bazelrc || exit 1
-            EXTRA_BAZEL_FLAGS="--config=sm8635-polly-66"
-          else
-            echo "Fetching .bazelrc with sm8635-polly configuration (cortex-a720)..."
-            curl -LSs https://raw.githubusercontent.com/TheFloresto/kernel_patches/main/next/sm8635-polly.bazelrc -o .bazelrc || exit 1
-            EXTRA_BAZEL_FLAGS="--config=sm8635-polly"
-          fi
-
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
             LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
           else
-            # Clear unnecessary .NET, Android NDK, Haskell, CodeQL runtime while building kernel, freeing space without blocking subsequent steps
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            tools/bazel build --disk_cache=/home/runner/.cache/bazel != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=full $EXTRA_BAZEL_FLAGS //common:kernel_aarch64_dist || exit 1
+            # Conditional flag based on kernel version
+            if [[ "${{ inputs.kernel_version }}" != "6.6" ]]; then
+              MULTI_THREADED_FLAG="--experimental_multi_threaded_digest"
+            else
+              MULTI_THREADED_FLAG=""
+            fi
+            tools/bazel build --disk_cache=/home/runner/.cache/bazel $MULTI_THREADED_FLAG --config=fast --lto=full //common:kernel_aarch64_dist || exit 1
           fi
-          echo "Kernel compilation completed!"
-          echo "ccache status:"
           ccache -s
-          echo "Space after compilation:"
-          df -h
 
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && inputs.use_make == 'false' }}
