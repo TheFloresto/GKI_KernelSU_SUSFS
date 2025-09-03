@@ -505,10 +505,13 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-          echo "CONFIG_LTO_CLANG_THIN=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_LTO_CLANG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "./common/arch/arm64/configs/gki_defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "./common/arch/arm64/configs/gki_defconfig"
+          echo "CONFIG_LTO_CLANG_THIN=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_LTO_CLANG=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" | tee -a "./common/arch/arm64/configs/gki_defconfig"
+
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
+          # Ativar ccache
+          echo "CONFIG_CCACHE=y" | tee -a ./common/arch/arm64/configs/gki_defconfig        
 
       - name: Detect Clang Version from Configs
         if: ${{ inputs.use_make == true }}
