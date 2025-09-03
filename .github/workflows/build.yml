@@ -540,7 +540,7 @@ jobs:
         if: ${{ inputs.use_make == true }}  
         shell: bash
         run: |                
-            echo "Configuring gki_defconfig for Pixel 8a..."
+            echo "Configuring gki_defconfig for GKI..."
             CONFIG_FILE="$CONFIG/common/arch/arm64/configs/gki_defconfig"
 
             # Super bloco seguro de otimizações usando array
@@ -580,15 +580,12 @@ jobs:
               "CONFIG_CMA_AREAS=7"
             )
 
-            # Aplica cada opção se não existir
+            # Применяем каждую опцию, если она не существует
             for opt in "${opts[@]}"; do
                 grep -q "$opt" "$CONFIG_FILE" || echo "$opt" >> "$CONFIG_FILE"
             done
 
             echo "gki_defconfig configured successfully for GKI"
-            else
-            echo "PIXEL8A not set. Skipping GKI configuration."
-            fi
 
       - name: Build Kernel
         if: ${{ inputs.use_make == true }}  
