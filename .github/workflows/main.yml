@@ -113,7 +113,7 @@ jobs:
       - build-kernels-a15-6-6
     env:
       GH_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v1.5.9"
+      RELEASE_NAME: "GKI Kernels With KSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
       - name: Checkout code
