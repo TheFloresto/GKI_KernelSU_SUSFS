@@ -517,9 +517,9 @@ jobs:
           
           if [ -f ./build/kernel/kleaf/impl/stamp.bzl ]; then
            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-           else
-          fi
-            sed -i.bak '/if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/,/echo \$scmversion/ s/^/            # /' ./stamp.bzl                        
+           else          
+            sed -i.bak '/if \[\[ -n "\$android_release" \]\] && \[\[ -n "\$KMI_GENERATION" \]\]; then/,/echo \$scmversion/ s/^/            # /' ./stamp.bzl           
+           fi
 
           # Try to find and replace user/host in all possible locations
            find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
