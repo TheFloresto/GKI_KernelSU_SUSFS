@@ -319,16 +319,6 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Release Assets
-        run: |
-          for file in ./downloaded-artifacts/*-kernel-*/*; do
-            if [ -d "$file" ]; then
-              continue
-            fi
-            echo "Uploading $file..."
-            gh release upload ${{ env.NEW_TAG }} "$file"
-          done
-
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
