@@ -530,6 +530,7 @@ jobs:
           # Alternative: modify init/Makefile directly if it exists
           perl -pi -e "s/build-user = .*/build-user = ${{ env.BUILD_USER }}/" ./common/init/Makefile
           perl -pi -e "s/build-host = .*/build-host = ${{ env.BUILD_HOST }}/" ./common/init/Makefile         
+          fi   
 
       - name: Add Build based configs
         if: ${{ inputs.use_make == true }}
