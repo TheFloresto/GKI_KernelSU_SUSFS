@@ -337,6 +337,6 @@ jobs:
             📋 *Release Information:*
             🔧 *KernelSU Variant:* ${{ inputs.kernel_variant }}
             
-            [🔗 View GitHub Release] (https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
+            [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
             
