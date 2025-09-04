@@ -312,12 +312,12 @@ jobs:
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
-            cp -v  ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
+            cp -v  ../../kernel_patches/next/syscall_hooks.patch ./
+            patch -p1 --forward < syscall_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
             echo "Applying hooks for WKSU..."
-            cp -v ../../kernel_patches/wild/hooks/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
+            cp -v ../../kernel_patches/wild/hooks/syscall_hooks.patch ./
+            patch -p1 --forward < syscall_hooks.patch
           fi
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
