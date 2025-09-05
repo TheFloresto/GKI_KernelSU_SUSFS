@@ -243,7 +243,7 @@ jobs:
           -> WKSU Kernels & Others
           -> Multi Manager Support for WKSU Manager & KernelSU Next Manager (Only Install One)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.4
+          -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
