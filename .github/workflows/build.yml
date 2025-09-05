@@ -234,20 +234,11 @@ jobs:
             "WKSU")
               echo "Applying SUSFS patches for WKSU..."
               cd ./Wild_KSU
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-              
-              cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-              
-              cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
-              patch -p1 --forward < fix_rules.c.patch
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch
 
-              cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
-              patch -p1 --forward < fix_sucompat.c.patch
-
-              cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
-              patch -p1 --forward < fix_kernel_compat.c.patch
+              cp -v ../../kernel_patches/next/0001-james.patch ./
+              patch -p1 --forward < 0001-james.patch
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
@@ -258,23 +249,11 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-              
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
-              patch -p1 --forward < fix_apk_sign.c.patch
-              
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-              
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
-              patch -p1 --forward < fix_rules.c.patch
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch
 
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
-              patch -p1 --forward < fix_sucompat.c.patch
-
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
-              patch -p1 --forward < fix_kernel_compat.c.patch
+              cp -v ../../kernel_patches/next/0001-james.patch ./
+              patch -p1 --forward < 0001-james.patch
               ;;
 
           esac
@@ -320,12 +299,12 @@ jobs:
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
-            cp -v  ../../kernel_patches/next/syscall_hooks.patch ./
-            patch -p1 --forward < syscall_hooks.patch
+            cp -v  ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
             echo "Applying hooks for WKSU..."
-            cp -v ../../kernel_patches/wild/hooks/syscall_hooks.patch ./
-            patch -p1 --forward < syscall_hooks.patch
+            cp -v ../../kernel_patches/wild/hooks/60_scope-minimized_manual_hooks.patch ./
+            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
           fi
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
