@@ -500,9 +500,7 @@ jobs:
             find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
              xargs sed -i "s/\$(shell uname -n)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
                
-           # Alternative: modify init/Makefile directly if it exists
-             perl -pi -e "s/build-user = .*/build-user = ${{ env.BUILD_USER }}/" ./common/init/Makefile
-             perl -pi -e "s/build-host = .*/build-host = ${{ env.BUILD_HOST }}/" ./common/init/Makefile
+           # Alternative: modify init/Makefile directly if it existed 
              perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
              perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h 
 
