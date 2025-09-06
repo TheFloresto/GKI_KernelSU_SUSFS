@@ -81,7 +81,7 @@ jobs:
 
       - name: Install dependencies
         if: ${{ inputs.use_make == true }}
-        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves
+        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
 
       - name: Install Repo
         run: |
@@ -116,6 +116,14 @@ jobs:
           echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
           echo "CLANG_VERSION=zyc-22.0.0" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+
+      - name: Setup GCC Cross-Compilation Toolchains
+        if: ${{ inputs.use_make == true }}
+        shell: bash
+        run: |
+          echo "Installing GCC cross-compilation toolchains..."
+          echo "GCC_AARCH64_PATH=/usr/bin" >> $GITHUB_ENV
+          echo "GCC_ARM_PATH=/usr/bin" >> $GITHUB_ENV
 
       - name: Initialize and Sync Kernel Source
         run: |
@@ -485,7 +493,7 @@ jobs:
           perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           
-          #Set Kernel Timestamp
+          # Set static kernel timestamp
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
           
           #Set Kernel Name
@@ -499,16 +507,16 @@ jobs:
           perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
               
           # Try to find and replace user/host in all possible locations
-            find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
-             xargs sed -i "s/\$(shell whoami)/${{ env.BUILD_USER }}/g" 2>/dev/null || true
-            find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
-             xargs sed -i "s/\$(shell hostname)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
-            find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
-             xargs sed -i "s/\$(shell uname -n)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
+          find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
+           xargs sed -i "s/\$(shell whoami)/${{ env.BUILD_USER }}/g" 2>/dev/null || true
+          find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
+           xargs sed -i "s/\$(shell hostname)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
+          find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
+           xargs sed -i "s/\$(shell uname -n)/${{ env.BUILD_HOST }}/g" 2>/dev/null || true
                
-           # Alternative: modify init/Makefile directly if it existed 
-             perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
-             perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h 
+          # Alternative: modify init/Makefile directly if it existed 
+          perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
+          perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h 
 
       - name: Add Build based configs
         if: ${{ inputs.use_make == true }}
@@ -584,6 +592,7 @@ jobs:
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           CLANG_BIN_PATH="${{ env.CLANG_BIN_PATH }}"
           CLANG_VERSION="${{ env.CLANG_VERSION }}"
+          
           if [ -d "$CLANG_BIN_PATH" ] && [ -x "$CLANG_BIN_PATH/clang" ]; then
             echo "Adding Clang to PATH: $CLANG_BIN_PATH"
             export PATH="$CLANG_BIN_PATH:$PATH"
@@ -595,7 +604,10 @@ jobs:
             echo "Error: No valid Clang binary found"
             exit 1
           fi
+          
           echo "Using Clang version: $($SELECTED_CLANG --version | head -n1)"
+          
+          # Check LLVM tools
           LLVM_TOOLS="clang ld.lld llvm-ar llvm-objcopy llvm-objdump llvm-nm"
           MISSING_TOOLS=""
           for tool in $LLVM_TOOLS; do
@@ -603,6 +615,7 @@ jobs:
               MISSING_TOOLS="$MISSING_TOOLS $tool"
             fi
           done
+          
           if [ -n "$MISSING_TOOLS" ]; then
             echo "Installing missing LLVM tools:$MISSING_TOOLS"
             sudo apt-get update
@@ -614,25 +627,38 @@ jobs:
               fi
             done
           fi
+          
           KERNEL_VERSION="${{ inputs.kernel_version }}"
           if [[ "$KERNEL_VERSION" == "5.10" ]]; then
             USE_LLVM_IAS=true
           fi
+          
           cd "$KERNEL_PATH/common" || exit 1
-          MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- \
-            RUSTC=$GITHUB_WORKSPACE/clang-zyc/bin/rustc \
+          
+          # Build arguments with both Clang and GCC cross-compilation support
+          MAKE_ARGS="LLVM=1 ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabihf- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
             PAHOLE=$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole \
-            LD=ld.lld HOSTLD=ld.lld"
+            LD=ld.lld HOSTLD=ld.lld \
+            CC=\"ccache clang\""
+          
           if [[ -v USE_LLVM_IAS ]]; then
             MAKE_ARGS="LLVM_IAS=1 $MAKE_ARGS"
           fi
 
-           if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections" gki_defconfig || exit 1
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections" || exit 1          
+          # Setup ccache for faster builds
+          export USE_CCACHE=1
+          export CCACHE_DIR="$HOME/.ccache"
+          mkdir -p "$CCACHE_DIR"
+
+          if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections" gki_defconfig || exit 1
+            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections" || exit 1          
           else     
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" gki_defconfig || exit 1
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" || exit 1
+            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" gki_defconfig || exit 1
+            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" || exit 1
           fi
           
       - name: Create Kernel ZIP
@@ -667,4 +693,3 @@ jobs:
             *.zip
             *.img.gz
             *Image*
-            
