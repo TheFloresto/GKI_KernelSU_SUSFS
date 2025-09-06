@@ -292,7 +292,7 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           cp -v ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 --forward -F 3 < 69_hide_stuff.patch
+          patch -p1 --forward < 69_hide_stuff.patch
 
       - name: Apply Hooks Patches
         run: |
@@ -328,6 +328,15 @@ jobs:
           cd drivers
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
+
+      - name: Fix CLIDR CLANG
+        if: ${{ inputs.use_make == true }}
+        shell: bash      
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
+          patch -p1 --forward < fix-clidr-uninitialized.patch
 
       - name: Set Build Info Environment Variables
         shell: bash
