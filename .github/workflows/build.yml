@@ -55,6 +55,7 @@ jobs:
           verbose: 'true'                # Enable detailed logging
           
       - name: Setup SWAP
+        if: ${{ inputs.use_make == false }}   
         shell: bash
         run: |
           sudo swapoff -a
