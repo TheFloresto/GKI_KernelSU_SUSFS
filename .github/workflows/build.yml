@@ -171,15 +171,6 @@ jobs:
             echo "Line already present. Skipping insert."
           fi
 
-      - name: Fix CLIDR CLANG
-        if: ${{ inputs.use_make == true }}
-        shell: bash      
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
-          cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
-          patch -p1 --forward < fix-clidr-uninitialized.patch
-
       - name: Apply ptrace patch for older kernels
         if: fromJSON(inputs.kernel_version) < 5.16
         run: |
@@ -231,6 +222,40 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
           esac
+          
+      - name: Fix CLIDR CLANG
+        if: ${{ inputs.use_make == true }}
+        shell: bash      
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          
+          # Apply Clang 22 compatibility patch (like in shell script)
+          local clidr_patch_file="../../kernel_patches/fix-clidr-uninitialized.patch"
+          if [ -f "$clidr_patch_file" ]; then
+            echo "Applying Clang 22 compatibility patch (fix-clidr-uninitialized.patch)..."
+            cp -v "$clidr_patch_file" ./
+            
+            # Check if patch is already applied
+            if patch -p1 --dry-run --reverse < fix-clidr-uninitialized.patch >/dev/null 2>&1; then
+              echo "CLIDR patch already applied, skipping."
+            elif patch -p1 --dry-run < fix-clidr-uninitialized.patch >/dev/null 2>&1; then
+              # Patch can be applied cleanly
+              patch -p1 < fix-clidr-uninitialized.patch
+              echo "CLIDR patch applied successfully."
+            else
+              # Try with fuzz tolerance
+              echo "Patch doesn't apply cleanly, trying with fuzz tolerance..."
+              if patch -p1 --fuzz=3 < fix-clidr-uninitialized.patch; then
+                echo "CLIDR patch applied with fuzz tolerance."
+              else
+                echo "CLIDR patch could not be applied. Build may fail with Clang 22+."
+              fi
+            fi
+          else
+            echo "Clang 22 compatibility patch not found, skipping."
+            echo "This may cause build errors with Clang 22 or newer."
+          fi
 
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
