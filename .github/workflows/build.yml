@@ -81,7 +81,7 @@ jobs:
 
       - name: Install dependencies
         if: ${{ inputs.use_make == true }}
-        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential
+        run: sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves
 
       - name: Install Repo
         run: |
