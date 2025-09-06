@@ -633,7 +633,7 @@ jobs:
           else     
            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" gki_defconfig || exit 1
            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" || exit 1
-
+          fi
       - name: Create Kernel ZIP
         run: |
           echo "Creating kernel ZIP..."
