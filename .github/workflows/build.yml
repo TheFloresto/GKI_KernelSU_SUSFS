@@ -360,9 +360,7 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
 
-          # Add SUSFS configuration settings
-          echo 'CONFIG_LOCALVERSION_AUTO=n' | tee -a ./common/arch/arm64/configs/gki_defconfig
-          echo 'CONFIG_LOCALVERSION="-GKI-@NoFloresto+@mr_vokintos"' | tee -a ./common/arch/arm64/configs/gki_defconfig          
+          # Add SUSFS configuration settings          
           echo "CONFIG_KSU_SUSFS=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a ./common/arch/arm64/configs/gki_defconfig
@@ -429,22 +427,22 @@ jobs:
           cd "$CONFIG"
           if [ -f "build/build.sh" ]; then
               perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-GKI-@NoFloresto+@mr_vokintos"/s' ./common/scripts/setlocalversion
+              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-GKI-@NoFloresto"/s' ./common/scripts/setlocalversion
               perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
-
+              
               # Fix user and host
               perl -pi -e "s/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY=\"${{ env.BUILD_USER }}\"/" ./common/scripts/mkcompile_h
-              perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h              
-             else
+              perl -pi -e "s/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST=\"${{ env.BUILD_HOST }}\"/" ./common/scripts/mkcompile_h                           
+          else
               #Remove -maybe-dirty
               perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
               
               #Set Kernel Name
-              echo "CONFIG_LOCALVERSION=\"-GKI-@NoFloresto+@mr_vokintos\"" >> ./common/arch/arm64/configs/gki_defconfig
+              echo "CONFIG_LOCALVERSION=\"-GKI-@NoFloresto\"" >> ./common/arch/arm64/configs/gki_defconfig
 
               #Set Kernel Timestamp
               perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
-
+              
               # Try to find and replace user/host in all possible locations
               find . -type f \( -name "*.bzl" -o -name "*.mk" -o -name "Makefile*" -o -name "BUILD*" \) | \
                xargs sed -i "s/\$(shell whoami)/${{ env.BUILD_USER }}/g" 2>/dev/null || true
@@ -457,7 +455,6 @@ jobs:
                perl -pi -e "s/build-user = .*/build-user = ${{ env.BUILD_USER }}/" ./common/init/Makefile
                perl -pi -e "s/build-host = .*/build-host = ${{ env.BUILD_HOST }}/" ./common/init/Makefile
           fi
-
 
       - name: Add Build based configs
         if: ${{ inputs.use_make == false }}
@@ -491,16 +488,15 @@ jobs:
         run: |
           cd "$CONFIG"
           perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           
-          # Set static kernel timestamp
+          #Set Kernel Timestamp
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
           
           #Set Kernel Name
           if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")(?!.*\1)/echo "\$\{KERNELVERSION\}-GKI-@NoFloresto+@mr_vokintos"/s' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")(?!.*\1)/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-💜-@NoFloresto"/s' ./common/scripts/setlocalversion
           else
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*\1)/echo "\-GKI-@NoFloresto+@mr_vokintos"/s' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*\1)/echo "\-💜-@NoFloresto"/s' ./common/scripts/setlocalversion
           fi
               
           #Set Kernel Timestamp
@@ -539,51 +535,6 @@ jobs:
          echo "CLANG_VERSION=zyc-22.0.0" >> $GITHUB_ENV
          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
          echo "Using ZyC Clang: $GITHUB_WORKSPACE/clang-zyc/bin/clang"
-
-      - name: Optimized Clang
-        if: ${{ inputs.use_make == true }}  
-        shell: bash
-        run: |                
-            echo "Configuring gki_defconfig for GKI..."
-            CONFIG_FILE="$CONFIG/common/arch/arm64/configs/gki_defconfig"
-
-            # Super bloco seguro de otimizações usando array
-            opts=(
-              "CONFIG_ARM64_VA_BITS=48"
-              "CONFIG_ARM64_PA_BITS=48"
-              "CONFIG_ARM64_TAGGED_ADDR_ABI=y"
-              "CONFIG_SCHED_MC=y"
-              "CONFIG_ENERGY_MODEL=y"
-              "CONFIG_UCLAMP_TASK=y"
-              "CONFIG_UCLAMP_TASK_GROUP=y"
-              "CONFIG_SCHEDUTIL=y"
-              "CONFIG_CPU_FREQ=y"
-              "CONFIG_CPUFREQ_DT=y"
-              "CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y"
-              "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y"
-              "CONFIG_OPP=y"
-              "CONFIG_CPU_IDLE=y"
-              "CONFIG_ARM_PSCI_CPUIDLE=y"
-              "CONFIG_THERMAL=y"
-              "CONFIG_CPU_THERMAL=y"
-              "CONFIG_DEVFREQ_THERMAL=y"
-              "CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y"
-              "CONFIG_THERMAL_GOV_STEP_WISE=y"
-              "CONFIG_THERMAL_GOV_FAIR_SHARE=y"
-              "CONFIG_THERMAL_EMULATION=y"
-              "CONFIG_THERMAL_WRITABLE_TRIPS=y"
-              "CONFIG_POWER_CAP=y"
-              "CONFIG_PERF_EVENTS=y"
-              "CONFIG_CMA=y"
-              "CONFIG_CMA_AREAS=7"
-            )
-
-            # Применяем каждую опцию, если она не существует
-            for opt in "${opts[@]}"; do
-                grep -q "$opt" "$CONFIG_FILE" || echo "$opt" >> "$CONFIG_FILE"
-            done
-
-            echo "gki_defconfig configured successfully for GKI"
 
       - name: Build Kernel
         if: ${{ inputs.use_make == true }}  
