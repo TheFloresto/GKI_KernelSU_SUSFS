@@ -533,41 +533,8 @@ jobs:
         shell: bash      
         run: |
           echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
-          
-          # Copy patch file if it exists in the source location
-          if [ -f "../../kernel_patches/fix-clidr-uninitialized.patch" ]; then
-            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
-          else
-            echo "CLIDR patch file not found in kernel_patches directory, skipping."
-            exit 0
-          fi
-          
-          # Apply patch with comprehensive error handling
-          if [ -f "fix-clidr-uninitialized.patch" ]; then
-            echo "Found CLIDR patch file, checking application status..."
-            
-            # Check if patch is already applied (reverse check)
-            if patch -p1 --dry-run --reverse < fix-clidr-uninitialized.patch >/dev/null 2>&1; then
-              echo "CLIDR patch already applied, skipping."
-            # Check if patch can be applied cleanly
-            elif patch -p1 --dry-run < fix-clidr-uninitialized.patch >/dev/null 2>&1; then
-              echo "Applying CLIDR patch cleanly..."
-              patch -p1 --forward < fix-clidr-uninitialized.patch
-              echo "CLIDR patch applied successfully."
-            else
-              echo "Patch doesn't apply cleanly, trying with fuzz tolerance..."
-              if patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch 2>/dev/null; then
-                echo "CLIDR patch applied with fuzz tolerance."
-              else
-                echo "CLIDR patch could not be applied to this kernel version."
-                echo "This may cause build errors with Clang 22 or newer, but continuing..."
-                echo "Consider updating the patch for this kernel version: ${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-              fi
-            fi
-          else
-            echo "CLIDR patch file not found after copy, skipping."
-          fi
+          cd "$CONFIG/common"          
+          curl -LSs https://github.com/infectedmushi/kernel_patches/commit/36bd00f53e5af07953d983791b979b405e09f33a.patch | patch -p1 —forward
 
       - name: Build Kernel
         if: ${{ inputs.use_make == true }}
