@@ -346,12 +346,12 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"          
-          if [[ "$CONFIG" == *"6.6"* ]]; then        
-            curl -Ls https://raw.githubusercontent.com/TheFloresto/kernel_patches/1093b1c59062fd19f140566103dc8a53b85196b3/fix-clidr-uninitialized6.patch | patch -p1 --fuzz=10
-          else 
-            curl -Ls https://raw.githubusercontent.com/infectedmushi/kernel_patches/36bd00f53e5af07953d983791b979b405e09f33a/fix-clidr-uninitialized.patch | patch -p1 --fuzz=3
-           fi
-
+           if [[ "$CONFIG" == *"6.6"* ]]; then        
+          echo "Version 6.6 detected - skipping CLIDR patch"
+           else          
+           echo "Applying CLIDR patch for non-6.6 version"
+           curl -Ls https://raw.githubusercontent.com/infectedmushi/kernel_patches/36bd00f53e5af07953d983791b979b405e09f33a/fix-clidr-uninitialized.patch | patch -p1 --fuzz=3
+          fi
 
       - name: Build Kernel
         run: |
