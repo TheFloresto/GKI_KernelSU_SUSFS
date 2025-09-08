@@ -346,7 +346,7 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"          
-          curl -LSs https://github.com/infectedmushi/kernel_patches/commit/36bd00f53e5af07953d983791b979b405e09f33a.patch | patch -p1 —forward
+          curl -Ls https://raw.githubusercontent.com/infectedmushi/kernel_patches/36bd00f53e5af07953d983791b979b405e09f33a/fix-clidr-uninitialized.patch | patch -p1
 
       - name: Build Kernel
         run: |
