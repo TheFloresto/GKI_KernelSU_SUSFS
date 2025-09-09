@@ -213,19 +213,72 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Собираем все файлы для загрузки
-          UPLOAD_FILES=()
-          for file in ./downloaded-artifacts/*-kernel-*/*; do
-            if [ ! -d "$file" ]; then
-              UPLOAD_FILES+=("$file")
-            fi
-          done
+          # Debug: Show what artifacts were actually downloaded
+          echo "=== DEBUG: Listing downloaded artifacts structure ==="
+          if [ -d "./downloaded-artifacts" ]; then
+            find ./downloaded-artifacts -type f -name "*" | head -20
+            echo "Total files found: $(find ./downloaded-artifacts -type f | wc -l)"
+          else
+            echo "ERROR: ./downloaded-artifacts directory does not exist!"
+            exit 1
+          fi
           
-          # Создаем релиз в публичном репозитории NerestKernels
+          echo "=== DEBUG: Directory structure ==="
+          ls -la ./downloaded-artifacts/ || echo "Cannot list ./downloaded-artifacts/"
+          
+          # Collect all files for upload with better pattern matching
+          UPLOAD_FILES=()
+          
+          # Try different patterns to find kernel files
+          echo "=== DEBUG: Searching for kernel files ==="
+          
+          # Pattern 1: Find all files in downloaded-artifacts recursively
+          while IFS= read -r -d '' file; do
+            if [ -f "$file" ]; then
+              # Skip if it's a directory or hidden file
+              if [[ ! "$(basename "$file")" =~ ^\. ]]; then
+                UPLOAD_FILES+=("$file")
+                echo "Found file: $file"
+              fi
+            fi
+          done < <(find ./downloaded-artifacts -type f -print0 2>/dev/null)
+          
+          # Alternative: try glob patterns with nullglob option
+          if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
+            echo "=== DEBUG: Trying alternative patterns ==="
+            shopt -s nullglob
+            
+            # Try various patterns
+            for pattern in \
+              "./downloaded-artifacts/*/*" \
+              "./downloaded-artifacts/*kernel*/*" \
+              "./downloaded-artifacts/*/kernel*" \
+              "./downloaded-artifacts/*/*.img" \
+              "./downloaded-artifacts/*/*.zip" \
+              "./downloaded-artifacts/**/*" \
+            ; do
+              echo "Trying pattern: $pattern"
+              for file in $pattern; do
+                if [ -f "$file" ]; then
+                  UPLOAD_FILES+=("$file")
+                  echo "Found with pattern $pattern: $file"
+                fi
+              done
+            done
+            
+            shopt -u nullglob
+          fi
+          
+          echo "=== DEBUG: Final file list ==="
+          printf '%s\n' "${UPLOAD_FILES[@]}"
+          echo "Total files to upload: ${#UPLOAD_FILES[@]}"
+          
+          # Create release in NerestKernels repository
           if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
             echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS..."
             
-            # Создаем релиз с первым файлом
+            # Create release with first file
+            echo "Creating release with first file: ${UPLOAD_FILES[0]}"
             gh release create "$NEW_TAG" \
               --repo "NerestKernels/GKI_KernelSU_SUSFS" \
               --title "$RELEASE_NAME" \
@@ -233,29 +286,31 @@ jobs:
               $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
               "${UPLOAD_FILES[0]}"
             
-            # Загружаем остальные файлы, если они есть
+            # Upload additional files if they exist
             if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
               echo "Uploading additional files..."
               for i in "${!UPLOAD_FILES[@]}"; do
                 if [ $i -gt 0 ]; then
-                  echo "Uploading ${UPLOAD_FILES[$i]}..."
+                  echo "Uploading file $((i+1))/${#UPLOAD_FILES[@]}: ${UPLOAD_FILES[$i]}"
                   gh release upload "$NEW_TAG" \
                     --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-                    "${UPLOAD_FILES[$i]}"
+                    "${UPLOAD_FILES[$i]}" || echo "Failed to upload ${UPLOAD_FILES[$i]}"
                 fi
               done
             fi
             
             echo "Release created successfully!"
           else
-            echo "No files found to upload!"
+            echo "ERROR: No files found to upload!"
+            echo "=== DEBUG: Final directory check ==="
+            find ./downloaded-artifacts -type f -exec ls -la {} \; 2>/dev/null || echo "No files found anywhere"
             exit 1
           fi
 
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
-          ls ./downloaded-artifacts/**/*
+          find ./downloaded-artifacts -type f -exec ls -la {} \; 2>/dev/null || echo "No files found"
             
       - name: Send Telegram Notification
         run: |
