@@ -32,6 +32,7 @@ jobs:
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
 
+
   release:
     runs-on: ubuntu-latest
     needs:
@@ -41,6 +42,7 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
+
     env:
       GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v1.5.9"
@@ -159,9 +161,10 @@ jobs:
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
+          pattern: '*-make'
 
       - name: Set release body
         run: |
@@ -176,7 +179,7 @@ jobs:
           -> Wild KSU
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager (Only Install One)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.5
+          -> Scope-Minimized Manual hooks v1.4
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
@@ -184,11 +187,10 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-          -> ZyC = clang
       
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
-          -> Official Kernel Flasher, try https://github.com/fatalcoder524/KernelFlasher/
+          -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
       
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
@@ -310,17 +312,17 @@ jobs:
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
-          find ./downloaded-artifacts -type f -exec ls -la {} \; 2>/dev/null || echo "No files found"
+          ls ./downloaded-artifacts/**/*
             
       - name: Send Telegram Notification
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
+            -F message_thread_id="${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}" \
             -F text="
             🌽 *New Kernel Release Uploaded*  
             📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ env.NEW_TAG }})" \
+            [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
             
