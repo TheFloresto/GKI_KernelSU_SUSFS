@@ -314,6 +314,7 @@ jobs:
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
+          -> **Warning**: boot.img files may not boot on some Android 16 devices
       
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
