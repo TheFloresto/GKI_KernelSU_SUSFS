@@ -40,18 +40,32 @@ jobs:
         build_type: ["make", "normal"]
 
     steps:
-      # # - name: Maximize Build Space
-        # uses: AdityaGarg8/remove-unwanted-software@v5
-        # with:
-          # remove-dotnet: 'true'          # Frees ~2 GB
-          # remove-android: 'true'         # Frees ~9 GB
-          # remove-haskell: 'true'         # Frees ~5.2 GB
-          # remove-codeql: 'true'          # Frees ~5.4 GB
-          # remove-docker-images: 'true'   # Frees ~3.2 GB
-          # remove-large-packages: 'true'  # Frees ~3.1 GB
-          # remove-swapfile: 'true'        # Frees ~4 GB
-          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          # verbose: 'true'                # Enable detailed logging
+      - name: Maximize Build Space
+        uses: AdityaGarg8/remove-unwanted-software@v5
+        with:
+          remove-dotnet: 'true'          # Frees ~2 GB
+          remove-android: 'true'         # Frees ~9 GB
+          remove-haskell: 'true'         # Frees ~5.2 GB
+          remove-codeql: 'true'          # Frees ~5.4 GB
+          remove-docker-images: 'true'   # Frees ~3.2 GB
+          remove-large-packages: 'true'  # Frees ~3.1 GB
+          remove-swapfile: 'true'        # Frees ~4 GB
+          remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          verbose: 'true'                # Enable detailed logging
+
+      - name: Setup SWAP
+        shell: bash
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon -p 1 /swapfile
+          echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
+          echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+          echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
+          free -h      
           
       - name: Set CONFIG Environment Variable
         run: |
