@@ -6,7 +6,18 @@ permissions:
 
 on:
   push:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      kernelsu_variant:
+        required: true
+        type: string
+      kernelsu_branch:
+        required: true
+        type: string
+      kernelsu_branch_other:
+        required: false
+        type: string
+        default: ""  
 
 jobs:
   build-check:
@@ -64,3 +75,6 @@ jobs:
       kernel_version: ${{ matrix.kernel_config.kernel_version }}
       sub_level: ${{ matrix.kernel_config.sub_level }}
       os_patch_level: ${{ matrix.kernel_config.os_patch_level }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
