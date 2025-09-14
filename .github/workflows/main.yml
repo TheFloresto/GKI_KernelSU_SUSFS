@@ -6,34 +6,135 @@ permissions:
 
 on:
   workflow_dispatch:
-
+    inputs:
+      release_type:
+        description: "Choose Release Type"
+        required: true
+        type: choice
+        options:
+          - Actions
+          - Pre-Release
+          - Release
+        default: Pre-Release
+      include_wild:
+        description: 'Include WILD?'
+        required: true
+        type: boolean
+        default: false
+      include_ksu:
+        description: 'Include KSU?'
+        required: true
+        type: boolean
+        default: false
+      include_next:
+        description: 'Include NEXT?'
+        required: true
+        type: boolean
+        default: true
+      include_mksu:
+        description: 'Include MKSU?'
+        required: true
+        type: boolean
+        default: false
+      kernelsu_branch:
+        description: "Choose ksu branch"
+        required: true
+        type: choice
+        options:
+          - Stable
+          - Dev
+          - Other
+        default: Dev
+      kernelsu_branch_other:
+        description: "If 'Other' is selected, specify your custom branch"
+        required: false
+        type: string
+        default: ""
+          
 jobs:
   build-a12-5-10:
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   build-a13-5-10:
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   build-a13-5-15:
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   build-a14-5-15:
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   build-a14-6-1:
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   build-a15-6-6:
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
+  set-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          VARIANTS=()
+          [[ "${{ inputs.include_wild }}" == "true" ]] && VARIANTS+=("\"WILD\"")
+          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
+          [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
+          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
+          echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   release:
+    if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}  
     runs-on: ubuntu-latest
     needs:
       - build-a12-5-10
@@ -94,11 +195,27 @@ jobs:
 
       - name: Get KernelSU variant refs and links
         run: |
-          # Get WKSU latest commit from wild branch
-          WKSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
-          WKSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$WKSU_REF"
-          echo "WKSU_REF=$WKSU_REF" >> $GITHUB_ENV
-          echo "WKSU_URL=$WKSU_URL" >> $GITHUB_ENV
+          BRANCH="${{ inputs.kernelsu_branch }}"
+      
+          get_ref() {
+            local name="$1" repo="$2" path="$3" mode="$4"
+            if [[ "$mode" == "tag" ]]; then
+              ref=$(git ls-remote --tags --sort=-v:refname "$repo" | grep -o 'refs/tags/.*' | cut -d/ -f3 | head -n1)
+              url="https://github.com/$path/releases/tag/$ref"
+            else
+              ref=$(git ls-remote "$repo" HEAD | awk '{print $1}')
+              url="https://github.com/$path/commit/$ref"
+            fi
+            echo "${name}_REF=$ref" >> $GITHUB_ENV
+            echo "${name}_URL=$url" >> $GITHUB_ENV
+          }
+      
+          [[ "$BRANCH" == "Stable" ]] && MODE="tag" || MODE="commit"
+
+          get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
+          get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
+          get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
+          get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
 
       - name: Generate New Tag
         env:
@@ -177,9 +294,9 @@ jobs:
       
           Features:
           -> Wild KSU
-          -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager (Only Install One)
+          -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & other (Only Install One)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.4
+          -> Scope-Minimized Manual hooks v1.5         
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
@@ -196,11 +313,16 @@ jobs:
           -> https://github.com/sidex15/ksu_module_susfs
       
           Managers:
-          -> WKSU: https://t.me/Wild_Kernels/26618
-          -> Next: https://github.com/KernelSU-Next/KernelSU-Next
+          -> WKSU: https://github.com/WildKernels/Wild_KSU / https://t.me/Wild_Kernels/26618
+          -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
+          -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
+          -> MKSU KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci                    
           
           Commit Hashes (at the time of release):
           -> WKSU: [${{ env.WKSU_REF }}](${{ env.WKSU_URL }})
+          -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
+          -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
+          -> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})          
 
           -> SUSFS4KSU: 
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
