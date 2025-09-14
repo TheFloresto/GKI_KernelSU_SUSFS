@@ -52,81 +52,9 @@ on:
         default: ""
           
 jobs:
-  build-a12-5-10:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a12-5-10.yml
-    secrets: inherit
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
-  build-a13-5-10:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a13-5-10.yml
-    secrets: inherit
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
-  build-a13-5-15:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a13-5-15.yml
-    secrets: inherit
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
-  build-a14-5-15:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a14-5-15.yml
-    secrets: inherit
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
-  build-a14-6-1:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a14-6-1.yml
-    secrets: inherit
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
-  build-a15-6-6:
-    needs: set-matrix
-    uses: ./.github/workflows/kernel-a15-6-6.yml
-    secrets: inherit
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
   set-matrix:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 5
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -138,6 +66,78 @@ jobs:
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
+
+  build-a12-5-10:
+    needs: set-matrix
+    uses: ./.github/workflows/kernel-a12-5-10.yml
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
+  build-a13-5-10:
+    needs: set-matrix
+    uses: ./.github/workflows/kernel-a13-5-10.yml
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
+  build-a13-5-15:
+    needs: set-matrix
+    uses: ./.github/workflows/kernel-a13-5-15.yml
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
+  build-a14-5-15:
+    needs: set-matrix
+    uses: ./.github/workflows/kernel-a14-5-15.yml
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
+  build-a14-6-1:
+    needs: set-matrix
+    uses: ./.github/workflows/kernel-a14-6-1.yml
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
+  build-a15-6-6:
+    needs: set-matrix
+    uses: ./.github/workflows/kernel-a15-6-6.yml
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    with:
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   release:
     if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}  
@@ -153,20 +153,13 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v1.5.9"
-      RELEASE_BODY:
+      
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
-          # remove-dotnet: 'true'          # Frees ~2 GB
-          # remove-android: 'true'         # Frees ~9 GB
-          # remove-haskell: 'true'         # Frees ~5.2 GB
-          # remove-codeql: 'true'          # Frees ~5.4 GB
-          # remove-docker-images: 'true'   # Frees ~3.2 GB
-          # remove-large-packages: 'true'  # Frees ~3.1 GB
-          remove-swapfile: 'true'        # Frees ~4 GB
-          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          verbose: 'true'                # Enable detailed logging
+          remove-swapfile: 'true'
+          verbose: 'true'
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -227,7 +220,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Получаем последний тег из публичного репозитория NerestKernels
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
@@ -236,7 +228,6 @@ jobs:
           
           echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
           
-          # Генерируем новый тег с увеличенным номером ревизии
           NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{
             if (NF > 1) {
               suffix = $NF + 1
@@ -249,13 +240,11 @@ jobs:
           
           echo "Proposed new tag: $NEW_TAG"
           
-          # Проверяем, существует ли тег в публичном репозитории NerestKernels
           TAG_EXISTS=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$NEW_TAG\") | .name" 2>/dev/null || echo "")
           
           if [ -n "$TAG_EXISTS" ]; then
             echo "Tag $NEW_TAG already exists in NerestKernels repository, finding next available tag"
             
-            # Находим следующий доступный тег
             BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
             BASE_REVISION=$(echo "$LATEST_TAG" | grep -o 'r[0-9]*$' | sed 's/r//' || echo "0")
             COUNTER=$((BASE_REVISION + 1))
@@ -272,7 +261,6 @@ jobs:
               
               COUNTER=$((COUNTER + 1))
               
-              # Защита от бесконечного цикла
               if [ "$COUNTER" -gt $((BASE_REVISION + 100)) ]; then
                 echo "Error: Could not find available tag after 100 attempts"
                 exit 1
@@ -287,17 +275,16 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-          pattern: '*-make'
 
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
-      
+          
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
           Please ensure you have proper backups before installation.
-      
+          
           Features:
           -> Wild KSU
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & other (Only Install One)
@@ -310,15 +297,15 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-      
+          
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
           -> **Warning**: boot.img files may not boot on some Android 16 devices
-      
+          
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
-      
+          
           Managers:
           -> WKSU: https://github.com/WildKernels/Wild_KSU / https://t.me/Wild_Kernels/26618
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
@@ -326,11 +313,15 @@ jobs:
           -> MKSU KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci                    
           
           Commit Hashes (at the time of release):
-          -> WKSU: [${{ env.WKSU_REF }}](${{ env.WKSU_URL }})
-          -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
-          -> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
-          -> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})          
-
+          EOF
+          
+          [[ "${{ inputs.include_wild }}" == "true" ]] && echo "-> WKSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})" >> release_body.md
+          [[ "${{ inputs.include_ksu }}" == "true" ]] && echo "-> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})" >> release_body.md
+          [[ "${{ inputs.include_next }}" == "true" ]] && echo "-> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})" >> release_body.md
+          [[ "${{ inputs.include_mksu }}" == "true" ]] && echo "-> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})" >> release_body.md
+          
+          cat << 'EOF' >> release_body.md
+          
           -> SUSFS4KSU: 
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
             -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
@@ -344,104 +335,38 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Debug: Show what artifacts were actually downloaded
-          echo "=== DEBUG: Listing downloaded artifacts structure ==="
-          if [ -d "./downloaded-artifacts" ]; then
-            find ./downloaded-artifacts -type f -name "*" | head -20
-            echo "Total files found: $(find ./downloaded-artifacts -type f | wc -l)"
-          else
+          if [ ! -d "./downloaded-artifacts" ]; then
             echo "ERROR: ./downloaded-artifacts directory does not exist!"
             exit 1
           fi
           
-          echo "=== DEBUG: Directory structure ==="
-          ls -la ./downloaded-artifacts/ || echo "Cannot list ./downloaded-artifacts/"
-          
-          # Collect all files for upload with better pattern matching
           UPLOAD_FILES=()
-          
-          # Try different patterns to find kernel files
-          echo "=== DEBUG: Searching for kernel files ==="
-          
-          # Pattern 1: Find all files in downloaded-artifacts recursively
           while IFS= read -r -d '' file; do
-            if [ -f "$file" ]; then
-              # Skip if it's a directory or hidden file
-              if [[ ! "$(basename "$file")" =~ ^\. ]]; then
-                UPLOAD_FILES+=("$file")
-                echo "Found file: $file"
-              fi
+            if [ -f "$file" ] && [[ "$(basename "$file")" != .* ]]; then
+              UPLOAD_FILES+=("$file")
+              echo "Found: $file"
             fi
-          done < <(find ./downloaded-artifacts -type f -print0 2>/dev/null)
+          done < <(find ./downloaded-artifacts -type f -print0)
           
-          # Alternative: try glob patterns with nullglob option
+          echo "Total files found: ${#UPLOAD_FILES[@]}"
+          
           if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
-            echo "=== DEBUG: Trying alternative patterns ==="
-            shopt -s nullglob
-            
-            # Try various patterns
-            for pattern in \
-              "./downloaded-artifacts/*/*" \
-              "./downloaded-artifacts/*kernel*/*" \
-              "./downloaded-artifacts/*/kernel*" \
-              "./downloaded-artifacts/*/*.img" \
-              "./downloaded-artifacts/*/*.zip" \
-              "./downloaded-artifacts/**/*" \
-            ; do
-              echo "Trying pattern: $pattern"
-              for file in $pattern; do
-                if [ -f "$file" ]; then
-                  UPLOAD_FILES+=("$file")
-                  echo "Found with pattern $pattern: $file"
-                fi
-              done
-            done
-            
-            shopt -u nullglob
-          fi
-          
-          echo "=== DEBUG: Final file list ==="
-          printf '%s\n' "${UPLOAD_FILES[@]}"
-          echo "Total files to upload: ${#UPLOAD_FILES[@]}"
-          
-          # Create release in NerestKernels repository
-          if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
-            echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS..."
-            
-            # Create release with first file
-            echo "Creating release with first file: ${UPLOAD_FILES[0]}"
-            gh release create "$NEW_TAG" \
-              --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-              --title "$RELEASE_NAME" \
-              --notes-file release_body.md \
-              $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
-              "${UPLOAD_FILES[0]}"
-            
-            # Upload additional files if they exist
-            if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
-              echo "Uploading additional files..."
-              for i in "${!UPLOAD_FILES[@]}"; do
-                if [ $i -gt 0 ]; then
-                  echo "Uploading file $((i+1))/${#UPLOAD_FILES[@]}: ${UPLOAD_FILES[$i]}"
-                  gh release upload "$NEW_TAG" \
-                    --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-                    "${UPLOAD_FILES[$i]}" || echo "Failed to upload ${UPLOAD_FILES[$i]}"
-                fi
-              done
-            fi
-            
-            echo "Release created successfully!"
-          else
-            echo "ERROR: No files found to upload!"
-            echo "=== DEBUG: Final directory check ==="
-            find ./downloaded-artifacts -type f -exec ls -la {} \; 2>/dev/null || echo "No files found anywhere"
+            echo "ERROR: No files found!"
             exit 1
           fi
+          
+          echo "Creating release with all files..."
+          gh release create "$NEW_TAG" \
+            --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+            --title "$RELEASE_NAME" \
+            --notes-file release_body.md \
+            $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
+            "${UPLOAD_FILES[@]}"
 
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
-          ls ./downloaded-artifacts/**/*
+          find ./downloaded-artifacts -type f -exec basename {} \;
             
       - name: Send Telegram Notification
         run: |
