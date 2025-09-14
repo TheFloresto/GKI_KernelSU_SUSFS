@@ -17,7 +17,7 @@ on:
           - Release
         default: Pre-Release
       include_wild:
-        description: 'Include WILD?'
+        description: 'Include WKSU?'
         required: true
         type: boolean
         default: false
