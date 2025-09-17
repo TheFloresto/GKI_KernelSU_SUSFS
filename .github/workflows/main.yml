@@ -272,7 +272,7 @@ jobs:
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v4
         with:
           path: ./downloaded-artifacts
 
