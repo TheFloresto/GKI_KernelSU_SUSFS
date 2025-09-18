@@ -337,7 +337,6 @@ jobs:
           
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" >> "$defconfig"
-          echo "CONFIG_KSU_SWITCH_MANAGER=y" >> "$defconfig"          
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then         
            echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
