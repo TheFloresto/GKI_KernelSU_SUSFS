@@ -50,7 +50,7 @@ on:
         required: false
         type: string
         default: ""
-          
+
 jobs:
   set-matrix:
     runs-on: ubuntu-latest
@@ -140,7 +140,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   release:
-    if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}  
+    if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}    
     runs-on: ubuntu-latest
     needs:
       - build-a12-5-10
@@ -153,13 +153,20 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v1.5.9"
-      
+      RELEASE_BODY:
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
-          remove-swapfile: 'true'
-          verbose: 'true'
+          # remove-dotnet: 'true'          # Frees ~2 GB
+          # remove-android: 'true'         # Frees ~9 GB
+          # remove-haskell: 'true'         # Frees ~5.2 GB
+          # remove-codeql: 'true'          # Frees ~5.4 GB
+          # remove-docker-images: 'true'   # Frees ~3.2 GB
+          # remove-large-packages: 'true'  # Frees ~3.1 GB
+          remove-swapfile: 'true'        # Frees ~4 GB
+          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          verbose: 'true'                # Enable detailed logging
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -272,24 +279,25 @@ jobs:
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
+          pattern: '*-make'
 
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
-          
+      
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
           Please ensure you have proper backups before installation.
-          
+      
           Features:
           -> Wild KSU
-          -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & other (Only Install One)
+          -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager (Only Install One)
           -> SUSFS ඞ v1.5.9
-          -> Scope-Minimized Manual hooks v1.5         
+          -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
           -> Futile Maphide for jit-zygote-cache Detections
@@ -297,31 +305,32 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-          
+      
+          Build Types:
+          -> **Make Build**: Built using traditional make
+          -> **Normal Build**: Built using Bazel or build.sh
+          -> **For avbroot users**: Try the normal build from CI to get proper KMI (Kernel Module Interface) compatibility
+
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
           -> **Warning**: boot.img files may not boot on some Android 16 devices
-          
+      
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
-          
+      
           Managers:
           -> WKSU: https://github.com/WildKernels/Wild_KSU / https://t.me/Wild_Kernels/26618
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
           -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
-          -> MKSU KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci                    
+          -> MKSU KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci      
           
           Commit Hashes (at the time of release):
-          EOF
-          
           [[ "${{ inputs.include_wild }}" == "true" ]] && echo "-> WKSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})" >> release_body.md
           [[ "${{ inputs.include_ksu }}" == "true" ]] && echo "-> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})" >> release_body.md
           [[ "${{ inputs.include_next }}" == "true" ]] && echo "-> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})" >> release_body.md
           [[ "${{ inputs.include_mksu }}" == "true" ]] && echo "-> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})" >> release_body.md
-          
-          cat << 'EOF' >> release_body.md
-          
+
           -> SUSFS4KSU: 
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
             -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
@@ -363,10 +372,20 @@ jobs:
             $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
             "${UPLOAD_FILES[@]}"
 
+      - name: Upload Release Assets
+        run: |
+          for file in ./downloaded-artifacts/*/*; do
+            if [ -d "$file" ]; then
+              continue
+            fi
+            echo "Uploading $file..."
+            gh release upload ${{ env.NEW_TAG }} "$file"
+          done
+
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
-          find ./downloaded-artifacts -type f -exec basename {} \;
+          ls ./downloaded-artifacts/**/*
             
       - name: Send Telegram Notification
         run: |
