@@ -231,7 +231,7 @@ jobs:
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./Wild_KSU
               cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward --fuzz=3 < 0001-Susfs-1.5.9.patch             
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch             
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
@@ -243,7 +243,7 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
               cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward --fuzz=3 < 0001-Susfs-1.5.9.patch
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch
 
               cp -v ../../kernel_patches/next/0001-james.patch ./
               patch -p1 --forward < 0001-james.patch
