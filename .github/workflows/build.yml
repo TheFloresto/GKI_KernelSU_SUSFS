@@ -242,25 +242,8 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
-              #cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-          
-              # Apply compatibility fixes
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-          
-              ## Skip fix_rules.c.patch for Android 14 with kernel 6.1
-              #if [ "${{ inputs.android_version }}" != "android14" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
-              #  cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
-              #  patch -p1 --forward < fix_rules.c.patch
-              #fi
-
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
-              patch -p1 --forward < fix_sucompat.c.patch
-
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
-              patch -p1 --forward < fix_kernel_compat.c.patch
+              cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              patch -p1 --forward --fuzz=3 < 0001-Susfs-1.5.9.patch
 
               cp -v ../../kernel_patches/next/0001-james.patch ./
               patch -p1 --forward < 0001-james.patch
@@ -306,8 +289,8 @@ jobs:
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
-            cp -v ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
-            patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
+            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+            patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
@@ -436,13 +419,13 @@ jobs:
           
           #Set Kernel Name
           if [ "${{ matrix.build_type }}" = "make" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-TheFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "make" ]; then
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-TheFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-TheFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ]; then
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-TheFloresto"/s' ./common/scripts/setlocalversion
           fi
 
           #Set Kernel Timestamp
