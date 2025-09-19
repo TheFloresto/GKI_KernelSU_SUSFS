@@ -40,18 +40,18 @@ jobs:
         build_type: ["make", "normal"]
 
     steps:
-      - name: Maximize Build Space
-        uses: AdityaGarg8/remove-unwanted-software@v5
-        with:
-          remove-dotnet: 'true'          # Frees ~2 GB
-          remove-android: 'true'         # Frees ~9 GB
-          remove-haskell: 'true'         # Frees ~5.2 GB
-          remove-codeql: 'true'          # Frees ~5.4 GB
-          remove-docker-images: 'true'   # Frees ~3.2 GB
-          remove-large-packages: 'true'  # Frees ~3.1 GB
-          remove-swapfile: 'true'        # Frees ~4 GB
-          remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          verbose: 'true'                # Enable detailed logging
+      # # - name: Maximize Build Space
+        # uses: AdityaGarg8/remove-unwanted-software@v5
+        # with:
+          # remove-dotnet: 'true'          # Frees ~2 GB
+          # remove-android: 'true'         # Frees ~9 GB
+          # remove-haskell: 'true'         # Frees ~5.2 GB
+          # remove-codeql: 'true'          # Frees ~5.4 GB
+          # remove-docker-images: 'true'   # Frees ~3.2 GB
+          # remove-large-packages: 'true'  # Frees ~3.1 GB
+          # remove-swapfile: 'true'        # Frees ~4 GB
+          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          # verbose: 'true'                # Enable detailed logging
           
       - name: Set CONFIG Environment Variable
         run: |
@@ -181,12 +181,6 @@ jobs:
               ;;
           esac
 
-      - name: Apply ptrace patch for older kernels
-        if: fromJSON(inputs.kernel_version) < 5.16
-        run: |
-          cd "$CONFIG/common"
-          patch -p1 -F 3 < "../../kernel_patches/gki_ptrace.patch"
-
       - name: Add KernelSU
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -211,21 +205,24 @@ jobs:
               ;;
           esac
 
+      - name: Apply ptrace patch for older kernels
+        if: fromJSON(inputs.kernel_version) < 5.16
+        run: |
+          cd "$CONFIG/common"
+          patch -p1 -F 3 < "../../kernel_patches/gki_ptrace.patch"
+          
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
-          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
           
-          echo "Applying SUSFS patches..."
-          
-          # Copy SUSFS patches
+          # Apply core SUSFS patches
           cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
           cd common
           patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
           cd ..
           cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-
+          
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
               echo "Applying SUSFS patches for Official KernelSU..."
@@ -253,38 +250,9 @@ jobs:
               cd ./KernelSU
               ;;
           esac
-
-      - name: Getting KernelSU Version
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
-          
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./Wild_KSU
-              BASE_VERSION=10200
-              ;;
-            "KSU")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./KernelSU
-              BASE_VERSION=10200
-              ;;
-            "NEXT")
-              cd ./KernelSU-Next
-              BASE_VERSION=10200
-              ;;
-            "MKSU")
-              ;;
-          esac
-          
-          cd ./kernel
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           
       - name: Apply Hooks Patches
         run: |
-          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
@@ -337,11 +305,36 @@ jobs:
           
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" >> "$defconfig"
-          
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then         
+
+
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ];               
            echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
-          fi                          
+          fi
           
+          # SUSFS Configuration
+          echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
+          
+          # SUSFS Auto Mount Features
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
+          
+          # SUSFS Advanced Features
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
+          
+          # SUSFS Debugging and Security
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
+
           # Mountify Support
           echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$defconfig"
@@ -373,29 +366,6 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
-          # SUSFS Configuration
-          echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
-          
-          # SUSFS Auto Mount Features
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
-          
-          # SUSFS Advanced Features
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
-          
-          # SUSFS Debugging and Security
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
           
           # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
@@ -418,13 +388,13 @@ jobs:
           
           #Set Kernel Name
           if [ "${{ matrix.build_type }}" = "make" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-Floresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "make" ]; then
-            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-Floresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-Floresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ]; then
-            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-TheFloresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-Floresto"/s' ./common/scripts/setlocalversion
           fi
 
           #Set Kernel Timestamp
@@ -446,12 +416,6 @@ jobs:
           else
             tools/bazel build --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
           fi
-          
-          # Limit Bazel resources to prevent OOM
-          BAZEL_JOBS=$(($(nproc --all) / 2))
-          if [ $BAZEL_JOBS -lt 1 ]; then
-           BAZEL_JOBS=1
-          fi      
 
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
