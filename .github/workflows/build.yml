@@ -306,9 +306,8 @@ jobs:
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" >> "$defconfig"
 
-
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ];               
-           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then               
+            echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
           fi
           
           # SUSFS Configuration
