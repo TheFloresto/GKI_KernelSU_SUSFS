@@ -272,6 +272,8 @@ jobs:
               BASE_VERSION=10200
               ;;
             "MKSU")
+             cd ./KernelSU
+             BASE_VERSION=10200     
               ;;
           esac
           
