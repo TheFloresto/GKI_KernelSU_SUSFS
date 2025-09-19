@@ -63,7 +63,7 @@ jobs:
 
       - name: Setup Build Environment
         run: |
-          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential
+          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves
           
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
@@ -245,8 +245,8 @@ jobs:
               cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward --fuzz=3 < 0001-Susfs-1.5.9.patch    
 
-              cp -v ../../kernel_patches/next/0001-james.patch ./
-              patch -p1 --forward --fuzz=3 < 0001-james.patch              
+              cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
+              patch -p1 --forward --fuzz=3 < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
