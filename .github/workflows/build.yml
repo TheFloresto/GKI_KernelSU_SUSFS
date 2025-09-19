@@ -446,6 +446,12 @@ jobs:
           else
             tools/bazel build --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
           fi
+          
+          # Limit Bazel resources to prevent OOM
+          BAZEL_JOBS=$(($(nproc --all) / 2))
+          if [ $BAZEL_JOBS -lt 1 ]; then
+           BAZEL_JOBS=1
+          fi      
 
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
