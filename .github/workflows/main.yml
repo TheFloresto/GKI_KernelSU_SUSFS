@@ -151,7 +151,7 @@ jobs:
       - build-a15-6-6
 
     env:
-      GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v1.5.9"
       RELEASE_BODY:
     steps:
@@ -373,6 +373,8 @@ jobs:
             "${UPLOAD_FILES[@]}"
 
       - name: Upload Release Assets
+        env:     
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           for file in ./downloaded-artifacts/*/*; do
             if [ -d "$file" ]; then
