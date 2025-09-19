@@ -240,16 +240,44 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
               cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward --fuzz=3 < 0001-Susfs-1.5.9.patch    
+              patch -p1 --forward < 0001-Susfs-1.5.9.patch    
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
-              patch -p1 --forward --fuzz=3 < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
+              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
               ;;
           esac
+
+      - name: Getting KernelSU Version
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG"
+          
+          case "${{ inputs.kernelsu_variant }}" in
+            "WILD")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./Wild_KSU
+              BASE_VERSION=10200
+              ;;
+            "KSU")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./KernelSU
+              BASE_VERSION=10200
+              ;;
+            "NEXT")
+              cd ./KernelSU-Next
+              BASE_VERSION=10200
+              ;;
+            "MKSU")
+              ;;
+          esac
+          
+          cd ./kernel
+          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           
       - name: Apply Hooks Patches
         run: |
