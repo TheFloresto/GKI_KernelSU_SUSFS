@@ -318,10 +318,10 @@ jobs:
           EOF
           
           # Add commit hashes conditionally
-          [[ "${{ inputs.include_wild }}" == "true" ]] && echo "-> WKSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})" >> release_body.md
-          [[ "${{ inputs.include_ksu }}" == "true" ]] && echo "-> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})" >> release_body.md
-          [[ "${{ inputs.include_next }}" == "true" ]] && echo "-> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})" >> release_body.md
-          [[ "${{ inputs.include_mksu }}" == "true" ]] && echo "-> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})" >> release_body.md
+          echo "-> WKSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})" >> release_body.md
+          echo "-> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})" >> release_body.md
+          echo "-> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})" >> release_body.md
+          echo "-> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})" >> release_body.md
 
           cat << 'EOF' >> release_body.md
           
