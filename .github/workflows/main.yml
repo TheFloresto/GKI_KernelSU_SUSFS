@@ -227,6 +227,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
+          # Получаем последний тег из публичного репозитория NerestKernels
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
@@ -235,6 +236,7 @@ jobs:
           
           echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
           
+          # Генерируем новый тег с увеличенным номером ревизии
           NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{
             if (NF > 1) {
               suffix = $NF + 1
@@ -247,11 +249,13 @@ jobs:
           
           echo "Proposed new tag: $NEW_TAG"
           
+          # Проверяем, существует ли тег в публичном репозитории NerestKernels
           TAG_EXISTS=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$NEW_TAG\") | .name" 2>/dev/null || echo "")
           
           if [ -n "$TAG_EXISTS" ]; then
             echo "Tag $NEW_TAG already exists in NerestKernels repository, finding next available tag"
             
+            # Находим следующий доступный тег
             BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
             BASE_REVISION=$(echo "$LATEST_TAG" | grep -o 'r[0-9]*$' | sed 's/r//' || echo "0")
             COUNTER=$((BASE_REVISION + 1))
@@ -268,6 +272,7 @@ jobs:
               
               COUNTER=$((COUNTER + 1))
               
+              # Защита от бесконечного цикла
               if [ "$COUNTER" -gt $((BASE_REVISION + 100)) ]; then
                 echo "Error: Could not find available tag after 100 attempts"
                 exit 1
@@ -344,45 +349,44 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          if [ ! -d "./downloaded-artifacts" ]; then
-            echo "ERROR: ./downloaded-artifacts directory does not exist!"
-            exit 1
-          fi
-          
+          # Собираем все файлы для загрузки
           UPLOAD_FILES=()
-          while IFS= read -r -d '' file; do
-            if [ -f "$file" ] && [[ "$(basename "$file")" != .* ]]; then
+          for file in ./downloaded-artifacts/*-kernel-*/*; do
+            if [ ! -d "$file" ]; then
               UPLOAD_FILES+=("$file")
-              echo "Found: $file"
             fi
-          done < <(find ./downloaded-artifacts -type f -print0)
+          done
           
-          echo "Total files found: ${#UPLOAD_FILES[@]}"
-          
-          if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
-            echo "ERROR: No files found!"
+          # Создаем релиз в публичном репозитории NerestKernels
+          if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
+            echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS..."
+            
+            # Создаем релиз с первым файлом
+            gh release create "$NEW_TAG" \
+              --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+              --title "$RELEASE_NAME" \
+              --notes-file release_body.md \
+              $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
+              "${UPLOAD_FILES[0]}"
+            
+            # Загружаем остальные файлы, если они есть
+            if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
+              echo "Uploading additional files..."
+              for i in "${!UPLOAD_FILES[@]}"; do
+                if [ $i -gt 0 ]; then
+                  echo "Uploading ${UPLOAD_FILES[$i]}..."
+                  gh release upload "$NEW_TAG" \
+                    --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+                    "${UPLOAD_FILES[$i]}"
+                fi
+              done
+            fi
+            
+            echo "Release created successfully!"
+          else
+            echo "No files found to upload!"
             exit 1
           fi
-          
-          echo "Creating release with all files..."
-          gh release create "$NEW_TAG" \
-            --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-            --title "$RELEASE_NAME" \
-            --notes-file release_body.md \
-            $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
-            "${UPLOAD_FILES[@]}"
-
-      - name: Upload Release Assets
-        env:     
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          for file in ./downloaded-artifacts/*/*; do
-            if [ -d "$file" ]; then
-              continue
-            fi
-            echo "Uploading $file..."
-            gh release upload ${{ env.NEW_TAG }} "$file"
-          done
 
       - name: Display Files Uploaded
         run: |
