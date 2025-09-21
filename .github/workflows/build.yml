@@ -244,7 +244,7 @@ jobs:
               patch -p1 --forward < 0001-Susfs-1.5.9.patch      
 
               cp -v ../../kernel_patches/next/0001-james.patch ./
-              patch -p1 --forward < 0001-james.patch 
+              patch -p1 --forward --fuzz=3 < 0001-james.patch 
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
@@ -262,7 +262,7 @@ jobs:
               patch -p1 --forward < 0001-Susfs-1.5.9.patch    
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
-              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
+              patch -p1 --forward --fuzz=3 < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
