@@ -1,4 +1,4 @@
-name: Build Check - All LTS Kernels
+name: Kernel Config - LTS TEST
 
 permissions:
   contents: write
@@ -73,8 +73,8 @@ jobs:
     with:
       android_version: ${{ matrix.kernel_config.android_version }}
       kernel_version: ${{ matrix.kernel_config.kernel_version }}
-      sub_level: ${{ matrix.sub_level }}
-      os_patch_level: ${{ matrix.os_patch_level }}
+      sub_level: ${{ matrix.kernel_config.sub_level }}
+      os_patch_level: ${{ matrix.kernel_config.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}      
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
