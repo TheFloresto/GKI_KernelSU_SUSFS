@@ -417,13 +417,13 @@ jobs:
           
           #Set Kernel Name
           if [ "${{ matrix.build_type }}" = "make" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-Floresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}@NoFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "make" ]; then
-            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-Floresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-@NoFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-Floresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-@NoFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ]; then
-            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-Floresto"/s' ./common/scripts/setlocalversion
+            perl -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-@NoFloresto"/s' ./common/scripts/setlocalversion
           fi
 
           #Set Kernel Timestamp
@@ -485,7 +485,6 @@ jobs:
           fi
           echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
-
 
       - name: Build Kernel
         if: ${{ matrix.build_type == 'make' }}
