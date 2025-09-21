@@ -279,7 +279,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Applying SUSFS patches for WKSU..."
               cd ./Wild_KSU
               BASE_VERSION=10200
               ;;
@@ -289,10 +289,12 @@ jobs:
               BASE_VERSION=10200
               ;;
             "NEXT")
+              echo "Applying SUSFS patches for NEXT..."
               cd ./KernelSU-Next
               BASE_VERSION=10200
               ;;
             "MKSU")
+              echo "Applying SUSFS patches for MKSU..."   
               cd ./KernelSU
               BASE_VERSION=10200     
               ;;
