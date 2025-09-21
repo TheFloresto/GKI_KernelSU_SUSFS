@@ -258,8 +258,28 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward < 0001-Susfs-1.5.9.patch                  
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
+              #cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+          
+              # Apply compatibility fixes
+              cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+          
+              ## Skip fix_rules.c.patch for Android 14 with kernel 6.1
+              #if [ "${{ inputs.android_version }}" != "android14" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
+              #  cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
+              #  patch -p1 --forward < fix_rules.c.patch
+              #fi
+
+              cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
+              patch -p1 --forward < fix_sucompat.c.patch
+
+              cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
+              patch -p1 --forward < fix_kernel_compat.c.patch    
+              
+              cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
+              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch       
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
