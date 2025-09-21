@@ -228,6 +228,7 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
+          -> ZyC Clang used
       
           Build Types:
           -> **Make Build**: Built using traditional make
