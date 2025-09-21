@@ -357,9 +357,10 @@ jobs:
           # Получаем версию ядра
           KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
           ANDROID_VERSION="${{ inputs.android_version }}"
+          FUSS_VERSION="${{ inputs.fuss_version }}"
           
           # Проверяем условие: НЕ применяем патч для Android 15 с ядром 6.6
-          if [ "$ANDROID_VERSION" == "15" ] && [ "$KERNEL_VERSION" == "6.6" ]; then
+          if [ "$KERNEL_VERSION" == "6.6" ]; then
             echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
           else
             echo "Applying fix 22 clang..."
@@ -444,7 +445,6 @@ jobs:
           echo "CONFIG_LTO_CLANG=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "$defconfig"                
-          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
                     
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
