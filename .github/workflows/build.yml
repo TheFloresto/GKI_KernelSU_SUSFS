@@ -327,8 +327,8 @@ jobs:
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
+            cp -v ../../kernel_patches/next/scope_min_manual_hooks_v1.5.patch ./
+            patch -p1 --forward < scope_min_manual_hooks_v1.5.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
