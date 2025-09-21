@@ -284,7 +284,7 @@ jobs:
       
           Features:
           -> Wild KSU
-          -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager (Only Install One)
+          -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
           -> SUSFS ඞ v1.5.9
           -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
@@ -312,7 +312,7 @@ jobs:
           -> WKSU: https://github.com/WildKernels/Wild_KSU / https://t.me/Wild_Kernels/26618
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
           -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
-          -> MKSU KernelSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci      
+          -> MKSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci      
           
           Commit Hashes (at the time of release):
           EOF
@@ -365,7 +365,7 @@ jobs:
           # Create the release first
           gh release create "$NEW_TAG" \
             --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-            --title "GKI Kernels With WKSU & SUSFS v1.5.9" \
+            --title "GKI Kernels With KSU & SUSFS v1.5.9" \
             --notes-file release_body.md \
             $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease")
           
