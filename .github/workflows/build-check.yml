@@ -1,4 +1,4 @@
-name: Build Check - All LTS Kernels
+name: Kernel Config - LTS TEST
 
 permissions:
   contents: write
