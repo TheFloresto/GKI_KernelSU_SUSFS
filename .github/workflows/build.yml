@@ -444,7 +444,8 @@ jobs:
           echo "CONFIG_LTO_CLANG=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "$defconfig"                
-                    echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
+          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
+                    
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
