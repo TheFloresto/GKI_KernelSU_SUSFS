@@ -98,6 +98,19 @@ jobs:
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
+          
+      - name: Setup ZyCromerZ Clang Toolchain
+        run: |
+          echo "Downloading ZyCromerZ Clang 22.0.0..."
+          mkdir -p clang-zyc
+          cd clang-zyc
+          curl -LO https://github.com/ZyCromerZ/Clang/releases/download/22.0.0git-20250921-release/Clang-22.0.0git-20250921.tar.gz      
+          tar -xzf Clang-22.0.0git-20250921.tar.gz
+          cd ..
+          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
+          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          echo "CLANG_VERSION=zyc-22.0.0" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
 
       - name: Initialize and Sync Kernel Source
         run: |
@@ -227,7 +240,7 @@ jobs:
             "WILD")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./Wild_KSU
-              cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch      
 
               cp -v ../../kernel_patches/next/0001-james.patch ./
@@ -239,13 +252,13 @@ jobs:
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch             
                  
-              cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch          
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch    
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
@@ -459,12 +472,22 @@ jobs:
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
         run: |
+          # Check if ZyCromerZ Clang is already set up
+          if [ "${{ env.CLANG_SOURCE }}" = "zyc" ]; then
+            echo "Using ZyCromerZ Clang toolchain"
+            echo "CLANG_VERSION=${{ env.CLANG_VERSION }}" >> $GITHUB_ENV
+            echo "CLANG_BIN_PATH=${{ env.CLANG_BIN_PATH }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          
+          # Original logic for Android prebuilt clang
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           DEFCONFIG="$KERNEL_PATH/common/arch/arm64/configs/gki_defconfig"
           BUILDCONFIG="$KERNEL_PATH/common/build.config.gki"
           CONSTANTSCONFIG="$KERNEL_PATH/common/build.config.constants"
           CLANG_VERSION=""
           CLANG_BIN_PATH=""
+          
           if grep -q '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null; then
             CLANG_VERSION=$(grep '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | tr -d '"' | xargs)
           elif grep -q '^CLANG_VERSION=' "$BUILDCONFIG" 2>/dev/null; then
@@ -475,6 +498,7 @@ jobs:
           else
             echo "No clang version found in config, will auto-detect in prebuilts."
           fi
+          
           if [ -z "$CLANG_VERSION" ]; then
             if [ -d "$KERNEL_PATH/prebuilts/clang/host/linux-x86" ]; then
               CLANG_VERSION=$(ls -d "$KERNEL_PATH"/prebuilts/clang/host/linux-x86/clang-r*/ | tail -n 1 | xargs basename)
@@ -493,6 +517,7 @@ jobs:
               CLANG_BIN_PATH="$KERNEL_PATH/prebuilts-master/clang/host/linux-x86/$CLANG_VERSION/bin"
             fi
           fi
+          
           echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
 
