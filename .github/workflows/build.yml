@@ -100,6 +100,7 @@ jobs:
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
           
       - name: Setup ZyCromerZ Clang Toolchain
+        if: ${{ matrix.build_type == 'make' }}      
         run: |
           echo "Downloading ZyCromerZ Clang 22.0.0..."
           mkdir -p clang-zyc
@@ -349,6 +350,7 @@ jobs:
           echo "obj-y += min_kdp.o" >> Makefile
 
       - name: Apply FIX 22 clang Patches
+        if: ${{ matrix.build_type == 'make' }}
         run: |
           cd "$CONFIG/common"
           
@@ -442,7 +444,7 @@ jobs:
           echo "CONFIG_LTO_CLANG=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "$defconfig"                
-          
+                    echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
