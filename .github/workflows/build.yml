@@ -362,7 +362,7 @@ jobs:
           else
             echo "Applying fix 22 clang..."
             cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
-            patch -p1 --forward fuzz=3 < fix-clidr-uninitialized.patch
+            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
           fi
 
       - name: Apply Kernel Configuration
