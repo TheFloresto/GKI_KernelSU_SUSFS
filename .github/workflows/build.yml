@@ -276,10 +276,7 @@ jobs:
               patch -p1 --forward < fix_sucompat.c.patch
 
               cp ../../kernel_patches/wild/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
-              patch -p1 --forward < fix_kernel_compat.c.patch    
-              
-              cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
-              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch       
+              patch -p1 --forward < fix_kernel_compat.c.patch                      
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
