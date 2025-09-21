@@ -377,77 +377,80 @@ jobs:
           echo "Applying kernel configurations one by one..."
           
           # KernelSU Core Configuration
-          echo "CONFIG_KSU=y" >> "$defconfig"
+          echo "CONFIG_KSU=y" | tee -a "$defconfig"
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then               
-            echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
+            echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a "$defconfig"
           fi
           
           # SUSFS Configuration
-          echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" | tee -a "$defconfig"
           
           # SUSFS Auto Mount Features
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" | tee -a "$defconfig"
           
           # SUSFS Advanced Features
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" | tee -a "$defconfig"
           
           # SUSFS Debugging and Security
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" | tee -a "$defconfig"
 
           # Mountify Support
-          echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
-          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$defconfig"
+          echo "CONFIG_TMPFS_XATTR=y" | tee -a "$defconfig"
+          echo "CONFIG_TMPFS_POSIX_ACL=y" | tee -a "$defconfig"
           
           # Networking Configuration
-          echo "CONFIG_IP_NF_TARGET_TTL=y" >> "$defconfig"
-          echo "CONFIG_IP6_NF_TARGET_HL=y" >> "$defconfig"
-          echo "CONFIG_IP6_NF_MATCH_HL=y" >> "$defconfig"
+          echo "CONFIG_IP_NF_TARGET_TTL=y" | tee -a "$defconfig"
+          echo "CONFIG_IP6_NF_TARGET_HL=y" | tee -a "$defconfig"
+          echo "CONFIG_IP6_NF_MATCH_HL=y" | tee -a "$defconfig"
           
           # BBR TCP Congestion Control
-          echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$defconfig"
-          echo "CONFIG_TCP_CONG_BBR=y" >> "$defconfig"
-          echo "CONFIG_NET_SCH_FQ=y" >> "$defconfig"
-          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "$defconfig"         
-          echo "CONFIG_TCP_CONG_BIC=n" >> "$defconfig"
-          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "$defconfig"
-          echo "CONFIG_TCP_CONG_HTCP=n" >> "$defconfig"
+          echo "CONFIG_TCP_CONG_ADVANCED=y" | tee -a "$defconfig"
+          echo "CONFIG_TCP_CONG_BBR=y" | tee -a "$defconfig"
+          echo "CONFIG_NET_SCH_FQ=y" | tee -a "$defconfig"
+          echo "CONFIG_NET_SCH_FQ_CODEL=y" | tee -a "$defconfig"         
+          echo "CONFIG_TCP_CONG_BIC=n" | tee -a "$defconfig"
+          echo "CONFIG_TCP_CONG_WESTWOOD=n" | tee -a "$defconfig"
+          echo "CONFIG_TCP_CONG_HTCP=n" | tee -a "$defconfig"
           
           # IPSet support
-          echo "CONFIG_IP_SET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_MAX=256" >> "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_IP=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_PORT=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IP=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORT=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
+          echo "CONFIG_IP_SET=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_MAX=256" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_BITMAP_IP=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_BITMAP_PORT=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IP=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IPPORT=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NET=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NETNET=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NETPORT=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NETIFACE=y" | tee -a "$defconfig"
           
           # Build Optimization Configuration
-          echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
-          echo "CONFIG_LTO_CLANG=y" >> "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "$defconfig"                
+          echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
+          echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" | tee -a "$defconfig"
+          echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"      
+          echo "CONFIG_LOCALVERSION_AUTO=n" | tee -a "$defconfig"
+          echo "CONFIG_LOCALVERSION=-GKI-@NoFloresto" | tee -a "$defconfig"               
                     
           # Remove check_defconfig
-          sed -i 's/check_defconfig//' ./common/build.config.gki
+          sed -i '2s/check_defconfig//' ./common/build.config.gki
 
       - name: Change Kernel Name
         run: |
@@ -461,13 +464,13 @@ jobs:
           
           #Set Kernel Name
           if [ "${{ matrix.build_type }}" = "make" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-           sed -i 's/echo "\${KERNELVERSION}\${file_localversion}\${config_localversion}\${LOCALVERSION}\${scm_version}"/echo "\${KERNELVERSION}-${{ inputs.android_version }}-GKI-@NoFloresto"/' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-GKI-@NoFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "make" ]; then
-           sed -i 's/echo "\$res"/echo "-${{ inputs.android_version }}-GKI-@NoFloresto"/' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-GKI-@NoFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-           sed -i 's/echo "\${KERNELVERSION}\${file_localversion}\${config_localversion}\${LOCALVERSION}\${scm_version}"/echo "\${KERNELVERSION}\${file_localversion}\${config_localversion}\${LOCALVERSION}\${scm_version}-GKI-@NoFloresto"/' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-GKI-@NoFloresto"/s' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ]; then
-           sed -i 's/echo "\$res"/echo "\$res-GKI-@NoFloresto"/' ./common/scripts/setlocalversion
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-GKI-@NoFloresto"/s' ./common/scripts/setlocalversion
           fi
 
           #Set Kernel Timestamp
@@ -475,7 +478,7 @@ jobs:
               
           #Remove Abi Exports and Error
           rm -rf ./common/android/abi_gki_protected_exports_*
-          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel          
+          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
 
       - name: Build
         if: ${{ matrix.build_type == 'normal' }}
