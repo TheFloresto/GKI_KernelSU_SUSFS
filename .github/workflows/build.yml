@@ -472,7 +472,7 @@ jobs:
           cd "$CONFIG"
           
           perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-          sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
+          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./build/kernel/kleaf/impl/stamp.bzl
 
