@@ -446,7 +446,6 @@ jobs:
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" | tee -a "$defconfig"
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"      
-          echo "CONFIG_LOCALVERSION_AUTO=n" | tee -a "$defconfig"
           echo "CONFIG_LOCALVERSION=-GKI-@NoFloresto" | tee -a "$defconfig"               
                     
           # Remove check_defconfig
