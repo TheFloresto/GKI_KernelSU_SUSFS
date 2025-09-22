@@ -474,7 +474,6 @@ jobs:
           perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-          sed -i '/# Check for uncommitted changes\./,/fi/d' ./build/kernel/kleaf/impl/stamp.bzl
 
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
