@@ -455,9 +455,9 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" | tee -a "$defconfig"
           
           # Build Optimization Configuration
-          echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
-          echo "CONFIG_LTO_CLANG_FULL=y" | tee -a "$defconfig"
+          echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig""
           echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" | tee -a "$defconfig"
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
           echo "CONFIG_LOCALVERSION_AUTO=n" | tee -a "$defconfig"
