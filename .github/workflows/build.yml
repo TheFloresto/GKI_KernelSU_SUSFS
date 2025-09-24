@@ -484,13 +484,13 @@ jobs:
           
           #Set Kernel Name
           if [ "${{ matrix.build_type }}" = "make" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -pi -e 's/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"/echo "\${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
+            sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "make" ]; then
-            perl -pi -e 's/^(\s*echo "\$res"\s*)$/echo "\${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
+            sed -i 's/echo "$res"/echo "${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -pi -e 's/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"/echo "\${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
+            sed -i 's/echo "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}${scm_version}"/echo "${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
           elif [ "${{ matrix.build_type }}" = "normal" ]; then
-            perl -pi -e 's/^(\s*echo "\$res"\s*)$/echo "\${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
+            sed -i 's/echo "$res"/echo "${KERNELVERSION}-NoFloresto"/' ./common/scripts/setlocalversion
           fi
 
           #Set Kernel Timestamp in Makefile
