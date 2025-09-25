@@ -118,8 +118,8 @@ jobs:
           echo "Downloading ZyCromerZ Clang 22.0.0..."
           mkdir -p clang-zyc
           cd clang-zyc
-          curl -LO https://github.com/ZyCromerZ/Clang/releases/download/22.0.0git-20250921-release/Clang-22.0.0git-20250921.tar.gz      
-          tar -xzf Clang-22.0.0git-20250921.tar.gz
+          curl -LO https://github.com/ZyCromerZ/Clang/releases/download/22.0.0git-20250924-release/Clang-22.0.Ogit-20250924-release      
+          tar -xzf Clang-22.0.0git-20250924.tar.gz
           cd ..
           echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
           echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
