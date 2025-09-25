@@ -219,7 +219,7 @@ jobs:
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.5.9-r0"
+            LATEST_TAG="v1.5.10-r0"
           fi
           
           echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
@@ -285,7 +285,7 @@ jobs:
           Features:
           -> Wild KSU
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
-          -> SUSFS ඞ v1.5.9
+          -> SUSFS ඞ v1.5.10
           -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
@@ -365,7 +365,7 @@ jobs:
           # Create the release first
           gh release create "$NEW_TAG" \
             --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-            --title "GKI Kernels With KSU & SUSFS v1.5.9" \
+            --title "GKI Kernels With KSU & SUSFS v1.5.10" \
             --notes-file release_body.md \
             $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease")
           
