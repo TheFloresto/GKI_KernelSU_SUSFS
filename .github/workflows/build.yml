@@ -291,9 +291,7 @@ jobs:
               ;;
              "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
-              cd ./KernelSU         
-              cp ../../kernel_patches/next/0001-sukisu.patch ./
-              patch -p1 --forward < 0001-sukisu.patch     
+              cd ./KernelSU              
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -325,6 +323,7 @@ jobs:
               BASE_VERSION=10200
               ;;
             "SukiSU")
+              echo "Applying SUSFS patches for SukiSU..."   
               cd ./KernelSU
               BASE_VERSION=13050         
               ;;
