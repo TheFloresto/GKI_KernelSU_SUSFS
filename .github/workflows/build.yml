@@ -308,7 +308,7 @@ jobs:
             "SukiSU")
               echo "Getting SukiSU version..."  
               cd ./KernelSU
-              BASE_VERSION=13095                       
+              BASE_VERSION=13093                       
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
