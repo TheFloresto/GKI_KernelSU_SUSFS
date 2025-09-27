@@ -321,9 +321,8 @@ jobs:
               ;;
             "SukiSU")
               echo "Getting SukiSU version..."   
-              git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
-              cd SukiSU-Ultra
-              BASE_VERSION=10700         
+              cd ./KernelSU
+              BASE_VERSION=13095   
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
@@ -353,20 +352,6 @@ jobs:
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
             patch -p1 < 60_scope-minimized_manual_hooks.patch
           fi
-
-      - name: Apply LZ4KD & ZSTDN for SukiSU-Ultra
-        run: |
-          cd "$CONFIG/common"
-          cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
-          cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
-          cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
-          cp -r ../../SukiSU_patch/other/zram/lz4k_oplus ./lib/
-
-          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
-          patch -p1 --forward -F 3 < lz4kd.patch || true
-
-          #cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
-          #patch -p1 --forward -F 3 < lz4k_oplus.patch || true
           
       - name: Apply Module Symbol Version Fix Patch
         run: |
@@ -424,19 +409,6 @@ jobs:
           defconfig="./common/arch/arm64/configs/gki_defconfig"
           
           echo "Applying kernel configurations one by one..."
-
-          # Suki ZRAM and KPM
-          echo "CONFIG_ZSMALLOC=y" | tee -a "$defconfig"
-          echo "CONFIG_ZRAM=y" | tee -a "$defconfig"
-          echo "CONFIG_MODULE_SIG=n" | tee -a "$defconfig"
-          echo "CONFIG_CRYPTO_LZO=y" | tee -a "$defconfig"
-          echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" | tee -a "$defconfig"
-          echo "CONFIG_CRYPTO_LZ4HC=y" | tee -a "$defconfig"
-          echo "CONFIG_CRYPTO_LZ4K=y" | tee -a "$defconfig"
-          echo "CONFIG_CRYPTO_LZ4KD=y" | tee -a "$defconfig"
-          echo "CONFIG_CRYPTO_842=y" | tee -a "$defconfig"
-          echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" | tee -a "$defconfig"
-          echo "CONFIG_ZRAM_WRITEBACK=y" | tee -a "$defconfig"
           
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" | tee -a "$defconfig"
