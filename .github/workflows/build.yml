@@ -63,7 +63,7 @@ jobs:
 
       - name: Setup Build Environment
         run: |
-          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves kmod bc rsync
+          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves
           
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
@@ -309,7 +309,7 @@ jobs:
             "SukiSU")
               echo "Getting SukiSU version..."  
               cd ./KernelSU
-              BASE_VERSION=13095                  
+              BASE_VERSION=13094            
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
