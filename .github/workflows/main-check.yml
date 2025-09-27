@@ -1,4 +1,4 @@
-name: Build Kernels- TEST
+name: Build Kernels - TEST
 
 permissions:
   contents: write
@@ -31,11 +31,6 @@ on:
         required: true
         type: boolean
         default: true
-      include_sukisu:       
-        description: 'Include SukiSU?'
-        required: true
-        type: boolean
-        default: false
       include_mksu:
         description: 'Include MKSU?'
         required: true
@@ -55,7 +50,7 @@ on:
         required: false
         type: string
         default: ""
-
+        
 jobs:
   set-matrix:
     runs-on: ubuntu-latest
@@ -89,11 +84,10 @@ jobs:
     if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}    
     runs-on: ubuntu-latest
     needs: build-all-lts
-
+    
     env:
-      GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With KSU & SUSFS v1.5.10"
-      RELEASE_BODY:
+      GITHUB_TOKEN: ${{ github.token }}
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.10"
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -110,6 +104,9 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Get commit hashes and generate commit URLs
         run: |
@@ -155,14 +152,12 @@ jobs:
             echo "${name}_REF=$ref" >> $GITHUB_ENV
             echo "${name}_URL=$url" >> $GITHUB_ENV
           }
-      
-          [[ "$BRANCH" == "Stable" ]] && MODE="tag" || MODE="commit"
-
+          [[ "$BRANCH" == "Dev" ]] && MODE="tag" || MODE="commit"
           get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
-          get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"          
-          get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
+          get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"
+          get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "$MODE"          
 
       - name: Generate New Tag
         env:
@@ -228,19 +223,18 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-          pattern: '*-*' 
 
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
-      
+          
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
           Please ensure you have proper backups before installation.
       
           Features:
-          -> Nerest Kernels
+          -> ${{ inputs.kernel_variant }} Kernels & Others
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
           -> SUSFS ඞ v1.5.10
           -> Scope-Minimized Manual hooks v1.5
@@ -250,11 +244,11 @@ jobs:
           -> Ptrace Patch Support for Older Kernels (<5.16)
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
-          -> BBR v1 Support        
-          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
+          -> BBR v1 Support
+           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
           -> KPM = ON
-          fi
-      
+           fi
+          
           Build Types:
           -> **Make Build**: Built using traditional make
           -> **Normal Build**: Built using Bazel or build.sh
@@ -269,19 +263,18 @@ jobs:
           -> https://github.com/sidex15/ksu_module_susfs
       
           Managers:
-          -> WKSU: https://github.com/WildKernels/Wild_KSU / https://t.me/Wild_Kernels/26618
-          -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
-          -> NEXT: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
-          -> SukiSU: https://github.com/SukiSU-Ultra/SukiSU-Ultra / https://t.me/Sukiksu     
-          -> MKSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci      
-          
+          -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
+          -> KernelSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
+          -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
+          -> SukiSU-Ultra: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
+      
           Commit Hashes (at the time of release):
           -> WKSU: [${{ env.WKSU_REF }}](${{ env.WKSU_URL }})
           -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           -> NEXT: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
-          -> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})         
+          -> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})
           -> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
-
+          
           -> SUSFS4KSU: 
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
             -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
