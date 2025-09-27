@@ -35,7 +35,7 @@ on:
         description: 'Include SukiSU?'
         required: true
         type: boolean
-        default: true     
+        default: false
       include_mksu:
         description: 'Include MKSU?'
         required: true
