@@ -1,4 +1,4 @@
-name: Build Kernels - TEST
+name: Build Kernels- TEST
 
 permissions:
   contents: write
@@ -31,6 +31,11 @@ on:
         required: true
         type: boolean
         default: true
+      include_sukisu:
+        description: 'Include SukiSU?'
+        required: true
+        type: boolean
+        default: false
       include_mksu:
         description: 'Include MKSU?'
         required: true
@@ -64,7 +69,7 @@ jobs:
           [[ "${{ inputs.include_wild }}" == "true" ]] && VARIANTS+=("\"WILD\"")
           [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
-          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")                 
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")                   
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
@@ -84,10 +89,10 @@ jobs:
     if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}    
     runs-on: ubuntu-latest
     needs: build-all-lts   
-    
+      
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.10"
+      RELEASE_NAME: "GKI Kernels With KernelSU & SUSFS v1.5.10"
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -153,7 +158,7 @@ jobs:
             echo "${name}_URL=$url" >> $GITHUB_ENV
           }
           [[ "$BRANCH" == "Dev" ]] && MODE="tag" || MODE="commit"
-          get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
+          get_ref "WKSU" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
           get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"
@@ -234,7 +239,7 @@ jobs:
           Please ensure you have proper backups before installation.
       
           Features:
-          -> ${{ inputs.kernel_variant }} Kernels & Others
+          -> KernelSU Kernels & Others
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
           -> SUSFS ඞ v1.5.10
           -> Scope-Minimized Manual hooks v1.5
@@ -245,9 +250,7 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-          -> KPM = ON
-           fi
+          -> SukiSU: KPM = ON
           
           Build Types:
           -> **Make Build**: Built using traditional make
@@ -343,4 +346,3 @@ jobs:
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
-            
