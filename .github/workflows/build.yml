@@ -261,7 +261,7 @@ jobs:
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
-              cp-v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true          
               ;;
             "NEXT")
@@ -289,7 +289,7 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-          case "${{ inputs.kernel_variant }}" in
+          case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Getting WKSU version..."
               cd ./Wild_KSU
@@ -330,7 +330,7 @@ jobs:
             echo "Applying hooks for KernelSU-Next..."
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
             patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
-          elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+          elif [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
             echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
             patch -p1 --forward < 60_scope-minimized_manual_hooks.patch                
@@ -400,7 +400,7 @@ jobs:
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" | tee -a "$defconfig"
 
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
            echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a "$defconfig"        
           fi
 
@@ -409,7 +409,7 @@ jobs:
             echo "CONFIG_KSU_MANUAL_HOOK=y" | tee -a "$defconfig"          
           fi
 
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
             echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a "$defconfig"
           fi
           
@@ -487,7 +487,7 @@ jobs:
           
           sed -i 's/-dirty//g' ./common/scripts/setlocalversion
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
-          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
+          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl 2>/dev/null || true
 
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
@@ -572,7 +572,6 @@ jobs:
           echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
 
-
       - name: Build Kernel
         if: ${{ matrix.build_type == 'make' }}
         run: |
@@ -615,12 +614,12 @@ jobs:
           
           cd "$KERNEL_PATH/common" || exit 1
 
-          # Определяем флаги компиляции в зависимости от версии ядра
+          # Define optimization flags based on kernel version
           if [[ "$KERNEL_VERSION" == "6.6" ]]; then
-            # Для 6.6 исключаем -ffunction-sections
+            # For 6.6, exclude -ffunction-sections
             OPTIMIZATION_FLAGS="-Wno-error -O3 -flto=thin -fno-stack-protector"
           else
-            # Для других версий используем полный набор флагов
+            # For other versions, use full set of flags
             OPTIMIZATION_FLAGS="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections"
           fi
           
@@ -652,7 +651,7 @@ jobs:
         run: |
             echo "Patching Image file for Android 12/13 make build..."
             cd "$CONFIG/common/out/arch/arm64/boot/"
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
             chmod 777 patch
             ./patch
             rm -rf Image
@@ -708,48 +707,79 @@ jobs:
           ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-AK3.zip"
           zip -r "../$ZIP_NAME" ./*
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13
+      - name: Create Bootimgs Folder and Copy Images for Make Build
         if: ${{ matrix.build_type == 'make' }}
         run: |
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          cp $CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./bootimgs
-          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp $CONFIG/common/out/arch/arm64/boot/Image ./
-          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./
-          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
+          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
+            cp $CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
+            cp $CONFIG/common/out/arch/arm64/boot/Image ./
+          else
+            echo "Error: Image file not found at $CONFIG/common/out/arch/arm64/boot/Image"
+            exit 1
+          fi
+          
+          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image.gz" ]; then
+            cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./bootimgs
+            cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./
+          fi
+          
+          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image.lz4" ]; then
+            cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
+            cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
+          fi
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13
+      - name: Create Bootimgs Folder and Copy Images for Android 12/13 Normal Build
         if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
+          IMAGE_PATH="./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
+          
+          if [ -f "$IMAGE_PATH/Image" ]; then
+            cp $IMAGE_PATH/Image ./bootimgs
+            cp $IMAGE_PATH/Image ./
+          else
+            echo "Error: Image file not found at $IMAGE_PATH/Image"
+            exit 1
+          fi
+          
+          if [ -f "$IMAGE_PATH/Image.lz4" ]; then
+            cp $IMAGE_PATH/Image.lz4 ./bootimgs
+            cp $IMAGE_PATH/Image.lz4 ./
+          fi
 
           # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
+          gzip -n -k -f -9 ./Image
+          cp ./Image.gz ./bootimgs/
 
-      - name: Create Bootimgs Folder and Copy Images for Android 14/15
+      - name: Create Bootimgs Folder and Copy Images for Android 14/15 Normal Build
         if: ${{ (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
+          IMAGE_PATH="./$CONFIG/bazel-bin/common/kernel_aarch64"
+          
+          if [ -f "$IMAGE_PATH/Image" ]; then
+            cp $IMAGE_PATH/Image ./bootimgs
+            cp $IMAGE_PATH/Image ./
+          else
+            echo "Error: Image file not found at $IMAGE_PATH/Image"
+            exit 1
+          fi
+          
+          if [ -f "$IMAGE_PATH/Image.lz4" ]; then
+            cp $IMAGE_PATH/Image.lz4 ./bootimgs
+            cp $IMAGE_PATH/Image.lz4 ./
+          fi
 
           # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
+          gzip -n -k -f -9 ./Image
+          cp ./Image.gz ./bootimgs/
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
