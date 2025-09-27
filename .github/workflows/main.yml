@@ -31,6 +31,11 @@ on:
         required: true
         type: boolean
         default: true
+      include_sukisu:
+        description: 'Include SukiSU?'
+        required: true
+        type: boolean
+        default: false
       include_mksu:
         description: 'Include MKSU?'
         required: true
@@ -70,6 +75,7 @@ jobs:
 
   build-a12-5-10:
     needs: set-matrix
+    if: fromJson(needs.set-matrix.outputs.matrix).kernelsu_variant[0] != ''
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     strategy:
@@ -82,6 +88,7 @@ jobs:
 
   build-a13-5-10:
     needs: set-matrix
+    if: fromJson(needs.set-matrix.outputs.matrix).kernelsu_variant[0] != ''
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     strategy:
@@ -94,6 +101,7 @@ jobs:
 
   build-a13-5-15:
     needs: set-matrix
+    if: fromJson(needs.set-matrix.outputs.matrix).kernelsu_variant[0] != ''
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     strategy:
@@ -106,6 +114,7 @@ jobs:
 
   build-a14-5-15:
     needs: set-matrix
+    if: fromJson(needs.set-matrix.outputs.matrix).kernelsu_variant[0] != ''
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     strategy:
@@ -118,6 +127,7 @@ jobs:
 
   build-a14-6-1:
     needs: set-matrix
+    if: fromJson(needs.set-matrix.outputs.matrix).kernelsu_variant[0] != ''
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     strategy:
@@ -130,6 +140,7 @@ jobs:
 
   build-a15-6-6:
     needs: set-matrix
+    if: fromJson(needs.set-matrix.outputs.matrix).kernelsu_variant[0] != ''
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     strategy:
@@ -143,16 +154,17 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs:
-      - build-kernels-a12-5-10
-      - build-kernels-a13-5-10
-      - build-kernels-a13-5-15
-      - build-kernels-a14-5-15
-      - build-kernels-a14-6-1
-      - build-kernels-a15-6-6
+      - build-a12-5-10
+      - build-a13-5-10
+      - build-a13-5-15
+      - build-a14-5-15
+      - build-a14-6-1
+      - build-a15-6-6
+    if: always() && (needs.build-a12-5-10.result == 'success' || needs.build-a13-5-10.result == 'success' || needs.build-a13-5-15.result == 'success' || needs.build-a14-5-15.result == 'success' || needs.build-a14-6-1.result == 'success' || needs.build-a15-6-6.result == 'success')
       
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.10"
+      RELEASE_NAME: "GKI Kernels With KernelSU & SUSFS v1.5.10"
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -218,7 +230,7 @@ jobs:
             echo "${name}_URL=$url" >> $GITHUB_ENV
           }
           [[ "$BRANCH" == "Dev" ]] && MODE="tag" || MODE="commit"
-          get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
+          get_ref "WKSU" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
           get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"
@@ -299,7 +311,7 @@ jobs:
           Please ensure you have proper backups before installation.
       
           Features:
-          -> ${{ inputs.kernel_variant }} Kernels & Others
+          -> KernelSU Kernels & Others
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
           -> SUSFS ඞ v1.5.10
           -> Scope-Minimized Manual hooks v1.5
@@ -310,9 +322,7 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-          -> KPM = ON
-           fi
+          -> SukiSU: KPM = ON
           
           Build Types:
           -> **Make Build**: Built using traditional make
