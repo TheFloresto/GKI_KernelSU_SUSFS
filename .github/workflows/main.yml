@@ -149,6 +149,7 @@ jobs:
       - build-kernels-a14-5-15
       - build-kernels-a14-6-1
       - build-kernels-a15-6-6
+      
     env:
       GITHUB_TOKEN: ${{ github.token }}
       RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.10"
