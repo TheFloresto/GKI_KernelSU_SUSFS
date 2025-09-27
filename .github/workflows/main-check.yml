@@ -83,8 +83,7 @@ jobs:
   release:
     if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}    
     runs-on: ubuntu-latest
-    needs: build-all-lts
-    
+    needs: build-all-lts   
     env:
       GITHUB_TOKEN: ${{ github.token }}
       RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.10"
