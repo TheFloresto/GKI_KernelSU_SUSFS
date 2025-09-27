@@ -31,6 +31,11 @@ on:
         required: true
         type: boolean
         default: true
+      include_sukisu:       
+        description: 'Include SukiSU?'
+        required: true
+        type: boolean
+        default: false
       include_mksu:
         description: 'Include MKSU?'
         required: true
@@ -64,6 +69,7 @@ jobs:
           [[ "${{ inputs.include_wild }}" == "true" ]] && VARIANTS+=("\"WILD\"")
           [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")                 
           [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
@@ -144,6 +150,7 @@ jobs:
           get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
+          get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"          
           get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
 
       - name: Generate New Tag
@@ -153,7 +160,7 @@ jobs:
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.5.9-r0"
+            LATEST_TAG="v1.5.10-r0"
           fi
           
           echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
@@ -217,9 +224,9 @@ jobs:
           Please ensure you have proper backups before installation.
       
           Features:
-          -> Wild KSU
+          -> Nerest Kernels
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
-          -> SUSFS ඞ v1.5.9
+          -> SUSFS ඞ v1.5.10
           -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
@@ -228,7 +235,6 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-          -> ZyC Clang used
       
           Build Types:
           -> **Make Build**: Built using traditional make
@@ -247,6 +253,7 @@ jobs:
           -> WKSU: https://github.com/WildKernels/Wild_KSU / https://t.me/Wild_Kernels/26618
           -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
           -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
+          -> SukiSU: https://github.com/SukiSU-Ultra/SukiSU-Ultra / https://t.me/Sukiksu     
           -> MKSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci      
           
           Commit Hashes (at the time of release):
@@ -256,6 +263,7 @@ jobs:
           echo "-> WKSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})" >> release_body.md
           echo "-> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})" >> release_body.md
           echo "-> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})" >> release_body.md
+          echo "-> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})" >> release_body.md               
           echo "-> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})" >> release_body.md
 
           cat << 'EOF' >> release_body.md
@@ -300,7 +308,7 @@ jobs:
           # Create the release first
           gh release create "$NEW_TAG" \
             --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-            --title "GKI Kernels With KSU & SUSFS v1.5.9" \
+            --title "GKI Kernels With KSU & SUSFS v1.5.10" \
             --notes-file release_body.md \
             $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease")
           
