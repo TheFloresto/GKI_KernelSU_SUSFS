@@ -7,21 +7,23 @@ permissions:
 on:
   workflow_call:
     inputs:
-      kernel_variant:
+      kernelsu_variant:
         required: true
         type: string
-      kernel_uname:
+      kernelsu_branch:
+        required: true
+        type: string
+      kernelsu_branch_other:
         required: false
         type: string
+        default: ""  
+
 jobs:
   build-kernels-a12:
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
-        - sub_level: "136"
-          os_patch_level: "2022-11"
-          revision: "r15"
         - sub_level: "168"
           os_patch_level: "2023-04"
           revision: "r9"
@@ -59,5 +61,7 @@ jobs:
       kernel_version: "5.10"
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
-      kernel_variant: ${{ inputs.kernel_variant }}
-      kernel_uname: ${{ inputs.kernel_uname }}
+      revision: ${{ matrix.revision }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
