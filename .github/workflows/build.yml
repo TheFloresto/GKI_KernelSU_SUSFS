@@ -292,6 +292,8 @@ jobs:
              "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
               cd ./KernelSU         
+              cp ../../kernel_patches/next/0001-sukisu.patch ./
+              patch -p1 --forward < 0001-sukisu.patch     
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
