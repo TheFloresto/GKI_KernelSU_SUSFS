@@ -63,7 +63,7 @@ jobs:
 
       - name: Setup Build Environment
         run: |
-          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves
+          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential dwarves kmod module-init-tools bc rsync
           
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
@@ -80,6 +80,7 @@ jobs:
           mkdir -p ./git-repo
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
           chmod a+rx ./git-repo/repo
+          chmod +x kernel-build-tools/linux-x86/bin/*
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
       - name: Set boot sign key
