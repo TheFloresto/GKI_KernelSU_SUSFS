@@ -630,6 +630,15 @@ jobs:
           fi
           
           cd "$KERNEL_PATH/common" || exit 1
+
+          # Определяем флаги компиляции в зависимости от версии ядра
+          if [[ "$KERNEL_VERSION" == "6.6" ]]; then
+            # Для 6.6 исключаем -ffunction-sections
+            OPTIMIZATION_FLAGS="-Wno-error -O3 -flto=thin -fno-stack-protector"
+          else
+            # Для других версий используем полный набор флагов
+            OPTIMIZATION_FLAGS="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections"
+          fi
           
           MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- \
             RUSTC=$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc \
@@ -639,8 +648,8 @@ jobs:
             MAKE_ARGS="LLVM_IAS=1 $MAKE_ARGS"
           fi
           
-          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections " gki_defconfig Image Image.gz Image.lz4 || exit 1
-          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections " || exit 1
+          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="$OPTIMIZATION_FLAGS" gki_defconfig Image Image.gz Image.lz4 || exit 1
+          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="$OPTIMIZATION_FLAGS" || exit 1
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Normal Build)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
