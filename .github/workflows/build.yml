@@ -417,15 +417,15 @@ jobs:
           echo "CONFIG_KSU=y" | tee -a "$defconfig"
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-          echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a "$defconfig"        
+           echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a "$defconfig"        
+          fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-              echo "CONFIG_KPM=y" | tee -a "$defconfig"
-            fi
-            echo "CONFIG_KSU_MANUAL_HOOK=y" | tee -a "$defconfig"
+            echo "CONFIG_KPM=y" | tee -a "$defconfig"
+            echo "CONFIG_KSU_MANUAL_HOOK=y" | tee -a "$defconfig"          
           fi
-          
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then               
+
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
             echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a "$defconfig"
           fi
           
@@ -642,10 +642,10 @@ jobs:
           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections " gki_defconfig Image Image.gz Image.lz4 || exit 1
           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections " || exit 1
 
-      - name: Patch Image File for Android 12 and 13 (SukiSU only)
-        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
+      - name: Patch Image File for Android 12 and 13 (SukiSU only - Normal Build)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
         run: |
-            echo "Patching Image file..."
+            echo "Patching Image file for Android 12/13 normal build..."
             cd "$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
             chmod 777 patch
@@ -654,10 +654,22 @@ jobs:
             mv oImage Image
             cd ../../../..        
 
-      - name: Patch Image File for Android 14 and 15 (SukiSU only)
-        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
+      - name: Patch Image File for Android 12 and 13 (SukiSU only - Make Build)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'make' }}
         run: |
-            echo "Patching Image file..."
+            echo "Patching Image file for Android 12/13 make build..."
+            cd "$CONFIG/common/out/arch/arm64/boot/"
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+            chmod 777 patch
+            ./patch
+            rm -rf Image
+            mv oImage Image
+            cd ../../../../../..
+
+      - name: Patch Image File for Android 14 and 15 (SukiSU only - Normal Build)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'normal' }}
+        run: |
+            echo "Patching Image file for Android 14/15 normal build..."
             cd "$CONFIG/bazel-bin/common/kernel_aarch64/"
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
             chmod 777 patch
@@ -665,6 +677,18 @@ jobs:
             rm -rf Image
             mv oImage Image
             cd ../../..          
+
+      - name: Patch Image File for Android 14 and 15 (SukiSU only - Make Build)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'make' }}
+        run: |
+            echo "Patching Image file for Android 14/15 make build..."
+            cd "$CONFIG/common/out/arch/arm64/boot/"
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+            chmod 777 patch
+            ./patch
+            rm -rf Image
+            mv oImage Image
+            cd ../../../../../..
 
       - name: Create AK3 ZIP
         run: |
