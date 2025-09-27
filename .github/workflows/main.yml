@@ -8,66 +8,137 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Choose Release Type'
+        description: "Choose Release Type"
         required: true
         type: choice
         options:
+          - Actions
           - Pre-Release
           - Release
-        default: Release
-      kernel_variant:
-        description: 'Choose Kernel Variant'
+        default: Pre-Release
+      include_wild:
+        description: 'Include WKSU?'
+        required: true
+        type: boolean
+        default: false
+      include_ksu:
+        description: 'Include KSU?'
+        required: true
+        type: boolean
+        default: false
+      include_next:
+        description: 'Include NEXT?'
+        required: true
+        type: boolean
+        default: true
+      include_mksu:
+        description: 'Include MKSU?'
+        required: true
+        type: boolean
+        default: false
+      kernelsu_branch:
+        description: "Choose ksu branch"
         required: true
         type: choice
         options:
-          - WKSU
-          - KSU
-          - NEXT
-          - SukiSU
-          - MKSU
-        default: NEXT
+          - Stable
+          - Dev
+          - Other
+        default: Dev
+      kernelsu_branch_other:
+        description: "If 'Other' is selected, specify your custom branch"
+        required: false
+        type: string
+        default: ""
+        
 jobs:
-  build-kernels-a12-5-10:
-    name: ${{ inputs.kernel_variant }}-Android_12-5.10
+  set-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          VARIANTS=()
+          [[ "${{ inputs.include_wild }}" == "true" ]] && VARIANTS+=("\"WILD\"")
+          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
+          [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")                   
+          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
+          echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
+
+  build-a12-5-10:
+    needs: set-matrix
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
-  build-kernels-a13-5-10:
-    name: ${{ inputs.kernel_variant }}-Android_13-5.10
+  build-a13-5-10:
+    needs: set-matrix
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
-  build-kernels-a13-5-15:
-    name: ${{ inputs.kernel_variant }}-Android_13-5.15
+  build-a13-5-15:
+    needs: set-matrix
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
-  build-kernels-a14-5-15:
-    name: ${{ inputs.kernel_variant }}-Android_14-5.15
+  build-a14-5-15:
+    needs: set-matrix
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
-  build-kernels-a14-6-1:
-    name: ${{ inputs.kernel_variant }}-Android_14-6.1
+  build-a14-6-1:
+    needs: set-matrix
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
-  build-kernels-a15-6-6:
-    name: ${{ inputs.kernel_variant }}-Android_15-6.6
+  build-a15-6-6:
+    needs: set-matrix
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   release:
     runs-on: ubuntu-latest
