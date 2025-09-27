@@ -111,6 +111,7 @@ jobs:
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
+          git clone https://github.com/TheFloresto/SukiSU_patch.git -b main
           
       - name: Setup ZyCromerZ Clang Toolchain
         if: ${{ matrix.build_type == 'make' }}      
@@ -187,7 +188,11 @@ jobs:
         run: |
           case "${{ inputs.kernelsu_branch }}" in
             "Stable")
-              echo "BRANCH=-" >> $GITHUB_ENV
+              if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
+                echo "BRANCH=-s susfs-main" >> $GITHUB_ENV
+              else
+                echo "BRANCH=-" >> $GITHUB_ENV
+              fi
               ;;
             "Dev")
               if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
@@ -196,6 +201,8 @@ jobs:
                 echo "BRANCH=-s next" >> $GITHUB_ENV
               elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
+                echo "BRANCH=-s susfs-test" >> $GITHUB_ENV
               fi
               ;;
             "Other")
@@ -226,6 +233,10 @@ jobs:
               echo "Adding KernelSU Next..."
               curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
+            "SukiSU")
+              echo "Adding KernelSU SukiSU..."
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash ${{ env.BRANCH }}       
+              ;;
             "MKSU")
               echo "Adding KernelSU MKSU..."
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
@@ -252,7 +263,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
+              echo "Applying SUSFS patches for WKSU..."
               cd ./Wild_KSU
               cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch      
@@ -277,6 +288,10 @@ jobs:
               
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
               patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch
+              ;;
+             "SukiSU")
+              echo "Applying SUSFS patches for SukiSU..."
+              cd ./KernelSU         
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -307,6 +322,10 @@ jobs:
               cd ./KernelSU-Next
               BASE_VERSION=10200
               ;;
+            "SukiSU")
+              cd ./KernelSU
+              BASE_VERSION=13050         
+              ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."   
               cd ./KernelSU
@@ -329,9 +348,13 @@ jobs:
           elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "Applying hooks for Wild KSU..."
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
-          fi       
-
+            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch                
+          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
+            echo "Applying hooks for SukiSU..."
+            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+            patch -p1 < 60_scope-minimized_manual_hooks.patch
+          fi
+          
       - name: Apply Module Symbol Version Fix Patch
         run: |
           if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
@@ -391,8 +414,16 @@ jobs:
           
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" | tee -a "$defconfig"
+
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
           echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a "$defconfig"        
 
+          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
+              echo "CONFIG_KPM=y" | tee -a "$defconfig"
+            fi
+            echo "CONFIG_KSU_MANUAL_HOOK=y" | tee -a "$defconfig"
+          fi
+          
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then               
             echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a "$defconfig"
           fi
@@ -500,9 +531,9 @@ jobs:
           cd "$CONFIG"
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
+            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
           else
-            tools/bazel build --config=fast --lto=full //common:kernel_aarch64_dist || exit 1
+            tools/bazel build --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
           fi
 
       - name: Detect Clang Version from Configs
@@ -609,6 +640,30 @@ jobs:
           
           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections " gki_defconfig Image Image.gz Image.lz4 || exit 1
           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections " || exit 1
+
+      - name: Patch Image File for Android 12 and 13 (SukiSU only)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
+        run: |
+            echo "Patching Image file..."
+            cd "$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+            chmod 777 patch
+            ./patch
+            rm -rf Image
+            mv oImage Image
+            cd ../../../..        
+
+      - name: Patch Image File for Android 14 and 15 (SukiSU only)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
+        run: |
+            echo "Patching Image file..."
+            cd "$CONFIG/bazel-bin/common/kernel_aarch64/"
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+            chmod 777 patch
+            ./patch
+            rm -rf Image
+            mv oImage Image
+            cd ../../..          
 
       - name: Create AK3 ZIP
         run: |
