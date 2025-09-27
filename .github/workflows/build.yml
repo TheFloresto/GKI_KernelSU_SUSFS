@@ -40,31 +40,18 @@ jobs:
         build_type: ["make", "normal"]
 
     steps:
-      - name: Maximize Build Space
-        uses: AdityaGarg8/remove-unwanted-software@v5
-        with:
-          remove-dotnet: 'true'          # Frees ~2 GB
-          remove-android: 'true'         # Frees ~9 GB
-          remove-haskell: 'true'         # Frees ~5.2 GB
-          remove-codeql: 'true'          # Frees ~5.4 GB
-          remove-docker-images: 'true'   # Frees ~3.2 GB
-          remove-large-packages: 'true'  # Frees ~3.1 GB
-          remove-swapfile: 'true'        # Frees ~4 GB
-          remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          verbose: 'true'                # Enable detailed logging
-
-      - name: Setup SWAP
-        run: |
-         sudo swapoff -a
-         sudo fallocate -l 20G /swapfile
-         sudo chmod 600 /swapfile
-         sudo mkswap /swapfile
-         sudo swapon -p 1 /swapfile
-         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
-         sudo sysctl -p
-         free -h
+      # # - name: Maximize Build Space
+        # uses: AdityaGarg8/remove-unwanted-software@v5
+        # with:
+          # remove-dotnet: 'true'          # Frees ~2 GB
+          # remove-android: 'true'         # Frees ~9 GB
+          # remove-haskell: 'true'         # Frees ~5.2 GB
+          # remove-codeql: 'true'          # Frees ~5.4 GB
+          # remove-docker-images: 'true'   # Frees ~3.2 GB
+          # remove-large-packages: 'true'  # Frees ~3.1 GB
+          # remove-swapfile: 'true'        # Frees ~4 GB
+          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          # verbose: 'true'                # Enable detailed logging
           
       - name: Set CONFIG Environment Variable
         run: |
@@ -112,7 +99,7 @@ jobs:
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
           git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main
-          
+
       - name: Setup ZyCromerZ Clang Toolchain
         if: ${{ matrix.build_type == 'make' }}      
         run: |
@@ -184,6 +171,12 @@ jobs:
               sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
           fi
 
+      - name: Apply ptrace patch for older kernels
+        if: fromJSON(inputs.kernel_version) < 5.16
+        run: |
+          cd "$CONFIG/common"
+          patch -p1 -F 3 < "../../kernel_patches/gki_ptrace.patch"
+
       - name: Determine the branch for KernelSU
         run: |
           case "${{ inputs.kernelsu_branch }}" in
@@ -199,7 +192,7 @@ jobs:
                 echo "BRANCH=-s main" >> $GITHUB_ENV
               elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
                 echo "BRANCH=-s next" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
+              elif [[ "${{ inputs.kernelsu_variant }}" == "WKSU" ]]; then
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
               elif [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
                 echo "BRANCH=-s susfs-test" >> $GITHUB_ENV
@@ -221,8 +214,8 @@ jobs:
           cd "$CONFIG"
       
           case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Adding Wild KSU..."
+            "WKSU")
+              echo "Adding WKSU..."
               curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
             "KSU")
@@ -242,12 +235,6 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
           esac
-
-      - name: Apply ptrace patch for older kernels
-        if: fromJSON(inputs.kernel_version) < 5.16
-        run: |
-          cd "$CONFIG/common"
-          patch -p1 -F 3 < "../../kernel_patches/gki_ptrace.patch"
           
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
@@ -262,7 +249,7 @@ jobs:
           cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           
           case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
+            "WKSU")
               echo "Applying SUSFS patches for WKSU..."
               cd ./Wild_KSU
               cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
@@ -274,7 +261,7 @@ jobs:
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
-              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              cp-v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true          
               ;;
             "NEXT")
@@ -293,7 +280,7 @@ jobs:
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
-              cp ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch             
               ;;
           esac
@@ -302,9 +289,8 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-          
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
+          case "${{ inputs.kernel_variant }}" in
+            "WKSU")
               echo "Getting WKSU version..."
               cd ./Wild_KSU
               BASE_VERSION=10200
@@ -320,19 +306,21 @@ jobs:
               BASE_VERSION=10200
               ;;
             "SukiSU")
-              echo "Getting SukiSU version..."   
-              cd ./KernelSU
-              BASE_VERSION=13095   
+              echo "Getting SukiSU version..."  
+              git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
+              cd SukiSU-Ultra
+              BASE_VERSION=10700                               
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
               cd ./KernelSU
-              BASE_VERSION=10200     
+              BASE_VERSION=10200           
               ;;
           esac
-          
-          cd ./kernel
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
+          COMMIT_COUNT=$(/usr/bin/git rev-list --count HEAD)
+          echo "Commits: $COMMIT_COUNT"
+          KSU_VERSION=$(expr $COMMIT_COUNT "+" $BASE_VERSION)
+          echo "KSUVER=$KSU_VERSION"
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           
       - name: Apply Hooks Patches
@@ -352,7 +340,7 @@ jobs:
             cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
             patch -p1 < 60_scope-minimized_manual_hooks.patch
           fi
-          
+
       - name: Apply Module Symbol Version Fix Patch
         run: |
           if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
@@ -510,11 +498,12 @@ jobs:
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
 
           #Set Kernel Name
-           if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-              perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "-NoFloresto"/s' ./common/scripts/setlocalversion
-            else
-              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-NoFloresto"/s' ./common/scripts/setlocalversion
-            fi
+          echo "Set kernel uname: NoFloresto!"
+          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "-${{ inputs.android_version }}-NoFloresto"/s' ./common/scripts/setlocalversion
+          else
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-${{ inputs.android_version }}-NoFloresto"/s' ./common/scripts/setlocalversion
+          fi
           
           #Set Kernel Timestamp in Makefile
           perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
@@ -522,7 +511,7 @@ jobs:
           #Remove Abi Exports and Error
           rm -rf ./common/android/abi_gki_protected_exports_*
           perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
-      
+
       - name: Build
         if: ${{ matrix.build_type == 'normal' }}
         run : |
@@ -546,15 +535,13 @@ jobs:
             echo "CLANG_BIN_PATH=${{ env.CLANG_BIN_PATH }}" >> $GITHUB_ENV
             exit 0
           fi
-          
-          # Original logic for Android prebuilt clang
+                          
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           DEFCONFIG="$KERNEL_PATH/common/arch/arm64/configs/gki_defconfig"
           BUILDCONFIG="$KERNEL_PATH/common/build.config.gki"
           CONSTANTSCONFIG="$KERNEL_PATH/common/build.config.constants"
           CLANG_VERSION=""
           CLANG_BIN_PATH=""
-          
           if grep -q '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null; then
             CLANG_VERSION=$(grep '^CONFIG_CLANG_VERSION=' "$DEFCONFIG" 2>/dev/null | head -n1 | cut -d'=' -f2 | tr -d '"' | xargs)
           elif grep -q '^CLANG_VERSION=' "$BUILDCONFIG" 2>/dev/null; then
@@ -565,7 +552,6 @@ jobs:
           else
             echo "No clang version found in config, will auto-detect in prebuilts."
           fi
-          
           if [ -z "$CLANG_VERSION" ]; then
             if [ -d "$KERNEL_PATH/prebuilts/clang/host/linux-x86" ]; then
               CLANG_VERSION=$(ls -d "$KERNEL_PATH"/prebuilts/clang/host/linux-x86/clang-r*/ | tail -n 1 | xargs basename)
@@ -584,9 +570,9 @@ jobs:
               CLANG_BIN_PATH="$KERNEL_PATH/prebuilts-master/clang/host/linux-x86/$CLANG_VERSION/bin"
             fi
           fi
-          
           echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
+
 
       - name: Build Kernel
         if: ${{ matrix.build_type == 'make' }}
@@ -639,19 +625,16 @@ jobs:
             OPTIMIZATION_FLAGS="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections"
           fi
           
-          # Устанавливаем LOCALVERSION как переменную окружения
-          export LOCALVERSION=-NoFloresto
-          
           MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- \
             RUSTC=$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc \
             PAHOLE=$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole \
-            LD=ld.lld HOSTLD=ld.lld LOCALVERSION=-NoFloresto"
+            LD=ld.lld HOSTLD=ld.lld"
           if [[ -v USE_LLVM_IAS ]]; then
             MAKE_ARGS="LLVM_IAS=1 $MAKE_ARGS"
           fi
           
           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="$OPTIMIZATION_FLAGS" gki_defconfig Image Image.gz Image.lz4 || exit 1
-          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="$OPTIMIZATION_FLAGS" || exit 1
+          make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="$OPTIMIZATION_FLAGS"  || exit 1
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Normal Build)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
@@ -739,7 +722,7 @@ jobs:
           cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./
           cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13 Normal Build
+      - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
@@ -754,7 +737,7 @@ jobs:
           gzip -n -k -f -9 ./Image > ./Image.gz
           gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
 
-      - name: Create Bootimgs Folder and Copy Images for Android 14/15 Normal Build
+      - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
@@ -855,3 +838,4 @@ jobs:
           path: |
             *.zip
             *.img
+            
