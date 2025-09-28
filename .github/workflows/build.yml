@@ -12,13 +12,10 @@ on:
       kernel_version:
         required: true
         type: string
-      sub_level:
-        required: true
+      kernel_uname:
+        required: false
         type: string
-      os_patch_level:
-        required: true
-        type: string
-      kernelsu_variant:
+      kernel_variant:
         required: true
         type: string
       kernelsu_branch:
@@ -26,10 +23,16 @@ on:
         type: string
       kernelsu_branch_other:
         required: false
-        type: string        
+        type: string               
+      sub_level:
+        required: true
+        type: string
+      os_patch_level:
+        required: true
+        type: string
       revision:
         required: false
-        type: string
+        type: string 
 
 jobs:
   build-gki:
@@ -134,7 +137,7 @@ jobs:
           echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
           echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-          
+
       - name: Initialize and Sync Kernel Source
         run: |
           mkdir -p "$CONFIG"
@@ -341,8 +344,8 @@ jobs:
           echo "Commits: $COMMIT_COUNT"
           KSU_VERSION=$(expr $COMMIT_COUNT "+" $BASE_VERSION)
           echo "KSUVER=$KSU_VERSION"
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV         
-
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          
       - name: Apply Hooks Patches
         run: |
           cd "$CONFIG/common"
@@ -385,7 +388,6 @@ jobs:
             cp ../../kernel_patches/69_hide_stuff.patch ./
             patch -p1 --forward < 69_hide_stuff.patch
           fi
-          
 
       - name: Apply Module Symbol Version Fix Patch
         run: |
@@ -527,13 +529,12 @@ jobs:
                     
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
-
+          
       - name: Change Kernel Name
         run: |
           cd "$CONFIG"
           
           sed -i 's/-dirty//g' ./common/scripts/setlocalversion
-          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl 2>/dev/null || true
 
           #Set Custom Hostname and Username
@@ -581,7 +582,7 @@ jobs:
             echo "CLANG_BIN_PATH=${{ env.CLANG_BIN_PATH }}" >> $GITHUB_ENV
             exit 0
           fi
-                          
+          
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           DEFCONFIG="$KERNEL_PATH/common/arch/arm64/configs/gki_defconfig"
           BUILDCONFIG="$KERNEL_PATH/common/build.config.gki"
@@ -618,6 +619,7 @@ jobs:
           fi
           echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
+
 
       - name: Build Kernel
         if: ${{ matrix.build_type == 'make' }}
@@ -754,79 +756,48 @@ jobs:
           ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-AK3.zip"
           zip -r "../$ZIP_NAME" ./*
 
-      - name: Create Bootimgs Folder and Copy Images for Make Build
+      - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ matrix.build_type == 'make' }}
         run: |
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
-            cp $CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-            cp $CONFIG/common/out/arch/arm64/boot/Image ./
-          else
-            echo "Error: Image file not found at $CONFIG/common/out/arch/arm64/boot/Image"
-            exit 1
-          fi
-          
-          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image.gz" ]; then
-            cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./bootimgs
-            cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./
-          fi
-          
-          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image.lz4" ]; then
-            cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-            cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
-          fi
+          cp $CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
+          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./bootimgs
+          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
+          cp $CONFIG/common/out/arch/arm64/boot/Image ./
+          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./
+          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13 Normal Build
+      - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          IMAGE_PATH="./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
-          
-          if [ -f "$IMAGE_PATH/Image" ]; then
-            cp $IMAGE_PATH/Image ./bootimgs
-            cp $IMAGE_PATH/Image ./
-          else
-            echo "Error: Image file not found at $IMAGE_PATH/Image"
-            exit 1
-          fi
-          
-          if [ -f "$IMAGE_PATH/Image.lz4" ]; then
-            cp $IMAGE_PATH/Image.lz4 ./bootimgs
-            cp $IMAGE_PATH/Image.lz4 ./
-          fi
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
 
           # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image
-          cp ./Image.gz ./bootimgs/
+          gzip -n -k -f -9 ./Image > ./Image.gz
+          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
 
-      - name: Create Bootimgs Folder and Copy Images for Android 14/15 Normal Build
+      - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
-          IMAGE_PATH="./$CONFIG/bazel-bin/common/kernel_aarch64"
-          
-          if [ -f "$IMAGE_PATH/Image" ]; then
-            cp $IMAGE_PATH/Image ./bootimgs
-            cp $IMAGE_PATH/Image ./
-          else
-            echo "Error: Image file not found at $IMAGE_PATH/Image"
-            exit 1
-          fi
-          
-          if [ -f "$IMAGE_PATH/Image.lz4" ]; then
-            cp $IMAGE_PATH/Image.lz4 ./bootimgs
-            cp $IMAGE_PATH/Image.lz4 ./
-          fi
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./bootimgs
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./bootimgs
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
 
           # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image
-          cp ./Image.gz ./bootimgs/
+          gzip -n -k -f -9 ./Image > ./Image.gz
+          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
@@ -880,7 +851,7 @@ jobs:
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-boot-lz4.img
-
+                
       - name: Android 13/14/15 boot image build script
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
         run: |
@@ -906,11 +877,11 @@ jobs:
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-boot-lz4.img
-          
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL || inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}
+          name: WKSU-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL || inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}
           path: |
             *.zip
             *.img
