@@ -103,41 +103,6 @@ jobs:
           git clone https://github.com/TheFloresto/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
 
-      - name: Setup ZyCromerZ Clang Toolchain
-        if: ${{ matrix.build_type == 'make' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "Fetching latest ZyCromerZ Clang release..."
-          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
-          if [ -z "$LATEST_CLANG_TAG" ]; then
-            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
-            exit 1
-          fi
-          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
-          
-          # Extract version info for environment variables
-          CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
-          
-          echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
-          mkdir -p clang-zyc
-          cd clang-zyc
-          
-          # Download the latest release asset (assuming the naming pattern is consistent)
-          DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
-          echo "Download URL: $DOWNLOAD_URL"
-          
-          curl -LO "$DOWNLOAD_URL"
-          tar -xzf "Clang-$CLANG_VERSION.tar.gz"
-          cd ..
-          
-          # Set environment variables
-          echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
-          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
-          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-          echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
-          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-
       - name: Initialize and Sync Kernel Source
         run: |
           mkdir -p "$CONFIG"
@@ -419,25 +384,6 @@ jobs:
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
 
-      - name: Apply FIX 22 clang Patches
-        if: ${{ matrix.build_type == 'make' }}
-        run: |
-          cd "$CONFIG/common"
-          
-          # Получаем версию ядра
-          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
-          ANDROID_VERSION="${{ inputs.android_version }}"
-          FUSS_VERSION="${{ inputs.fuss_version }}"
-          
-          # Проверяем условие: НЕ применяем патч для Android 15 с ядром 6.6
-          if [ "$KERNEL_VERSION" == "6.6" ]; then
-            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
-          else
-            echo "Applying fix 22 clang..."
-            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
-            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
-          fi
-
       - name: Apply Kernel Configuration
         run: |
           cd "$CONFIG"
@@ -583,15 +529,7 @@ jobs:
 
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
-        run: |
-          # Check if ZyCromerZ Clang is already set up
-          if [ "${{ env.CLANG_SOURCE }}" = "zyc" ]; then
-            echo "Using ZyCromerZ Clang toolchain"
-            echo "CLANG_VERSION=${{ env.CLANG_VERSION }}" >> $GITHUB_ENV
-            echo "CLANG_BIN_PATH=${{ env.CLANG_BIN_PATH }}" >> $GITHUB_ENV
-            exit 0
-          fi
-          
+        run: |      
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           DEFCONFIG="$KERNEL_PATH/common/arch/arm64/configs/gki_defconfig"
           BUILDCONFIG="$KERNEL_PATH/common/build.config.gki"
@@ -890,7 +828,7 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: WKSU-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL || inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}
+          name: ${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL || inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}
           path: |
             *.zip
             *.img
