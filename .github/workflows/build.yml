@@ -15,7 +15,7 @@ on:
       kernel_uname:
         required: false
         type: string
-      kernel_variant:
+      kernelsu_variant:
         required: true
         type: string
       kernelsu_branch:
