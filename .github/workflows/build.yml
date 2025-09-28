@@ -545,11 +545,20 @@ jobs:
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
 
           #Set Kernel Name
-          echo "Set kernel uname: NoFloresto!"
-          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "-${{ inputs.android_version }}-NoFloresto"/s' ./common/scripts/setlocalversion
+          if [ ! -z ${{ inputs.kernel_uname }} ]; then
+            echo "Set kernel uname: ${{ inputs.kernel_uname }}!"
+            if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+              perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "-${{ inputs.android_version }}-${{ inputs.kernel_uname }}"/s' ./common/scripts/setlocalversion
+            else
+              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-${{ inputs.android_version }}-${{ inputs.kernel_uname }}"/s' ./common/scripts/setlocalversion
+            fi
           else
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-${{ inputs.android_version }}-NoFloresto"/s' ./common/scripts/setlocalversion
+            echo "Didn't set kernel uname! Set to default"
+            if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+              perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "-${{ inputs.android_version }}-\$\{KERNELVERSION\}-Tam"/s' ./common/scripts/setlocalversion
+            else
+              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-${{ inputs.android_version }}-\$KSUVER-Tam"/s' ./common/scripts/setlocalversion
+            fi
           fi
           
           #Set Kernel Timestamp in Makefile
