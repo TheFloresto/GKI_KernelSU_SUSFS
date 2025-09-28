@@ -341,32 +341,51 @@ jobs:
           echo "Commits: $COMMIT_COUNT"
           KSU_VERSION=$(expr $COMMIT_COUNT "+" $BASE_VERSION)
           echo "KSUVER=$KSU_VERSION"
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV         
+
+      - name: Apply Hooks Patches
+        run: |
+          cd "$CONFIG/common"
+          case "${{ inputs.kernel_variant }}" in
+            "WKSU")
+              echo "Applying hooks for WKSU..."
+              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+              patch -p1 < 60_scope-minimized_manual_hooks.patch
+            ;;
+            "KSU")
+              echo "Applying hooks for Official KernelSU..."
+              cp ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward < ksu_hooks.patch
+            ;;
+            "NEXT")
+              echo "Applying hooks for KernelSU-Next..."
+              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+              patch -p1 < 60_scope-minimized_manual_hooks.patch
+            ;;
+            "SukiSU")
+              echo "Applying hooks for SukiSU..."
+              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+              patch -p1 < 60_scope-minimized_manual_hooks.patch
+             ;;
+            "MKSU")
+              echo "Applying hooks for MKSU..."
+              cp ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward < ksu_hooks.patch             
+            ;;
+          esac
 
       - name: Apply Hide Stuff Patches
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
-          cp -v ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 --forward < 69_hide_stuff.patch
-          
-      - name: Apply Hooks Patches
-        run: |
-          cd "$CONFIG/common"
-          
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
-            echo "Applying hooks for KernelSU-Next..."
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch
-          elif [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
-            echo "Applying hooks for Wild KSU..."
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 --forward < 60_scope-minimized_manual_hooks.patch                
-          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            echo "Applying hooks for SukiSU..."
-            cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-            patch -p1 < 60_scope-minimized_manual_hooks.patch
+          if [ "${{ inputs.kernel_variant }}" == "SukiSU" ]; then
+            cp ../../SukiSU_patch/69_hide_stuff.patch ./
+            patch -p1 --forward < 69_hide_stuff.patch
+          else
+            cp ../../kernel_patches/69_hide_stuff.patch ./
+            patch -p1 --forward < 69_hide_stuff.patch
           fi
+          
 
       - name: Apply Module Symbol Version Fix Patch
         run: |
