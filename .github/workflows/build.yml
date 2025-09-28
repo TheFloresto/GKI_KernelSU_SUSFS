@@ -37,9 +37,9 @@ on:
 jobs:
   build-gki:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 142
     strategy:
-      matrix:
+       matrix:  
         build_type: ["make", "normal"]
 
     steps:
@@ -84,6 +84,41 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
+
+      - name: Setup ZyCromerZ Clang Toolchain
+        if: ${{ matrix.build_type == 'make' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Fetching latest ZyCromerZ Clang release..."
+          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
+          if [ -z "$LATEST_CLANG_TAG" ]; then
+            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
+            exit 1
+          fi
+          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
+          
+          # Extract version info for environment variables
+          CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
+          
+          echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
+          mkdir -p clang-zyc
+          cd clang-zyc
+          
+          # Download the latest release asset (assuming the naming pattern is consistent)
+          DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
+          echo "Download URL: $DOWNLOAD_URL"
+          
+          curl -LO "$DOWNLOAD_URL"
+          tar -xzf "Clang-$CLANG_VERSION.tar.gz"
+          cd ..
+          
+          # Set environment variables
+          echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
+          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
+          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
 
       - name: Set boot sign key
         env:
@@ -342,18 +377,6 @@ jobs:
             ;;
           esac
 
-      - name: Apply Hide Stuff Patches
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
-          if [ "${{ inputs.kernel_variant }}" == "SukiSU" ]; then
-            cp ../../SukiSU_patch/69_hide_stuff.patch ./
-            patch -p1 --forward < 69_hide_stuff.patch
-          else
-            cp ../../kernel_patches/69_hide_stuff.patch ./
-            patch -p1 --forward < 69_hide_stuff.patch
-          fi
-
       - name: Apply Module Symbol Version Fix Patch
         run: |
           if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
@@ -391,6 +414,21 @@ jobs:
           defconfig="./common/arch/arm64/configs/gki_defconfig"
           
           echo "Applying kernel configurations one by one..."
+
+          # SukiSU ZRAM 
+          if [ "${{ inputs.kernel_variant }}" == "SukiSU" ]; then
+            echo "CONFIG_ZSMALLOC=y" | tee -a "$defconfig"
+            echo "CONFIG_ZRAM=y" | tee -a "$defconfig"
+            echo "CONFIG_MODULE_SIG=n" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZO=y" | tee -a "$defconfig"
+            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4HC=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4K=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4KD=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_842=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" | tee -a "$defconfig"
+            echo "CONFIG_ZRAM_WRITEBACK=y" | tee -a "$defconfig"
+          fi  
           
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" | tee -a "$defconfig"
@@ -469,7 +507,7 @@ jobs:
           echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
           echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" | tee -a "$defconfig"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" | tee -a "$defconfig"
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"                 
           echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
                     
@@ -529,7 +567,15 @@ jobs:
 
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
-        run: |      
+        run: |
+          # Check if ZyCromerZ Clang is already set up
+          if [ "${{ env.CLANG_SOURCE }}" = "zyc" ]; then
+            echo "Using ZyCromerZ Clang toolchain"
+            echo "CLANG_VERSION=${{ env.CLANG_VERSION }}" >> $GITHUB_ENV
+            echo "CLANG_BIN_PATH=${{ env.CLANG_BIN_PATH }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           DEFCONFIG="$KERNEL_PATH/common/arch/arm64/configs/gki_defconfig"
           BUILDCONFIG="$KERNEL_PATH/common/build.config.gki"
@@ -613,10 +659,10 @@ jobs:
           # Define optimization flags based on kernel version
           if [[ "$KERNEL_VERSION" == "6.6" ]]; then
             # For 6.6, exclude -ffunction-sections
-            OPTIMIZATION_FLAGS="-Wno-error -O3 -flto=thin -fno-stack-protector"
+            OPTIMIZATION_FLAGS="-Wno-error -O2 -flto=thin -fno-stack-protector -fdata-sections"
           else
             # For other versions, use full set of flags
-            OPTIMIZATION_FLAGS="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections"
+            OPTIMIZATION_FLAGS="-Wno-error -O2 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections"
           fi
           
           MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- \
@@ -831,5 +877,4 @@ jobs:
           name: ${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL || inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}
           path: |
             *.zip
-            *.img
-            
+            *.img      
