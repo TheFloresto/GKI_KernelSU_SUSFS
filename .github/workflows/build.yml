@@ -79,8 +79,7 @@ jobs:
           
           mkdir -p ./git-repo
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
-          chmod a+rx ./git-repo/repo
-          chmod +x kernel-build-tools/linux-x86/bin/*
+          chmod a+rx ./git-repo/repo         
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
       - name: Set boot sign key
@@ -102,19 +101,40 @@ jobs:
           git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main
 
       - name: Setup ZyCromerZ Clang Toolchain
-        if: ${{ matrix.build_type == 'make' }}      
+        if: ${{ matrix.build_type == 'make' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Downloading ZyCromerZ Clang 22.0.0..."
+          echo "Fetching latest ZyCromerZ Clang release..."
+          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
+          if [ -z "$LATEST_CLANG_TAG" ]; then
+            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
+            exit 1
+          fi
+          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
+          
+          # Extract version info for environment variables
+          CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
+          
+          echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
           mkdir -p clang-zyc
           cd clang-zyc
-          curl -LO https://github.com/ZyCromerZ/Clang/releases/download/22.0.0git-20250924-release/Clang-22.0.0git-20250924.tar.gz
-          tar -xzf Clang-22.0.0git-20250924.tar.gz
+          
+          # Download the latest release asset (assuming the naming pattern is consistent)
+          DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
+          echo "Download URL: $DOWNLOAD_URL"
+          
+          curl -LO "$DOWNLOAD_URL"
+          tar -xzf "Clang-$CLANG_VERSION.tar.gz"
           cd ..
+          
+          # Set environment variables
+          echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
           echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
           echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-          echo "CLANG_VERSION=zyc-22.0.0" >> $GITHUB_ENV
+          echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-
+          
       - name: Initialize and Sync Kernel Source
         run: |
           mkdir -p "$CONFIG"
@@ -322,6 +342,13 @@ jobs:
           KSU_VERSION=$(expr $COMMIT_COUNT "+" $BASE_VERSION)
           echo "KSUVER=$KSU_VERSION"
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+
+      - name: Apply Hide Stuff Patches
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          cp -v ../../kernel_patches/69_hide_stuff.patch ./
+          patch -p1 --forward < 69_hide_stuff.patch
           
       - name: Apply Hooks Patches
         run: |
