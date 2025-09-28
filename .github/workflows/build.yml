@@ -15,7 +15,7 @@ on:
       kernel_uname:
         required: false
         type: string
-      kernelsu_variant:
+      kernel_variant:
         required: true
         type: string
       kernelsu_branch:
@@ -205,20 +205,20 @@ jobs:
         run: |
           case "${{ inputs.kernelsu_branch }}" in
             "Stable")
-              if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
+              if [[ "${{ inputs.kernel_variant }}" == "SukiSU" ]]; then
                 echo "BRANCH=-s susfs-main" >> $GITHUB_ENV
               else
                 echo "BRANCH=-" >> $GITHUB_ENV
               fi
               ;;
             "Dev")
-              if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
+              if [[ "${{ inputs.kernel_variant }}" =~ ^(KSU|MKSU)$ ]]; then
                 echo "BRANCH=-s main" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
+              elif [[ "${{ inputs.kernel_variant }}" == "NEXT" ]]; then
                 echo "BRANCH=-s next" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "WKSU" ]]; then
+              elif [[ "${{ inputs.kernel_variant }}" == "WKSU" ]]; then
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
+              elif [[ "${{ inputs.kernel_variant }}" == "SukiSU" ]]; then
                 echo "BRANCH=-s susfs-test" >> $GITHUB_ENV
               fi
               ;;
@@ -237,7 +237,7 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
       
-          case "${{ inputs.kernelsu_variant }}" in
+          case "${{ inputs.kernel_variant }}" in
             "WKSU")
               echo "Adding WKSU..."
               curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
@@ -272,7 +272,7 @@ jobs:
           cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           
-          case "${{ inputs.kernelsu_variant }}" in
+          case "${{ inputs.kernel_variant }}" in
             "WKSU")
               echo "Applying SUSFS patches for WKSU..."
               cd ./Wild_KSU
@@ -313,7 +313,7 @@ jobs:
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-          case "${{ inputs.kernelsu_variant }}" in
+          case "${{ inputs.kernel_variant }}" in
             "WKSU")
               echo "Getting WKSU version..."
               cd ./Wild_KSU
