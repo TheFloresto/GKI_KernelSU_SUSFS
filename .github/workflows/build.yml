@@ -330,9 +330,10 @@ jobs:
               BASE_VERSION=10200
               ;;
             "SukiSU")
-              echo "Getting SukiSU version..."  
-              cd ./KernelSU
-              BASE_VERSION=13090  
+              echo "Getting SukiSU version... "
+              git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
+              cd SukiSU-Ultra
+              BASE_VERSION=10700  
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
@@ -419,7 +420,6 @@ jobs:
           if [ "${{ inputs.kernel_variant }}" == "SukiSU" ]; then
             echo "CONFIG_ZSMALLOC=y" | tee -a "$defconfig"
             echo "CONFIG_ZRAM=y" | tee -a "$defconfig"
-            echo "CONFIG_MODULE_SIG=n" | tee -a "$defconfig"
             echo "CONFIG_CRYPTO_LZO=y" | tee -a "$defconfig"
             echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" | tee -a "$defconfig"
             echo "CONFIG_CRYPTO_LZ4HC=y" | tee -a "$defconfig"
