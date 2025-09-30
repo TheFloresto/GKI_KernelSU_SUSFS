@@ -79,6 +79,7 @@ jobs:
           echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
           echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
           echo "PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin:$PATH" >> $GITHUB_ENV
+          echo "DEPMOD=/usr/sbin/depmod" >> $GITHUB_ENV
           
           mkdir -p ./git-repo
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
@@ -561,9 +562,7 @@ jobs:
           if [ -f "build/build.sh" ]; then
             LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
           else
-           tools/bazel build --config=fast --lto=thin \
-           --action_env=DEPMOD=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/depmod \
-           //common:kernel_aarch64_dist || exit 1
+            tools/bazel build --config=fast --lto=thin --sandbox_debug //common:kernel_aarch64_dist || exit 1
           fi
 
       - name: Detect Clang Version from Configs
