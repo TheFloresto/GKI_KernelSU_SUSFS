@@ -66,7 +66,7 @@ jobs:
 
       - name: Setup Build Environment
         run: |
-          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential kmod
+          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential kmod dwarves
           
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
@@ -562,6 +562,7 @@ jobs:
             LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
           else
             tools/bazel build --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
+            --action_env=DEPMOD=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/depmod \
           fi
 
       - name: Detect Clang Version from Configs
