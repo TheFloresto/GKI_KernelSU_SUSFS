@@ -66,7 +66,7 @@ jobs:
 
       - name: Setup Build Environment
         run: |
-          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential kmod dwarves
+          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential
           
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
@@ -79,7 +79,6 @@ jobs:
           echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
           echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
           echo "PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin:$PATH" >> $GITHUB_ENV
-          echo "DEPMOD=/usr/sbin/depmod" >> $GITHUB_ENV
           
           mkdir -p ./git-repo
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
@@ -539,9 +538,9 @@ jobs:
           else
             echo "Didn't set kernel uname! Set to default"
             if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-              perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "-${{ inputs.android_version }}-\$\{KERNELVERSION\}-Tam"/s' ./common/scripts/setlocalversion
+              perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "-${{ inputs.android_version }}-\$\{KERNELVERSION\}-TheFloresto"/s' ./common/scripts/setlocalversion
             else
-              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-${{ inputs.android_version }}-\$KSUVER-Tam"/s' ./common/scripts/setlocalversion
+              perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-${{ inputs.android_version }}-\$KSUVER-TheFloresto"/s' ./common/scripts/setlocalversion
             fi
           fi
           
@@ -552,18 +551,55 @@ jobs:
           rm -rf ./common/android/abi_gki_protected_exports_*
           perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
 
+      - name: Setup ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+          
+          mkdir -p $HOME/.ccache
+          
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
+
       - name: Build
         if: ${{ matrix.build_type == 'normal' }}
-        run : |
+        run: |
           set -e
           set -x
           cd "$CONFIG"
+          
+          # Set ccache path in PATH
+          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
+          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
+          export CCACHE_NOHASHDIR="true"
+          export CCACHE_HARDLINK="true"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+          export CCACHE_MAXSIZE="${{ env.CCACHE_MAXSIZE }}"
+          /usr/bin/ccache -M "${{ env.CCACHE_MAXSIZE }}"
+          /usr/bin/ccache -o compression=true
+          /usr/bin/ccache -s      
+
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
+            # Clear unnecessary runtime while building kernel
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
           else
-            tools/bazel build --config=fast --lto=thin --sandbox_debug //common:kernel_aarch64_dist || exit 1
+            # Clear unnecessary runtime while building kernel
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=$HOME/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
           fi
+          echo "Kernel compilation completed!"
+          echo "ccache status:"
+          ccache -s
+          echo "Space after compilation:"
+          df -h
 
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
