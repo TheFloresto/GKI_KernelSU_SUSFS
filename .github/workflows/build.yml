@@ -561,8 +561,9 @@ jobs:
           if [ -f "build/build.sh" ]; then
             LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
           else
-            tools/bazel build --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
-            --action_env=DEPMOD=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/depmod \
+           tools/bazel build --config=fast --lto=thin \
+           --action_env=DEPMOD=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/depmod \
+           //common:kernel_aarch64_dist || exit 1
           fi
 
       - name: Detect Clang Version from Configs
