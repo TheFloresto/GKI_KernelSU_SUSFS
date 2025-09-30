@@ -649,7 +649,6 @@ jobs:
           echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
 
-
       - name: Build Kernel
         if: ${{ matrix.build_type == 'make' }}
         run: |
