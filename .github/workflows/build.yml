@@ -551,6 +551,12 @@ jobs:
           rm -rf ./common/android/abi_gki_protected_exports_*
           perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
 
+      - name: Fix depmod compatibility
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --reinstall kmod
+          depmod --version
+    
       - name: Setup ccache
         run: |
           sudo apt-get update
