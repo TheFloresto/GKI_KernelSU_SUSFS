@@ -599,7 +599,7 @@ jobs:
             sudo rm -rf /usr/local/lib/android &
             sudo rm -rf /opt/ghc &
             sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=$HOME/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
+            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=$HOME/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --sandbox_debug --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
           fi
           echo "Kernel compilation completed!"
           echo "ccache status:"
