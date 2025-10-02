@@ -12,18 +12,6 @@ on:
       kernel_version:
         required: true
         type: string
-      kernel_uname:
-        required: false
-        type: string
-      kernel_variant:
-        required: true
-        type: string
-      kernelsu_branch:
-        required: true
-        type: string
-      kernelsu_branch_other:
-        required: false
-        type: string               
       sub_level:
         required: true
         type: string
@@ -32,14 +20,14 @@ on:
         type: string
       revision:
         required: false
-        type: string 
+        type: string
 
 jobs:
   build-gki:
     runs-on: ubuntu-latest
-    timeout-minutes: 142
+    timeout-minutes: 120
     strategy:
-       matrix:  
+      matrix:
         build_type: ["make", "normal"]
 
     steps:
@@ -231,7 +219,7 @@ jobs:
               fi
               ;;
           esac
-
+          
       - name: Add KernelSU
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -265,12 +253,12 @@ jobs:
           cd "$CONFIG"
           
           # Apply core SUSFS patches
-          cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
           cd common
           patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
           cd ..
-          cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
-          cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+          cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
+          cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           
           case "${{ inputs.kernel_variant }}" in
             "WKSU")
@@ -354,29 +342,28 @@ jobs:
             "WKSU")
               echo "Applying hooks for WKSU..."
               cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 < 60_scope-minimized_manual_hooks.patch
+              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
             ;;
             "KSU")
               echo "Applying hooks for Official KernelSU..."
               cp ../../kernel_patches/sultan/ksu_hooks.patch ./
-              patch -p1 --forward < ksu_hooks.patch
+              patch -p1 -F 3 --forward < ksu_hooks.patch
             ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
               cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 < 60_scope-minimized_manual_hooks.patch
-            ;;
+              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
             "SukiSU")
               echo "Applying hooks for SukiSU..."
               cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 < 60_scope-minimized_manual_hooks.patch
+              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
              ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
               cp ../../kernel_patches/sultan/ksu_hooks.patch ./
-              patch -p1 --forward < ksu_hooks.patch             
+              patch -p1 --forward -F 3 < ksu_hooks.patch             
             ;;
-          esac
+          esac          
 
       - name: Apply Module Symbol Version Fix Patch
         run: |
@@ -512,21 +499,20 @@ jobs:
                     
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
-          
-      - name: Change Kernel Name
+
+      - name: Change Kernel Uname
         run: |
           cd "$CONFIG"
-          
-          sed -i 's/-dirty//g' ./common/scripts/setlocalversion
-          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl 2>/dev/null || true
+          perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
+          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
 
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
           perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h
-
+          
           #Set Kernel Timestamp
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
-
+          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
+          
           #Set Kernel Name
           if [ ! -z ${{ inputs.kernel_uname }} ]; then
             echo "Set kernel uname: ${{ inputs.kernel_uname }}!"
@@ -543,63 +529,26 @@ jobs:
               perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "-${{ inputs.android_version }}-\$KSUVER-TheFloresto"/s' ./common/scripts/setlocalversion
             fi
           fi
-          
-          #Set Kernel Timestamp in Makefile
+
+          #Set Kernel Timestamp
           perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
               
           #Remove Abi Exports and Error
           rm -rf ./common/android/abi_gki_protected_exports_*
           perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
-    
-      - name: Setup ccache
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache
           
-          mkdir -p $HOME/.ccache
-          
-          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
-          echo "CCACHE_MAXSIZE=3G" >> $GITHUB_ENV
-
       - name: Build
         if: ${{ matrix.build_type == 'normal' }}
-        run: |
+        run : |
           set -e
           set -x
           cd "$CONFIG"
-          
-          # Set ccache path in PATH
-          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
-          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
-          export CCACHE_MAXSIZE="${{ env.CCACHE_MAXSIZE }}"
-          /usr/bin/ccache -M "${{ env.CCACHE_MAXSIZE }}"
-          /usr/bin/ccache -o compression=true
-          /usr/bin/ccache -s      
-
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            # Clear unnecessary runtime while building kernel
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
+            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
           else
-            # Clear unnecessary runtime while building kernel
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            tools/bazel build --sandbox_writable_path=${{ env.CCACHE_DIR }} --disk_cache=$HOME/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --sandbox_debug --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
+            tools/bazel build --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
           fi
-          echo "Kernel compilation completed!"
-          echo "ccache status:"
-          ccache -s
-          echo "Space after compilation:"
-          df -h
 
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
@@ -648,6 +597,7 @@ jobs:
           fi
           echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
+
 
       - name: Build Kernel
         if: ${{ matrix.build_type == 'make' }}
@@ -905,11 +855,12 @@ jobs:
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-boot-lz4.img
-
+          
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.kernel_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL || inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}
           path: |
             *.zip
-            *.img      
+            *.img
+            
