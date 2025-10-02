@@ -12,6 +12,18 @@ on:
       kernel_version:
         required: true
         type: string
+      kernel_uname:
+        required: false
+        type: string
+      kernel_variant:
+        required: true
+        type: string
+      kernelsu_branch:
+        required: true
+        type: string
+      kernelsu_branch_other:
+        required: false
+        type: string               
       sub_level:
         required: true
         type: string
