@@ -508,7 +508,7 @@ jobs:
           echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" | tee -a "$defconfig"                          
-          echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
+          echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
                     
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
