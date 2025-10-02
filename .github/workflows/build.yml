@@ -355,26 +355,27 @@ jobs:
               echo "Applying hooks for WKSU..."
               cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
               patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
-            ;;
+              ;;
             "KSU")
               echo "Applying hooks for Official KernelSU..."
               cp ../../kernel_patches/sultan/ksu_hooks.patch ./
               patch -p1 -F 3 --forward < ksu_hooks.patch
-            ;;
+              ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
               cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
               patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+              ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."
               cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
               patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
-             ;;
+              ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
               cp ../../kernel_patches/sultan/ksu_hooks.patch ./
               patch -p1 --forward -F 3 < ksu_hooks.patch             
-            ;;
+              ;;
           esac          
 
       - name: Apply Module Symbol Version Fix Patch
