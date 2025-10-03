@@ -668,7 +668,8 @@ jobs:
            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" || exit 1
           else
            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" gki_defconfig Image Image.gz Image.lz4 || exit 1
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections " || exit 1          
+           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" || exit 1          
+          fi          
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Normal Build)
         if: ${{ inputs.kernel_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
