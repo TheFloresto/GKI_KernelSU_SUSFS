@@ -43,18 +43,31 @@ jobs:
         build_type: ["make", "normal"]
 
     steps:
-      # # - name: Maximize Build Space
-        # uses: AdityaGarg8/remove-unwanted-software@v5
-        # with:
-          # remove-dotnet: 'true'          # Frees ~2 GB
-          # remove-android: 'true'         # Frees ~9 GB
-          # remove-haskell: 'true'         # Frees ~5.2 GB
-          # remove-codeql: 'true'          # Frees ~5.4 GB
-          # remove-docker-images: 'true'   # Frees ~3.2 GB
-          # remove-large-packages: 'true'  # Frees ~3.1 GB
-          # remove-swapfile: 'true'        # Frees ~4 GB
-          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          # verbose: 'true'                # Enable detailed logging
+      - name: Maximize Build Space
+        uses: AdityaGarg8/remove-unwanted-software@v5
+        with:
+          remove-dotnet: 'true'          # Frees ~2 GB
+          remove-android: 'true'         # Frees ~9 GB
+          remove-haskell: 'true'         # Frees ~5.2 GB
+          remove-codeql: 'true'          # Frees ~5.4 GB
+          remove-docker-images: 'true'   # Frees ~3.2 GB
+          remove-large-packages: 'true'  # Frees ~3.1 GB
+          remove-swapfile: 'true'        # Frees ~4 GB
+          remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          verbose: 'true'                # Enable detailed logging
+
+      - name: Setup SWAP
+        run: |
+         sudo swapoff -a
+         sudo fallocate -l 20G /swapfile
+         sudo chmod 600 /swapfile
+         sudo mkswap /swapfile
+         sudo swapon -p 1 /swapfile
+         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
+         echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+         echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
+         sudo sysctl -p
+         free -h
           
       - name: Set CONFIG Environment Variable
         run: |
@@ -514,7 +527,8 @@ jobs:
           # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
           echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"            
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"  
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_03=y" | tee -a "$defconfig"         
           echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
                            
@@ -568,16 +582,43 @@ jobs:
           
       - name: Build
         if: ${{ matrix.build_type == 'normal' }}
-        run : |
+        run: |
           set -e
           set -x
           cd "$CONFIG"
+          
+          # Set ccache path in PATH
+          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
+          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
+          export CCACHE_NOHASHDIR="true"
+          export CCACHE_HARDLINK="true"
+          export CCACHE_DIR="$HOME/.ccache"
+          export CCACHE_MAXSIZE="5G"
+          /usr/bin/ccache -M "$CCACHE_MAXSIZE"
+          /usr/bin/ccache -o compression=true
+          /usr/bin/ccache -s
+
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
+            # Clear unnecessary software while building kernel, freeing space without blocking subsequent steps
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
           else
-            tools/bazel build --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
+            # Clear unnecessary software while building kernel, freeing space without blocking subsequent steps
+            sudo rm -rf /usr/share/dotnet &
+            sudo rm -rf /usr/local/lib/android &
+            sudo rm -rf /opt/ghc &
+            sudo rm -rf /opt/hostedtoolcache/CodeQL &
+            tools/bazel build --sandbox_writable_path=$HOME/.ccache --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=thin //common:kernel_aarch64_dist
           fi
+          echo "Kernel compilation completed!"
+          echo "ccache status:"
+          ccache -s
+          echo "Space after compilation:"
+          df -h
 
       - name: Detect Clang Version from Configs
         if: ${{ matrix.build_type == 'make' }}
