@@ -423,7 +423,6 @@ jobs:
           if [ "${{ inputs.kernel_variant }}" == "SukiSU" ]; then
             echo "CONFIG_ZSMALLOC=y" | tee -a "$defconfig"
             echo "CONFIG_ZRAM=y" | tee -a "$defconfig"
-            echo "CONFIG_MODULE_SIG=n" | tee -a "$defconfig"
             echo "CONFIG_CRYPTO_LZO=y" | tee -a "$defconfig"
             echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" | tee -a "$defconfig"
             echo "CONFIG_CRYPTO_LZ4HC=y" | tee -a "$defconfig"
