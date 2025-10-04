@@ -674,8 +674,8 @@ jobs:
           fi      
 
           if [[ "$KERNEL_VERSION" == "6.6" ]]; then
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -fdata-sections" gki_defconfig Image Image.gz Image.lz4 || exit 1
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -fdata-sections" || exit 1
+           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector" gki_defconfig Image Image.gz Image.lz4 || exit 1
+           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector" || exit 1
           else
            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" gki_defconfig Image Image.gz Image.lz4 || exit 1
            make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" || exit 1          
