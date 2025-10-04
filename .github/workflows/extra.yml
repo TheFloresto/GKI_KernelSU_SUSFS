@@ -14,7 +14,7 @@ on:
         options:
           - Pre-Release
           - Release
-        default: Release   
+        default: Pre-Release   
       kernel_build:
         description: |
           Comma-separated list of kernels to build: a12-5.10,a13-5.10,a13-5.15,a14-5.15,a14-6.1,a15-6.6
