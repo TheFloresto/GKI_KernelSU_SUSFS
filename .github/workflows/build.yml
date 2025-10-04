@@ -371,8 +371,8 @@ jobs:
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."
-              cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
-              patch -p1 --forward -F 3 < syscall_hooks.patch
+              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
@@ -509,6 +509,7 @@ jobs:
           # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
           echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"          
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" | tee -a "$defconfig"   
           echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
