@@ -411,6 +411,25 @@ jobs:
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
 
+      - name: Apply FIX 22 clang Patches
+        if: ${{ matrix.build_type == 'make' }}
+        run: |
+          cd "$CONFIG/common"
+          
+          # Получаем версию ядра
+          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
+          ANDROID_VERSION="${{ inputs.android_version }}"
+          FUSS_VERSION="${{ inputs.fuss_version }}"
+          
+          # Проверяем условие: НЕ применяем патч для Android 15 с ядром 6.6
+          if [ "$KERNEL_VERSION" == "6.6" ]; then
+            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
+          else
+            echo "Applying fix 22 clang..."
+            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
+            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
+          fi
+
       - name: Apply Kernel Configuration
         run: |
           cd "$CONFIG"
@@ -495,11 +514,10 @@ jobs:
           # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
           echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"          
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" | tee -a "$defconfig"   
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"            
           echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
-                    
+                           
           # Remove check_defconfig
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
@@ -660,11 +678,11 @@ jobs:
           fi      
 
           if [[ "$KERNEL_VERSION" == "6.6" ]]; then
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" gki_defconfig Image Image.gz Image.lz4 || exit 1
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector" || exit 1
+           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector" gki_defconfig Image Image.gz Image.lz4 || exit 1
+           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector" || exit 1
           else
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" gki_defconfig Image Image.gz Image.lz4 || exit 1
-           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O2 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" || exit 1          
+           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" gki_defconfig Image Image.gz Image.lz4 || exit 1
+           make -j$(nproc --all) O=out $MAKE_ARGS KCFLAGS+="-Wno-error -O3 -flto=thin -fno-stack-protector -ffunction-sections -fdata-sections" || exit 1          
           fi          
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Normal Build)
