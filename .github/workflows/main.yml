@@ -48,6 +48,8 @@ jobs:
     secrets: inherit
     with:
       kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernels-a13-5-10:
     name: ${{ inputs.kernel_variant }}-Android_13-5.10
@@ -55,6 +57,8 @@ jobs:
     secrets: inherit
     with:
       kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernels-a13-5-15:
     name: ${{ inputs.kernel_variant }}-Android_13-5.15
@@ -62,6 +66,8 @@ jobs:
     secrets: inherit
     with:
       kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernels-a14-5-15:
     name: ${{ inputs.kernel_variant }}-Android_14-5.15
@@ -69,6 +75,8 @@ jobs:
     secrets: inherit
     with:
       kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernels-a14-6-1:
     name: ${{ inputs.kernel_variant }}-Android_14-6.1
@@ -76,6 +84,8 @@ jobs:
     secrets: inherit
     with:
       kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-kernels-a15-6-6:
     name: ${{ inputs.kernel_variant }}-Android_15-6.6
@@ -83,6 +93,8 @@ jobs:
     secrets: inherit
     with:
       kernel_variant: ${{ inputs.kernel_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   release:
     runs-on: ubuntu-latest
@@ -100,15 +112,8 @@ jobs:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
-          # remove-dotnet: 'true'          # Frees ~2 GB
-          # remove-android: 'true'         # Frees ~9 GB
-          # remove-haskell: 'true'         # Frees ~5.2 GB
-          # remove-codeql: 'true'          # Frees ~5.4 GB
-          # remove-docker-images: 'true'   # Frees ~3.2 GB
-          # remove-large-packages: 'true'  # Frees ~3.1 GB
-          remove-swapfile: 'true'        # Frees ~4 GB
-          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          verbose: 'true'                # Enable detailed logging
+          remove-swapfile: 'true'
+          verbose: 'true'
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -171,7 +176,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Получаем последний тег из публичного репозитория NerestKernels
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
@@ -180,7 +184,6 @@ jobs:
           
           echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
           
-          # Генерируем новый тег с увеличенным номером ревизии
           NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{
             if (NF > 1) {
               suffix = $NF + 1
@@ -193,13 +196,11 @@ jobs:
           
           echo "Proposed new tag: $NEW_TAG"
           
-          # Проверяем, существует ли тег в публичном репозитории NerestKernels
           TAG_EXISTS=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$NEW_TAG\") | .name" 2>/dev/null || echo "")
           
           if [ -n "$TAG_EXISTS" ]; then
             echo "Tag $NEW_TAG already exists in NerestKernels repository, finding next available tag"
             
-            # Находим следующий доступный тег
             BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
             BASE_REVISION=$(echo "$LATEST_TAG" | grep -o 'r[0-9]*$' | sed 's/r//' || echo "0")
             COUNTER=$((BASE_REVISION + 1))
@@ -216,7 +217,6 @@ jobs:
               
               COUNTER=$((COUNTER + 1))
               
-              # Защита от бесконечного цикла
               if [ "$COUNTER" -gt $((BASE_REVISION + 100)) ]; then
                 echo "Error: Could not find available tag after 100 attempts"
                 exit 1
@@ -295,7 +295,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Собираем все файлы для загрузки
           UPLOAD_FILES=()
           for file in ./downloaded-artifacts/*-kernel-*/*; do
             if [ ! -d "$file" ]; then
@@ -303,11 +302,9 @@ jobs:
             fi
           done
           
-          # Создаем релиз в публичном репозитории NerestKernels
           if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
             echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS..."
             
-            # Создаем релиз с первым файлом
             gh release create "$NEW_TAG" \
               --repo "NerestKernels/GKI_KernelSU_SUSFS" \
               --title "$RELEASE_NAME" \
@@ -315,7 +312,6 @@ jobs:
               $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
               "${UPLOAD_FILES[0]}"
             
-            # Загружаем остальные файлы, если они есть
             if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
               echo "Uploading additional files..."
               for i in "${!UPLOAD_FILES[@]}"; do
