@@ -699,7 +699,7 @@ jobs:
           fi          
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Normal Build)
-        if: ${{ inputs.kernel_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
         run: |
             echo "Patching Image file for Android 12/13 normal build..."
             cd "$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
@@ -711,7 +711,7 @@ jobs:
             cd ../../../..        
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Make Build)
-        if: ${{ inputs.kernel_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'make' }}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'make' }}
         run: |
             echo "Patching Image file for Android 12/13 make build..."
             cd "$CONFIG/common/out/arch/arm64/boot/"
@@ -723,7 +723,7 @@ jobs:
             cd ../../../../../..
 
       - name: Patch Image File for Android 14 and 15 (SukiSU only - Normal Build)
-        if: ${{ inputs.kernel_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'normal' }}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'normal' }}
         run: |
             echo "Patching Image file for Android 14/15 normal build..."
             cd "$CONFIG/bazel-bin/common/kernel_aarch64/"
@@ -735,7 +735,7 @@ jobs:
             cd ../../..          
 
       - name: Patch Image File for Android 14 and 15 (SukiSU only - Make Build)
-        if: ${{ inputs.kernel_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'make' }}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'make' }}
         run: |
             echo "Patching Image file for Android 14/15 make build..."
             cd "$CONFIG/common/out/arch/arm64/boot/"
