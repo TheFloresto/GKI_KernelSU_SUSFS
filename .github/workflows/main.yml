@@ -35,7 +35,7 @@ on:
         description: 'Include SukiSU?'
         required: true
         type: boolean
-        default: false        
+        default: false      
       include_mksu:
         description: 'Include MKSU?'
         required: true
@@ -157,7 +157,6 @@ jobs:
       - build-a15-6-6
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.11"
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -282,6 +281,25 @@ jobs:
         with:
           path: ./downloaded-artifacts
 
+      - name: Set Release Name
+        run: |
+          VARIANTS=()
+          [[ "${{ inputs.include_wksu }}" == "true" ]] && VARIANTS+=("WKSU")
+          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("KSU")
+          [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("NEXT")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("SukiSU")
+          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("MKSU")
+          
+          if [ ${#VARIANTS[@]} -eq 0 ]; then
+            VARIANT_TEXT="KernelSU"
+          elif [ ${#VARIANTS[@]} -eq 1 ]; then
+            VARIANT_TEXT="${VARIANTS[0]}"
+          else
+            VARIANT_TEXT=$(IFS=', '; echo "${VARIANTS[*]}")
+          fi
+          
+          echo "RELEASE_NAME=GKI Kernels With $VARIANT_TEXT & SUSFS v1.5.11" >> $GITHUB_ENV
+
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
@@ -292,7 +310,6 @@ jobs:
           Please ensure you have proper backups before installation.
       
           Features:
-          -> ${{ inputs.kernelsu_variant }} Kernels & Others
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
           -> SUSFS ඞ v1.5.11
           -> Scope-Minimized Manual hooks v1.5
@@ -346,40 +363,53 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           UPLOAD_FILES=()
-          for file in ./downloaded-artifacts/*-kernel-*/*; do
-            if [ ! -d "$file" ]; then
-              UPLOAD_FILES+=("$file")
-            fi
-          done
           
-          if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
-            echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS..."
-            
-            gh release create "$NEW_TAG" \
-              --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-              --title "$RELEASE_NAME" \
-              --notes-file release_body.md \
-              $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
-              "${UPLOAD_FILES[0]}"
-            
-            if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
-              echo "Uploading additional files..."
-              for i in "${!UPLOAD_FILES[@]}"; do
-                if [ $i -gt 0 ]; then
-                  echo "Uploading ${UPLOAD_FILES[$i]}..."
-                  gh release upload "$NEW_TAG" \
-                    --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-                    "${UPLOAD_FILES[$i]}"
-                fi
-              done
-            fi
-            
-            echo "Release created successfully!"
-          else
-            echo "No files found to upload!"
+          # Debug: Show downloaded artifacts structure
+          echo "Downloaded artifacts structure:"
+          ls -laR ./downloaded-artifacts/
+          
+          # Find all .zip and .img files, excluding directories
+          while IFS= read -r -d '' file; do
+            UPLOAD_FILES+=("$file")
+          done < <(find ./downloaded-artifacts -type f \( -name "*.zip" -o -name "*.img" \) -print0)
+          
+          # Debug: Show found files
+          echo "Found ${#UPLOAD_FILES[@]} files to upload:"
+          printf '%s\n' "${UPLOAD_FILES[@]}"
+          
+          if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
+            echo "ERROR: No files found to upload!"
+            echo "Full artifacts directory structure:"
+            find ./downloaded-artifacts -type f -ls
             exit 1
           fi
-
+          
+          echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS with ${#UPLOAD_FILES[@]} files..."
+          
+          # Create release with first file
+          gh release create "$NEW_TAG" \
+            --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+            --title "$RELEASE_NAME" \
+            --notes-file release_body.md \
+            $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
+            "${UPLOAD_FILES[0]}"
+          
+          # Upload remaining files if any
+          if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
+            echo "Uploading additional ${#UPLOAD_FILES[@]} files..."
+            for i in "${!UPLOAD_FILES[@]}"; do
+              if [ $i -gt 0 ]; then
+                echo "Uploading file $((i+1))/${#UPLOAD_FILES[@]}: ${UPLOAD_FILES[$i]}..."
+                gh release upload "$NEW_TAG" \
+                  --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+                  "${UPLOAD_FILES[$i]}" \
+                  --clobber
+              fi
+            done
+          fi
+          
+          echo "✅ Release created successfully with ${#UPLOAD_FILES[@]} files!"
+          
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
@@ -396,4 +426,3 @@ jobs:
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
-            
