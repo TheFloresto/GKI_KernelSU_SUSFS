@@ -1,4 +1,4 @@
-name: Build Kernels
+name: Build GKI Kernels
 
 permissions:
   contents: write
@@ -50,7 +50,7 @@ on:
         required: false
         type: string
         default: ""
-
+        
 jobs:
   set-matrix:
     runs-on: ubuntu-latest
@@ -61,10 +61,11 @@ jobs:
       - id: set-matrix
         run: |
           VARIANTS=()
-          [[ "${{ inputs.include_wild }}" == "true" ]] && VARIANTS+=("\"WILD\"")
+          [[ "${{ inputs.include_wksu }}" == "true" ]] && VARIANTS+=("\"WKSU\"")
           [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
           [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
-          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")          
+          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")                     
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-a12-5-10:
@@ -140,16 +141,18 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   release:
-    if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}    
+    if: ${{ inputs.release_type == 'Release' || inputs.release_type == 'Pre-Release' }}  
     runs-on: ubuntu-latest
     needs:
-      - build-a12-5-10
-      - build-a13-5-10
-      - build-a13-5-15
-      - build-a14-5-15
-      - build-a14-6-1
-      - build-a15-6-6
-
+      - build-kernels-a12-5-10
+      - build-kernels-a13-5-10
+      - build-kernels-a13-5-15
+      - build-kernels-a14-5-15
+      - build-kernels-a14-6-1
+      - build-kernels-a15-6-6
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.11"
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -159,6 +162,9 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Get commit hashes and generate commit URLs
         run: |
@@ -204,13 +210,12 @@ jobs:
             echo "${name}_REF=$ref" >> $GITHUB_ENV
             echo "${name}_URL=$url" >> $GITHUB_ENV
           }
-      
-          [[ "$BRANCH" == "Stable" ]] && MODE="tag" || MODE="commit"
-
-          get_ref "WILD" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
+          [[ "$BRANCH" == "Dev" ]] && MODE="tag" || MODE="commit"
+          get_ref "WKSU" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
           get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
           get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
-          get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "commit"
+          get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"
+          get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "$MODE"              
 
       - name: Generate New Tag
         env:
@@ -219,7 +224,7 @@ jobs:
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.5.9-r0"
+            LATEST_TAG="v1.5.11-r0"
           fi
           
           echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
@@ -266,26 +271,25 @@ jobs:
           
           echo "Final new tag: $NEW_TAG"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
+          
       - name: Download Artifacts
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-          pattern: '*-make'
 
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
-      
+          
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
           Please ensure you have proper backups before installation.
       
           Features:
-          -> Wild KSU
+          -> ${{ inputs.kernelsu_variant }} Kernels & Others
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
-          -> SUSFS ඞ v1.5.9
+          -> SUSFS ඞ v1.5.11
           -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
@@ -294,6 +298,7 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
+          -> SukiSU: KPM = ON
       
           Build Types:
           -> **Make Build**: Built using traditional make
@@ -309,21 +314,18 @@ jobs:
           -> https://github.com/sidex15/ksu_module_susfs
       
           Managers:
-          -> WKSU: https://github.com/WildKernels/Wild_KSU / https://t.me/Wild_Kernels/26618
-          -> KernelSU: https://github.com/tiann/KernelSU / https://t.me/KernelSU_group
-          -> KernelSU-Next: https://github.com/rifsxd/KernelSU-Next / https://t.me/ksunext_group
-          -> MKSU: https://github.com/5ec1cff/KernelSU / https://t.me/mksu_ci      
-          
+          -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
+          -> KernelSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
+          -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
+          -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
+          -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
+      
           Commit Hashes (at the time of release):
-          EOF
-          
-          # Add commit hashes conditionally
-          echo "-> WKSU: [${{ env.WILD_REF }}](${{ env.WILD_URL }})" >> release_body.md
-          echo "-> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})" >> release_body.md
-          echo "-> KernelSU Next: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})" >> release_body.md
-          echo "-> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})" >> release_body.md
-
-          cat << 'EOF' >> release_body.md
+          -> WKSU: [${{ env.WKSU_REF }}](${{ env.WKSU_URL }})
+          -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
+          -> NEXT: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
+          -> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})
+          -> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
           
           -> SUSFS4KSU: 
             -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
@@ -334,85 +336,59 @@ jobs:
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
 
-      - name: Verify artifacts exist
-        run: |
-          echo "Checking downloaded artifacts structure..."
-          if [ ! -d "./downloaded-artifacts" ]; then
-            echo "ERROR: ./downloaded-artifacts directory does not exist!"
-            exit 1
-          fi
-          
-          echo "Contents of ./downloaded-artifacts:"
-          ls -la ./downloaded-artifacts/
-          
-          echo "All files in downloaded-artifacts (recursive):"
-          find ./downloaded-artifacts -type f -name "*.zip" -o -name "*.img" | head -20
-          
-          ARTIFACT_COUNT=$(find ./downloaded-artifacts -type f \( -name "*.zip" -o -name "*.img" \) | wc -l)
-          echo "Total artifacts found: $ARTIFACT_COUNT"
-          
-          if [ "$ARTIFACT_COUNT" -eq 0 ]; then
-            echo "ERROR: No artifacts found!"
-            exit 1
-          fi
-
       - name: Create GitHub Release in NerestKernels Repository
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          echo "Creating release $NEW_TAG in NerestKernels/GKI_KernelSU_SUSFS..."
-          
-          # Create the release first
-          gh release create "$NEW_TAG" \
-            --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-            --title "GKI Kernels With KSU & SUSFS v1.5.9" \
-            --notes-file release_body.md \
-            $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease")
-          
-          echo "Release created successfully!"
-
-      - name: Upload Release Assets
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          echo "Starting file upload process..."
-          
-          # Collect all files to upload
           UPLOAD_FILES=()
-          while IFS= read -r -d '' file; do
-            UPLOAD_FILES+=("$file")
-          done < <(find ./downloaded-artifacts -type f \( -name "*.zip" -o -name "*.img" \) -print0)
-          
-          echo "Found ${#UPLOAD_FILES[@]} files to upload:"
-          for file in "${UPLOAD_FILES[@]}"; do
-            echo "  - $(basename "$file") ($(du -h "$file" | cut -f1))"
-          done
-          
-          # Upload files
-          for file in "${UPLOAD_FILES[@]}"; do
-            echo "Uploading: $(basename "$file")"
-            if ! gh release upload "$NEW_TAG" "$file" --repo "NerestKernels/GKI_KernelSU_SUSFS" --clobber; then
-              echo "ERROR: Failed to upload $file"
-              exit 1
+          for file in ./downloaded-artifacts/*-kernel-*/*; do
+            if [ ! -d "$file" ]; then
+              UPLOAD_FILES+=("$file")
             fi
-            echo "Successfully uploaded: $(basename "$file")"
           done
           
-          echo "All files uploaded successfully!"
+          if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
+            echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS..."
+            
+            gh release create "$NEW_TAG" \
+              --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+              --title "$RELEASE_NAME" \
+              --notes-file release_body.md \
+              $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
+              "${UPLOAD_FILES[0]}"
+            
+            if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
+              echo "Uploading additional files..."
+              for i in "${!UPLOAD_FILES[@]}"; do
+                if [ $i -gt 0 ]; then
+                  echo "Uploading ${UPLOAD_FILES[$i]}..."
+                  gh release upload "$NEW_TAG" \
+                    --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+                    "${UPLOAD_FILES[$i]}"
+                fi
+              done
+            fi
+            
+            echo "Release created successfully!"
+          else
+            echo "No files found to upload!"
+            exit 1
+          fi
 
       - name: Display Files Uploaded
         run: |
           echo "GitHub release created with the following files:"
-          find ./downloaded-artifacts -type f \( -name "*.zip" -o -name "*.img" \) -exec basename {} \;
+          ls -la ./downloaded-artifacts/**/*
             
       - name: Send Telegram Notification
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F message_thread_id="${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}" \
+            -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
             -F text="
             🌽 *New Kernel Release Uploaded*  
             📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
+            
