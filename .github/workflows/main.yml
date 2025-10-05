@@ -31,6 +31,11 @@ on:
         required: true
         type: boolean
         default: true
+      include_sukisu:
+        description: 'Include SukiSU?'
+        required: true
+        type: boolean
+        default: false        
       include_mksu:
         description: 'Include MKSU?'
         required: true
