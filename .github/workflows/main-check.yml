@@ -91,7 +91,6 @@ jobs:
     needs: build-all-lts
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernel_variant }} & SUSFS v1.5.11"
     steps:
       - name: Maximize Build Space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -216,6 +215,25 @@ jobs:
         with:
           path: ./downloaded-artifacts
 
+      - name: Set Release Name
+        run: |
+          VARIANTS=()
+          [[ "${{ inputs.include_wksu }}" == "true" ]] && VARIANTS+=("WKSU")
+          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("KSU")
+          [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("NEXT")
+          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("SukiSU")
+          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("MKSU")
+          
+          if [ ${#VARIANTS[@]} -eq 0 ]; then
+            VARIANT_TEXT="KernelSU"
+          elif [ ${#VARIANTS[@]} -eq 1 ]; then
+            VARIANT_TEXT="${VARIANTS[0]}"
+          else
+            VARIANT_TEXT=$(IFS=', '; echo "${VARIANTS[*]}")
+          fi
+          
+          echo "RELEASE_NAME=GKI Kernels With $VARIANT_TEXT & SUSFS v1.5.11" >> $GITHUB_ENV
+
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
@@ -226,7 +244,6 @@ jobs:
           Please ensure you have proper backups before installation.
       
           Features:
-          -> ${{ inputs.kernelsu_variant }} Kernels & Others
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
           -> SUSFS ඞ v1.5.11
           -> Scope-Minimized Manual hooks v1.5
@@ -286,7 +303,6 @@ jobs:
           ls -laR ./downloaded-artifacts/
           
           # Find all .zip and .img files, excluding directories
-          # Pattern matches: *.zip and *.img files
           while IFS= read -r -d '' file; do
             UPLOAD_FILES+=("$file")
           done < <(find ./downloaded-artifacts -type f \( -name "*.zip" -o -name "*.img" \) -print0)
@@ -314,7 +330,7 @@ jobs:
           
           # Upload remaining files if any
           if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
-            echo "Uploading ${#UPLOAD_FILES[@]} additional files..."
+            echo "Uploading additional ${#UPLOAD_FILES[@]} files..."
             for i in "${!UPLOAD_FILES[@]}"; do
               if [ $i -gt 0 ]; then
                 echo "Uploading file $((i+1))/${#UPLOAD_FILES[@]}: ${UPLOAD_FILES[$i]}..."
@@ -344,4 +360,3 @@ jobs:
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
-            
