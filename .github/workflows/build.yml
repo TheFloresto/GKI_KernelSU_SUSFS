@@ -100,33 +100,6 @@ jobs:
           git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git -b main          
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           
-          # Checkout specific commits for certain Android/kernel version combinations
-          if [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android12-5.10" ]; then
-            cd susfs4ksu
-            git checkout 0ed20c1656af7806a1760837ad320e62a8fb40fd
-            cd ..
-          elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android13-5.10" ]; then
-            cd susfs4ksu
-            git checkout 19e5b616464577c986e079cea0700428422bccb5
-            cd ..
-          elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android13-5.15" ]; then
-            cd susfs4ksu
-            git checkout b443e5be35cd8275b97a776f8cc84fbbf8169749
-            cd ..
-          elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android14-5.15" ]; then
-            cd susfs4ksu
-            git checkout 40823c6a92d072721c2c05f37776f69e3689ce8f
-            cd ..
-          elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android14-6.1" ]; then
-            cd susfs4ksu
-            git checkout 0e19a05277d28182c7b653580117145c53e69e92
-            cd ..
-          elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android15-6.6" ]; then
-            cd susfs4ksu
-            git checkout ef036830ec9d56035d63d328185281c09726b20f
-            cd ..
-          fi       
-
       - name: Initialize and Sync Kernel Source
         run: |
           mkdir -p "$CONFIG"
