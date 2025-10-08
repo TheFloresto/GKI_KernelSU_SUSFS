@@ -633,6 +633,7 @@ jobs:
 
       - name: Create AK3 ZIP
         run: |
+          # Try different Image locations based on build type
           if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
             cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image
           elif [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
@@ -646,28 +647,29 @@ jobs:
 
           cd AnyKernel3
           
+          # Use actual sublevel for LTS builds if available
           SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
-          if [ -n "${ACTUAL_SUBLEVEL:-}" ]; then
+          if [ -n "$ACTUAL_SUBLEVEL" ]; then
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           
           ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-AK3.zip"
           zip -r "../$ZIP_NAME" ./*
 
-      - name: Create Bootimgs Folder and Copy Images (Make Build)
+      - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ matrix.build_type == 'make' }}
         run: |
           mkdir bootimgs
 
           echo "Creating bootimgs folder and copying images..."
           cp $CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./bootimgs 2>/dev/null || gzip -n -k -f -9 $CONFIG/common/out/arch/arm64/boot/Image > ./bootimgs/Image.gz
-          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs 2>/dev/null || true
+          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./bootimgs
+          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
           cp $CONFIG/common/out/arch/arm64/boot/Image ./
-          cp ./bootimgs/Image.gz ./Image.gz 2>/dev/null || true
-          cp ./bootimgs/Image.lz4 ./Image.lz4 2>/dev/null || true
+          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./
+          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13 (Normal Build)
+      - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
@@ -678,10 +680,11 @@ jobs:
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
 
+          # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
           gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
 
-      - name: Create Bootimgs Folder and Copy Images for Android 14/15 (Normal Build)
+      - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ (inputs.android_version == 'android14' || inputs.android_version == 'android15') && matrix.build_type == 'normal' }}
         run: |
           mkdir bootimgs
@@ -692,6 +695,7 @@ jobs:
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
 
+          # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
           gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
 
@@ -701,14 +705,16 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd bootimgs
           
+          # Prepare sublevel for naming
           SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
-          if [ -n "${ACTUAL_SUBLEVEL:-}" ]; then
+          if [ -n "$ACTUAL_SUBLEVEL" ]; then
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           
           GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-"${{ inputs.os_patch_level }}"_"${{ inputs.revision }}".zip
           FALLBACK_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip
           
+          # Check if the GKI URL is available
           echo "Checking if GKI kernel URL is reachable: $GKI_URL"
           status=$(curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null)
           
@@ -720,6 +726,7 @@ jobs:
               curl -Lo gki-kernel.zip "$FALLBACK_URL"
           fi
           
+          # Unzip the downloaded kernel and remove the zip
           echo "Unzipping the downloaded kernel..."
           unzip gki-kernel.zip && rm gki-kernel.zip
           
@@ -750,8 +757,9 @@ jobs:
         run: |
           cd bootimgs
 
+          # Prepare sublevel for naming
           SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
-          if [ -n "${ACTUAL_SUBLEVEL:-}" ]; then
+          if [ -n "$ACTUAL_SUBLEVEL" ]; then
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           
