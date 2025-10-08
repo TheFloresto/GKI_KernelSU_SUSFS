@@ -47,8 +47,7 @@ jobs:
 
       - name: Setup Build Environment
         run: |
-          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache clang lld flex bison libncurses-dev zlib1g-dev liblz4-tool
-          libxml2-utils rsync unzip dwarves file python3
+          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache clang lld flex bison libncurses-dev zlib1g-dev
           
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
