@@ -54,7 +54,6 @@ jobs:
           verbose: 'true'                # Enable detailed logging
 
       - name: Setup SWAP
-        shell: bash
         run: |
           sudo swapoff -a
           sudo fallocate -l 15G /swapfile
@@ -465,7 +464,7 @@ jobs:
           
           echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
           echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"  
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"         
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" | tee -a "$defconfig"         
           echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
