@@ -255,6 +255,7 @@ jobs:
           -> Wireguard Support
           -> BBR v1 Support
           -> SukiSU: KPM = ON
+          -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
       
           Build Types:
           -> **Make Build**: Built using traditional make
