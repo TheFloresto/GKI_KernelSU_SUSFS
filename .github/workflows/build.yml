@@ -509,10 +509,10 @@ jobs:
             # Создаём список модулей для ZRAM
             mkdir -p ./common/android
             cat > ./common/android/gki_aarch64_modules << 'EOF'
-            mm/zsmalloc.ko
-            drivers/block/zram/zram.ko
-            EOF
-          fi  
+          mm/zsmalloc.ko
+          drivers/block/zram/zram.ko
+          EOF
+          fi
 
           if [ "${{ matrix.build_type }}" == "normal" ] || [ "${{ matrix.build_type }}" == "matrix" ]; then
             echo "CONFIG_LOCALVERSION_AUTO=n" >> "$defconfig"
