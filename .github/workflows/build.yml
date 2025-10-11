@@ -813,19 +813,25 @@ jobs:
           ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.$SUBLEVEL_FOR_NAME-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-AK3.zip"
           zip -r "../$ZIP_NAME" ./*
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13
-        if: ${{ matrix.build_type == 'make' }}
+      - name: Create Bootimgs Folder and Copy Images
+        if: ${{ matrix.build_type == 'make' }}      
         run: |
           mkdir bootimgs
-
-          echo "Creating bootimgs folder and copying images..."
-          cp $CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./bootimgs
-          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp $CONFIG/common/out/arch/arm64/boot/Image ./
-          cp $CONFIG/common/out/arch/arm64/boot/Image.gz ./
-          cp $CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
-
+          
+          IMG_PATH="$CONFIG/common/out/arch/arm64/boot/Image"
+          
+          echo "Copying Image files..."
+          cp "$IMG_PATH" ./bootimgs/
+          cp "$IMG_PATH" ./
+          
+          # Create lz4 compressed Image
+          lz4 -9 -f ./Image ./Image.lz4
+          lz4 -9 -f ./Image ./bootimgs/Image.lz4
+          
+          # Create gzip compressed Image
+          gzip -n -k -f -9 ./Image
+          cp ./Image.gz ./bootimgs/Image.gz
+          
       - name: Create Bootimgs Folder and Copy Images for Android 12/13
         if: ${{ (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'normal' }}
         run: |
