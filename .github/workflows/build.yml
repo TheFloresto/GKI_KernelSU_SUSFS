@@ -506,12 +506,14 @@ jobs:
             echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$defconfig"
             echo "CONFIG_ZRAM_WRITEBACK=y" >> "$defconfig"
             
-            # Создаём список модулей для ZRAM
+            # Создаём список модулей для ZRAM                 
+            if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
             mkdir -p ./common/android
             cat > ./common/android/gki_aarch64_modules << 'EOF'
           mm/zsmalloc.ko
           drivers/block/zram/zram.ko
           EOF
+          fi
           fi
 
           if [ "${{ matrix.build_type }}" == "normal" ] || [ "${{ matrix.build_type }}" == "matrix" ]; then
