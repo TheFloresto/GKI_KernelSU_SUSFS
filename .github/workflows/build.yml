@@ -71,10 +71,22 @@ jobs:
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
-      - name: Setup Build Environment
+      - name: Install build dependencies
         run: |
-          sudo apt update && sudo apt install -y libelf-dev libssl-dev build-essential ccache clang lld flex bison libncurses-dev zlib1g-dev
-          
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabihf \
+            clang \
+            lld \
+            llvm \
+            libelf-dev \
+            device-tree-compiler
+          which dtc
+          dtc --version
+
+      - name: Setup Build Environment
+        run: |          
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
           git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
@@ -92,6 +104,41 @@ jobs:
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
+      - name: Setup ZyCromerZ Clang Toolchain
+        if: ${{ matrix.build_type == 'make' }}         
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Fetching latest ZyCromerZ Clang release..."
+          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
+          if [ -z "$LATEST_CLANG_TAG" ]; then
+            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
+            exit 1
+          fi
+          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
+          
+          # Extract version info for environment variables
+          CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
+          
+          echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
+          mkdir -p clang-zyc
+          cd clang-zyc
+          
+          # Download the latest release asset (assuming the naming pattern is consistent)
+          DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
+          echo "Download URL: $DOWNLOAD_URL"
+          
+          curl -LO "$DOWNLOAD_URL"
+          tar -xzf "Clang-$CLANG_VERSION.tar.gz"
+          cd ..
+          
+          # Set environment variables
+          echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
+          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
+          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          
       - name: Set boot sign key
         env:
           BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
@@ -105,10 +152,37 @@ jobs:
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           
-          git clone --depth=1 https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-          git clone --depth=1 https://github.com/TheFloresto/kernel_patches.git -b main
-          git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git -b main          
+          git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          git clone https://github.com/TheFloresto/kernel_patches.git -b main
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main          
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+
+          ## Checkout specific commits for certain Android/kernel version combinations
+          #if [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android12-5.10" ]; then
+          #  cd susfs4ksu
+          #  git checkout 0ed20c1656af7806a1760837ad320e62a8fb40fd
+          #  cd ..
+          #elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android13-5.10" ]; then
+          #  cd susfs4ksu
+          #  git checkout 19e5b616464577c986e079cea0700428422bccb5
+          #  cd ..
+          #elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android13-5.15" ]; then
+          #  cd susfs4ksu
+          #  git checkout b443e5be35cd8275b97a776f8cc84fbbf8169749
+          #  cd ..
+          #elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android14-5.15" ]; then
+          #  cd susfs4ksu
+          #  git checkout 40823c6a92d072721c2c05f37776f69e3689ce8f
+          #  cd ..
+          #elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android14-6.1" ]; then
+          #  cd susfs4ksu
+          #  git checkout 0e19a05277d28182c7b653580117145c53e69e92
+          #  cd ..
+          #elif [ "${{ inputs.android_version }}-${{ inputs.kernel_version }}" = "android15-6.6" ]; then
+          #  cd susfs4ksu
+          #  git checkout ef036830ec9d56035d63d328185281c09726b20f
+          #  cd ..
+          #fi         
           
       - name: Initialize and Sync Kernel Source
         run: |
@@ -125,7 +199,7 @@ jobs:
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
           
-          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+          $REPO sync -c --optimized-fetch --prune --no-tags --fail-fast -j$(nproc)
 
       - name: Extract Actual Sublevel for LTS Builds
         if: inputs.sub_level == 'X'
@@ -231,6 +305,14 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
           esac
+
+      - name: Add BBG
+        run: |
+          cd "$CONFIG/common"
+          echo "Adding BBG..."
+          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+          echo "CONFIG_BBG=y" >> arch/arm64/configs/gki_defconfig
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/landlock/landlock,baseband_guard/ } }' security/Kconfig
           
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
@@ -262,8 +344,20 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward < 0001-Susfs-1.5.9.patch
+              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.11/fix_apk_sign.c.patch ./
+              patch -p1 --forward < fix_apk_sign.c.patch
+              
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.11/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.11/fix_sucompat.c.patch ./
+              patch -p1 --forward < fix_sucompat.c.patch
+
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.11/fix_kernel_compat.c.patch ./
+              patch -p1 --forward < fix_kernel_compat.c.patch
               
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
               patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch
@@ -337,13 +431,13 @@ jobs:
               ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
-              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+              cp ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
+              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
               ;;
             "SukiSU")
-              echo "Applying hooks for SukiSU..."
-              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+              echo "Applying hooks for SukiSU..."          
+              cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
+              patch -p1 --forward -F 3 < syscall_hooks.patch
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
@@ -352,23 +446,13 @@ jobs:
               ;;
           esac 
 
-      - name: Add BBG
-        run: |
-          cd "$CONFIG"
-          echo "Adding BBG..."
-          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
-          echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/landlock/landlock,baseband_guard/ } }' common/security/Kconfig
-
       - name: Apply Module Symbol Version Fix Patch
         run: |
           if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
             cd "$CONFIG/common/kernel/module"
-            #sed -i 's/pr_warn("%s: disagrees about version of symbol %s\\n"/pr_warn("%s: disagrees about version of symbol %s, but ignore...\\n"/' version.c
             sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' version.c
           else
             cd "$CONFIG/common/kernel"
-            #sed -i 's/pr_warn("%s: disagrees about version of symbol %s\\n"/pr_warn("%s: disagrees about version of symbol %s, but ignore...\\n"/' module.c
             sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' module.c
           fi
 
@@ -390,6 +474,25 @@ jobs:
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
 
+      - name: Apply FIX 22 clang Patches
+        if: ${{ matrix.build_type == 'make' }}     
+        run: |
+          cd "$CONFIG/common"
+          
+          # Получаем версию ядра
+          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
+          ANDROID_VERSION="${{ inputs.android_version }}"
+          FUSS_VERSION="${{ inputs.fuss_version }}"
+          
+          # Проверяем условие: НЕ применяем патч для Android 15 с ядром 6.6
+          if [ "$KERNEL_VERSION" == "6.6" ]; then
+            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
+          else
+            echo "Applying fix 22 clang..."
+            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
+            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
+          fi
+          
       - name: Apply Kernel Configuration
         run: |
           cd "$CONFIG"
@@ -399,6 +502,26 @@ jobs:
           echo "Applying kernel configurations one by one..."
           
           echo "CONFIG_KSU=y" | tee -a "$defconfig"
+
+          # Suki ZRAM and KPM
+          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
+            echo "CONFIG_ZSMALLOC=y" | tee -a "$defconfig"
+            echo "CONFIG_ZRAM=y" | tee -a "$defconfig"
+            echo "CONFIG_KPM=y" | tee -a "$defconfig"
+            echo "CONFIG_MODULE_SIG=n" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZO=y" | tee -a "$defconfig"
+            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4HC=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4K=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4KD=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_842=y" | tee -a "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" | tee -a "$defconfig"
+            echo "CONFIG_ZRAM_WRITEBACK=y" | tee -a "$defconfig"
+          fi  
+
+          if: ${{ matrix.build_type == 'normal' }}
+            echo "CONFIG_LOCALVERSION_AUTO=n" | tee -a "$defconfig"
+          fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
            echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a "$defconfig"        
@@ -412,7 +535,7 @@ jobs:
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
             echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a "$defconfig"
           fi
-          
+               
           echo "CONFIG_KSU_SUSFS=y" | tee -a "$defconfig"
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a "$defconfig"
@@ -463,8 +586,7 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" | tee -a "$defconfig"
           
           echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
-          echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" | tee -a "$defconfig"         
+          echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"         
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" | tee -a "$defconfig"         
           echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
           echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
@@ -472,60 +594,138 @@ jobs:
           sed -i '2s/check_defconfig//' ./common/build.config.gki
 
       - name: Change Kernel Name
+        if: ${{ matrix.build_type == 'make' }}
         run: |
           cd "$CONFIG"
-          
-          perl -pi -e 's/-dirty//g' ./common/scripts/setlocalversion
-          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-
-          perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
-          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h
-
+          #Set Kernel Timestamp
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
-          
-          if [ "${{ matrix.build_type }}" = "normal" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}-GKI-@NoFloresto"/s' ./common/scripts/setlocalversion
-          elif [ "${{ matrix.build_type }}" = "normal" ]; then
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\$res-GKI-@NoFloresto"/s' ./common/scripts/setlocalversion
+          #Set Custom Hostname and Username
+          perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
+          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
+          if [ -f "build/build.sh" ]; then
+            #Remove Dirty Flag
+            sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          else
+            #Remove Dirty Flag
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+            #Remove Abi Exports and Error
+            rm -rf ./common/android/abi_gki_protected_exports_*
+            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
 
-          perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
-              
-          rm -rf ./common/android/abi_gki_protected_exports_*
-          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+      - name: Change Kernel Name
+        if: ${{ matrix.build_type == 'normal' }}
+        run: |
+          cd "$CONFIG"
+          sed -i '$s|echo "\$res"|echo "\$res-GKI-@NoFloresto"|' ./common/scripts/setlocalversion
+          #Set Kernel Timestamp
+          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
+          #Set Custom Hostname and Username
+          perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
+          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
+          if [ -f "build/build.sh" ]; then
+            #Remove Dirty Flag
+            sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          else
+            #Remove Dirty Flag
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+            #Remove Abi Exports and Error
+            rm -rf ./common/android/abi_gki_protected_exports_*
+            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+          fi   
+          
+      - name: Detect Clang Toolchain
+        if: ${{ matrix.build_type == 'make' }}
+        run: |
+          set -euo pipefail
+          
+          # Use ZyCromerZ Clang toolchain
+          if [ -d "$GITHUB_WORKSPACE/clang-zyc/bin" ] && [ -x "$GITHUB_WORKSPACE/clang-zyc/bin/clang" ]; then
+            CLANG_BIN="$GITHUB_WORKSPACE/clang-zyc/bin"
+            CLANG_FOUND=true
+            echo "Using ZyCromerZ Clang toolchain from $CLANG_BIN"
+          else
+            echo "ZyCromerZ Clang toolchain not found"
+            exit 1
+          fi
+          
+          echo "CLANG_BIN_PATH=$CLANG_BIN" >> $GITHUB_ENV
+          CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
+          echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
+          echo "Detected Clang: $CLANG_VERSION"
 
-      - name: Customize Kernel Branding
+      - name: Build with Make
         if: ${{ matrix.build_type == 'make' }}
         run: |
           set -euo pipefail
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          cd "$KERNEL_PATH/common"
-          mkdir -p out
-          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-GKI-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
-
-      - name: Detect Clang (for make build)
-        if: ${{ matrix.build_type == 'make' }}
-        run: |
-          set -euo pipefail
-          KP="$GITHUB_WORKSPACE/$CONFIG"
-          CLANG_FOUND=false
-          for base in "$KP/prebuilts" "$KP/prebuilts-master"; do
-            [ -d "$base/clang/host/linux-x86" ] || continue
-            latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
-            if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
-              CLANG_BIN="$latest/bin"
-              CLANG_FOUND=true
-              break
-            fi
-          done
-          if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
-            CLANG_BIN="$(dirname "$(command -v clang)")"
-            CLANG_FOUND=true
-            echo "Using system clang."
+          COMMON="$KERNEL_PATH/common"
+          cd "$COMMON"
+          
+          # Debug: Print Clang version
+          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
+            "${CLANG_BIN_PATH}/clang" --version
           fi
-          $CLANG_FOUND || { echo "No clang toolchain found"; exit 1; }
-          echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
+          
+          # Clear scmversion
+          : > "$COMMON/.scmversion"
+          
+          # Setup toolchain PATH
+          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
+            export PATH="${CLANG_BIN_PATH}:$PATH"
+          fi
+          
+          # Export build variables
+          export LLVM=1 LLVM_IAS=1
+          export ARCH=arm64 SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm 
+          export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip 
+          export HOSTCC=clang HOSTCXX=clang++ CC=clang
+          
+          OUT=out
+          mkdir -p "$OUT"
+          
+          # Generate config
+          make O="$OUT" gki_defconfig
+          
+          # Apply LOCALVERSION
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "-GKI-@NoFloresto"
+          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
+          
+          # Apply O3 optimization
+          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          export KCFLAGS="-Wno-error -pipe -O3 -fno-stack-protector"
+          export KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
+          
+          make O="$OUT" olddefconfig
+          
+          echo "Starting kernel build with $(nproc --all) threads..."
+          set -o pipefail
+          make -j"$(nproc --all)" O="$OUT" 2>&1 | tee build.log
+          
+          IMG="$OUT/arch/arm64/boot/Image"
+          if [ ! -f "$IMG" ]; then
+            echo "Kernel Image missing"; exit 1
+          fi
+          
+          sha256sum "$IMG" | tee "$OUT/Image.sha256"
+          
+          # Validate Image
+          if ! file "$IMG" | grep -qi 'ARM64'; then
+            echo "Image does not appear to be ARM64:"
+            file "$IMG"
+            exit 1
+          fi
+          
+          MIN_SIZE=$((6*1024*1024))
+          ACTUAL_SIZE=$(stat -c %s "$IMG")
+          if [ "$ACTUAL_SIZE" -lt "$MIN_SIZE" ]; then
+            echo "Image size $ACTUAL_SIZE < $MIN_SIZE (suspicious)"; exit 1
+          fi
 
       - name: Build
         if: ${{ matrix.build_type == 'normal' }}
