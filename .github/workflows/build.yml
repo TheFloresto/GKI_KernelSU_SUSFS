@@ -479,6 +479,26 @@ jobs:
             cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
             patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
           fi
+
+      - name: Update GKI Modules List
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
+        run: |
+          cd "$CONFIG"
+          
+          echo "Updating GKI modules list for SukiSU with ZRAM support..."
+          
+          # Создаем директорию, если её нет
+          mkdir -p ./common/android
+          
+          # Создаем список модулей ZRAM
+          modules_list="./common/android/gki_aarch64_modules"
+          cat > "$modules_list" << 'EOF'
+          mm/zsmalloc.ko
+          drivers/block/zram/zram.ko
+          EOF
+          
+          echo "GKI modules list updated successfully"
+          cat "$modules_list"
           
       - name: Apply Kernel Configuration
         run: |
