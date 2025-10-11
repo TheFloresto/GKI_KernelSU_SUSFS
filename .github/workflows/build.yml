@@ -762,52 +762,6 @@ jobs:
           ccache -s
           echo "Space after compilation:"
           df -h
-
-      - name: Build Kernel (Make)
-        if: ${{ matrix.build_type == 'make' }}
-        run: |
-          set -euo pipefail
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          COMMON="$KERNEL_PATH/common"
-          cd "$COMMON"
-          : > "$COMMON/.scmversion"
-          
-          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
-            export PATH="${CLANG_BIN_PATH}:$PATH"
-          fi
-          
-          export LLVM=1 LLVM_IAS=1
-          export ARCH=arm64 SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-android-
-          export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
-          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
-          export CC=clang
-          
-          OUT=out
-          mkdir -p "$OUT"
-          make O="$OUT" gki_defconfig
-          
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-          fi 
-          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
-          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          export KCFLAGS="-Wno-error -O3 -pipe -flto=thin -fno-stack-protector"
-          export KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
-          
-          make O="$OUT" olddefconfig
-          echo "Starting build with $(nproc --all) threads..."
-          set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" 2>&1 | tee build.log
-          
-          IMG="$OUT/arch/arm64/boot/Image"
-          if [ ! -f "$IMG" ]; then
-            echo "Kernel Image missing"
-            exit 1
-          fi
-          sha256sum "$IMG" | tee "$OUT/Image.sha256"
           
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Make Build)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'make' }}
