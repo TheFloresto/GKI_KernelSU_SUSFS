@@ -519,8 +519,8 @@ jobs:
             echo "CONFIG_ZRAM_WRITEBACK=y" | tee -a "$defconfig"
           fi  
 
-          if: ${{ matrix.build_type == 'normal' }}
-            echo "CONFIG_LOCALVERSION_AUTO=n" | tee -a "$defconfig"
+          if [ "${{ matrix.build_type }}" == "normal" ] || [ "${{ matrix.build_type }}" == "matrix" ]; then
+           echo "CONFIG_LOCALVERSION_AUTO=n" | tee -a "$defconfig"
           fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
