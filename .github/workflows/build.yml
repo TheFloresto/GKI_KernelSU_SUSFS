@@ -491,31 +491,6 @@ jobs:
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" >> "$defconfig"
 
-          # Suki ZRAM and KPM
-          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            echo "CONFIG_ZSMALLOC=y" >> "$defconfig"
-            echo "CONFIG_ZRAM=y" >> "$defconfig"
-            echo "CONFIG_KPM=y" >> "$defconfig"
-            echo "CONFIG_MODULE_SIG=n" >> "$defconfig"
-            echo "CONFIG_CRYPTO_LZO=y" >> "$defconfig"
-            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" >> "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4HC=y" >> "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4K=y" >> "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4KD=y" >> "$defconfig"
-            echo "CONFIG_CRYPTO_842=y" >> "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$defconfig"
-            echo "CONFIG_ZRAM_WRITEBACK=y" >> "$defconfig"
-            
-            # Создаём список модулей для ZRAM                 
-            if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            mkdir -p ./common/android
-            cat > ./common/android/gki_aarch64_modules << 'EOF'
-          mm/zsmalloc.ko
-          drivers/block/zram/zram.ko
-          EOF
-          fi
-          fi
-
           if [ "${{ matrix.build_type }}" == "normal" ] || [ "${{ matrix.build_type }}" == "matrix" ]; then
             echo "CONFIG_LOCALVERSION_AUTO=n" >> "$defconfig"
           fi
@@ -525,7 +500,8 @@ jobs:
           fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$defconfig"          
+            echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$defconfig"        
+            echo "CONFIG_KPM=y" >> "$defconfig"
           fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
