@@ -479,26 +479,6 @@ jobs:
             cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
             patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
           fi
-
-      - name: Update GKI Modules List
-        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
-        run: |
-          cd "$CONFIG"
-          
-          echo "Updating GKI modules list for SukiSU with ZRAM support..."
-          
-          # Создаем директорию, если её нет
-          mkdir -p ./common/android
-          
-          # Создаем список модулей ZRAM
-          modules_list="./common/android/gki_aarch64_modules"
-          cat > "$modules_list" << 'EOF'
-          mm/zsmalloc.ko
-          drivers/block/zram/zram.ko
-          EOF
-          
-          echo "GKI modules list updated successfully"
-          cat "$modules_list"
           
       - name: Apply Kernel Configuration
         run: |
@@ -507,13 +487,15 @@ jobs:
           defconfig="./common/arch/arm64/configs/gki_defconfig"
           
           echo "Applying kernel configurations one by one..."
-          
+
+          # KernelSU Core Configuration
           echo "CONFIG_KSU=y" >> "$defconfig"
 
           # Suki ZRAM and KPM
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
             echo "CONFIG_ZSMALLOC=y" >> "$defconfig"
-            echo "CONFIG_ZRAM=y" >> "$defconfig"            
+            echo "CONFIG_ZRAM=y" >> "$defconfig"
+            echo "CONFIG_KPM=y" >> "$defconfig"
             echo "CONFIG_MODULE_SIG=n" >> "$defconfig"
             echo "CONFIG_CRYPTO_LZO=y" >> "$defconfig"
             echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" >> "$defconfig"
@@ -523,6 +505,13 @@ jobs:
             echo "CONFIG_CRYPTO_842=y" >> "$defconfig"
             echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$defconfig"
             echo "CONFIG_ZRAM_WRITEBACK=y" >> "$defconfig"
+            
+            # Создаём список модулей для ZRAM
+            mkdir -p ./common/android
+            cat > ./common/android/gki_aarch64_modules << 'EOF'
+            mm/zsmalloc.ko
+            drivers/block/zram/zram.ko
+            EOF
           fi  
 
           if [ "${{ matrix.build_type }}" == "normal" ] || [ "${{ matrix.build_type }}" == "matrix" ]; then
@@ -534,7 +523,6 @@ jobs:
           fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            echo "CONFIG_KPM=y" >> "$defconfig"
             echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$defconfig"          
           fi
 
@@ -546,29 +534,35 @@ jobs:
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
-          
+
+          # SUSFS Auto Mount Features
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
-          
+
+          # SUSFS Advanced Features
           echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
-          
+
+          # SUSFS Debugging and Security
           echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
 
+          # Mountify Support
           echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$defconfig"
-          
+
+          # Networking Configuration
           echo "CONFIG_IP_NF_TARGET_TTL=y" >> "$defconfig"
           echo "CONFIG_IP6_NF_TARGET_HL=y" >> "$defconfig"
           echo "CONFIG_IP6_NF_MATCH_HL=y" >> "$defconfig"
-          
+
+          # BBR TCP Congestion Control
           echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$defconfig"
           echo "CONFIG_TCP_CONG_BBR=y" >> "$defconfig"
           echo "CONFIG_NET_SCH_FQ=y" >> "$defconfig"
@@ -576,7 +570,8 @@ jobs:
           echo "CONFIG_TCP_CONG_BIC=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_HTCP=n" >> "$defconfig"
-          
+
+          # IPSet support
           echo "CONFIG_IP_SET=y" >> "$defconfig"
           echo "CONFIG_IP_SET_MAX=256" >> "$defconfig"
           echo "CONFIG_IP_SET_BITMAP_IP=y" >> "$defconfig"
@@ -590,14 +585,16 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
-          
+
+          # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
           echo "CONFIG_LTO_CLANG=y" >> "$defconfig"         
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "$defconfig"         
           echo "CONFIG_CCACHE=y" >> "$defconfig"          
           echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
           
-          sed -i 's/check_defconfig//' ./common/build.config.gki
+          # Remove check_defconfig
+          sed -i 's/check_defconfig//g' ./common/build.config.gki
 
       - name: Change Kernel Name
         if: ${{ matrix.build_type == 'make' }}
