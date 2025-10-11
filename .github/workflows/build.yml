@@ -481,7 +481,7 @@ jobs:
           fi
 
       - name: Update GKI Modules List
-        if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
         run: |
           cd "$CONFIG"
           
