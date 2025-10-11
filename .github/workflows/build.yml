@@ -479,26 +479,6 @@ jobs:
             cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
             patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
           fi
-
-      - name: Update GKI Modules List
-        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
-        run: |
-          cd "$CONFIG"
-          
-          echo "Updating GKI modules list for SukiSU with ZRAM support..."
-          
-          # Создаем директорию, если её нет
-          mkdir -p ./common/android
-          
-          # Создаем список модулей ZRAM
-          modules_list="./common/android/gki_aarch64_modules"
-          cat > "$modules_list" << 'EOF'
-          mm/zsmalloc.ko
-          drivers/block/zram/zram.ko
-          EOF
-          
-          echo "GKI modules list updated successfully"
-          cat "$modules_list"
           
       - name: Apply Kernel Configuration
         run: |
@@ -508,96 +488,96 @@ jobs:
           
           echo "Applying kernel configurations one by one..."
           
-          echo "CONFIG_KSU=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU=y" >> "$defconfig"
 
           # Suki ZRAM and KPM
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            echo "CONFIG_ZSMALLOC=y" | tee -a "$defconfig"
-            echo "CONFIG_ZRAM=y" | tee -a "$defconfig"            
-            echo "CONFIG_MODULE_SIG=n" | tee -a "$defconfig"
-            echo "CONFIG_CRYPTO_LZO=y" | tee -a "$defconfig"
-            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" | tee -a "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4HC=y" | tee -a "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4K=y" | tee -a "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4KD=y" | tee -a "$defconfig"
-            echo "CONFIG_CRYPTO_842=y" | tee -a "$defconfig"
-            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" | tee -a "$defconfig"
-            echo "CONFIG_ZRAM_WRITEBACK=y" | tee -a "$defconfig"
+            echo "CONFIG_ZSMALLOC=y" >> "$defconfig"
+            echo "CONFIG_ZRAM=y" >> "$defconfig"            
+            echo "CONFIG_MODULE_SIG=n" >> "$defconfig"
+            echo "CONFIG_CRYPTO_LZO=y" >> "$defconfig"
+            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" >> "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4HC=y" >> "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4K=y" >> "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4KD=y" >> "$defconfig"
+            echo "CONFIG_CRYPTO_842=y" >> "$defconfig"
+            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$defconfig"
+            echo "CONFIG_ZRAM_WRITEBACK=y" >> "$defconfig"
           fi  
 
           if [ "${{ matrix.build_type }}" == "normal" ] || [ "${{ matrix.build_type }}" == "matrix" ]; then
-           echo "CONFIG_LOCALVERSION_AUTO=n" | tee -a "$defconfig"
+            echo "CONFIG_LOCALVERSION_AUTO=n" >> "$defconfig"
           fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
-           echo "CONFIG_KSU_SWITCH_MANAGER=y" | tee -a "$defconfig"        
+            echo "CONFIG_KSU_SWITCH_MANAGER=y" >> "$defconfig"        
           fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            echo "CONFIG_KPM=y" | tee -a "$defconfig"
-            echo "CONFIG_KSU_MANUAL_HOOK=y" | tee -a "$defconfig"          
+            echo "CONFIG_KPM=y" >> "$defconfig"
+            echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$defconfig"          
           fi
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
-            echo "CONFIG_KSU_KPROBES_HOOK=n" | tee -a "$defconfig"
+            echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
           fi
                
-          echo "CONFIG_KSU_SUSFS=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
           
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
           
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
           
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" | tee -a "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" | tee -a "$defconfig"
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
 
-          echo "CONFIG_TMPFS_XATTR=y" | tee -a "$defconfig"
-          echo "CONFIG_TMPFS_POSIX_ACL=y" | tee -a "$defconfig"
+          echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
+          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$defconfig"
           
-          echo "CONFIG_IP_NF_TARGET_TTL=y" | tee -a "$defconfig"
-          echo "CONFIG_IP6_NF_TARGET_HL=y" | tee -a "$defconfig"
-          echo "CONFIG_IP6_NF_MATCH_HL=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_NF_TARGET_TTL=y" >> "$defconfig"
+          echo "CONFIG_IP6_NF_TARGET_HL=y" >> "$defconfig"
+          echo "CONFIG_IP6_NF_MATCH_HL=y" >> "$defconfig"
           
-          echo "CONFIG_TCP_CONG_ADVANCED=y" | tee -a "$defconfig"
-          echo "CONFIG_TCP_CONG_BBR=y" | tee -a "$defconfig"
-          echo "CONFIG_NET_SCH_FQ=y" | tee -a "$defconfig"
-          echo "CONFIG_NET_SCH_FQ_CODEL=y" | tee -a "$defconfig"         
-          echo "CONFIG_TCP_CONG_BIC=n" | tee -a "$defconfig"
-          echo "CONFIG_TCP_CONG_WESTWOOD=n" | tee -a "$defconfig"
-          echo "CONFIG_TCP_CONG_HTCP=n" | tee -a "$defconfig"
+          echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$defconfig"
+          echo "CONFIG_TCP_CONG_BBR=y" >> "$defconfig"
+          echo "CONFIG_NET_SCH_FQ=y" >> "$defconfig"
+          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "$defconfig"         
+          echo "CONFIG_TCP_CONG_BIC=n" >> "$defconfig"
+          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "$defconfig"
+          echo "CONFIG_TCP_CONG_HTCP=n" >> "$defconfig"
           
-          echo "CONFIG_IP_SET=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_MAX=256" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_IP=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_PORT=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IP=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORT=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NET=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETNET=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETPORT=y" | tee -a "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETIFACE=y" | tee -a "$defconfig"
+          echo "CONFIG_IP_SET=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_MAX=256" >> "$defconfig"
+          echo "CONFIG_IP_SET_BITMAP_IP=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_BITMAP_PORT=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IP=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IPPORT=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NET=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
+          echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
           
-          echo "CONFIG_LTO_CLANG_THIN=y" | tee -a "$defconfig"
-          echo "CONFIG_LTO_CLANG=y" | tee -a "$defconfig"         
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" | tee -a "$defconfig"         
-          echo "CONFIG_CCACHE=y" | tee -a "$defconfig"          
-          echo "CONFIG_OPTIMIZE_INLINING=y" | tee -a "$defconfig"
+          echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
+          echo "CONFIG_LTO_CLANG=y" >> "$defconfig"         
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "$defconfig"         
+          echo "CONFIG_CCACHE=y" >> "$defconfig"          
+          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
           
-          sed -i '2s/check_defconfig//' ./common/build.config.gki
+          sed -i 's/check_defconfig//' ./common/build.config.gki
 
       - name: Change Kernel Name
         if: ${{ matrix.build_type == 'make' }}
