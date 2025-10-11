@@ -727,41 +727,18 @@ jobs:
             echo "Image size $ACTUAL_SIZE < $MIN_SIZE (suspicious)"; exit 1
           fi
 
-      - name: Build
-        if: ${{ matrix.build_type == 'normal' }}
-        run: |
+      - name: Build Kernel
+        if: ${{ matrix.build_type == 'normal' }}     
+        run : |
           set -e
           set -x
           cd "$CONFIG"
-          
-          export PATH="/usr/lib/ccache:/usr/bin:$PATH"
-          export CCACHE_COMPILERCHECK="%compiler% -dumpmachine; %compiler% -dumpversion"
-          export CCACHE_NOHASHDIR="true"
-          export CCACHE_HARDLINK="true"
-          export CCACHE_DIR="$HOME/.ccache"
-          export CCACHE_MAXSIZE="4G"
-          /usr/bin/ccache -M "$CCACHE_MAXSIZE"
-          /usr/bin/ccache -o compression=true
-
           echo "Building the kernel..."
           if [ -f "build/build.sh" ]; then
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" HOSTCC="/usr/bin/ccache clang" || exit 1
+            LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
           else
-            sudo rm -rf /usr/share/dotnet &
-            sudo rm -rf /usr/local/lib/android &
-            sudo rm -rf /opt/ghc &
-            sudo rm -rf /opt/hostedtoolcache/CodeQL &
-            tools/bazel build --sandbox_writable_path=$HOME/.ccache --disk_cache=~/.cache/bazel $([[ "${{ inputs.kernel_version }}" != "6.6" ]] && echo "--experimental_multi_threaded_digest") --config=fast --lto=thin //common:kernel_aarch64_dist
+            tools/bazel build --config=fast --lto=thin --sandbox_debug --verbose_failures //common:kernel_aarch64_dist || exit 1
           fi
-          echo "Kernel compilation completed!"
-          echo "ccache status:"
-          ccache -s
-          echo "Space after compilation:"
-          df -h
           
       - name: Patch Image File for Android 12 and 13 (SukiSU only - Make Build)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') && matrix.build_type == 'make' }}
