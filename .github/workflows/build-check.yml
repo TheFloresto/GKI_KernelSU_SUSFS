@@ -1,4 +1,4 @@
-name: Kernel Config - LTS TEST
+name: Build Check - All LTS Kernels
 
 permissions:
   contents: write
@@ -6,7 +6,7 @@ permissions:
 
 on:
   workflow_call:
-    inputs:
+     inputs:
       kernelsu_variant:
         required: true
         type: string
@@ -16,7 +16,7 @@ on:
       kernelsu_branch_other:
         required: false
         type: string
-        default: ""  
+        default: "" 
 
 jobs:
   build-check:
