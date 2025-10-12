@@ -6,7 +6,7 @@ permissions:
 
 on:
   workflow_call:
-    inputs:
+     inputs:
       kernelsu_variant:
         required: true
         type: string
@@ -16,14 +16,16 @@ on:
       kernelsu_branch_other:
         required: false
         type: string
-        default: ""  
+        default: "" 
 
 jobs:
   build-kernels-a15:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
+          - sub_level: "30"
+            os_patch_level: "2024-07"
           - sub_level: "30"
             os_patch_level: "2024-08"
           - sub_level: "46"
@@ -49,9 +51,11 @@ jobs:
           - sub_level: "92"
             os_patch_level: "2025-07"
           - sub_level: "98"
+            os_patch_level: "2025-08"
+          - sub_level: "98"
             os_patch_level: "2025-09"
           - sub_level: "102"
-            os_patch_level: "2025-10"        
+            os_patch_level: "2025-10"
           - sub_level: "X"
             os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
@@ -63,4 +67,4 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}    
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}
