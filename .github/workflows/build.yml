@@ -221,7 +221,6 @@ jobs:
           fi
 
       - name: Apply glibc 2.38 Compatibility Fix
-        if: inputs.android_version == 'android14' && inputs.kernel_version == '6.1'
         run: |
           if [ ! -e build/build.sh ]; then 
             GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}') 
@@ -443,7 +442,7 @@ jobs:
               ;;
           esac 
 
-      - name: Apply Module Symbol Version Fix Patch
+      - name: Apply Module Check Bypass
         run: |
           if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
             cd "$CONFIG/common/kernel/module"
@@ -488,8 +487,8 @@ jobs:
             echo "Applying fix 22 clang..."
             cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
             patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
-          fi
-          
+          fi       
+
       - name: Apply Kernel Configuration
         run: |
           cd "$CONFIG"
@@ -497,10 +496,10 @@ jobs:
           defconfig="./common/arch/arm64/configs/gki_defconfig"
           
           echo "Applying kernel configurations one by one..."
-
+          
           # KernelSU Core Configuration
           echo "CONFIG_KSU=y" >> "$defconfig"
-
+          
           if [ "${{ matrix.build_type }}" == "normal" ] || [ "${{ matrix.build_type }}" == "matrix" ]; then
             echo "CONFIG_LOCALVERSION_AUTO=n" >> "$defconfig"
           fi
@@ -517,26 +516,24 @@ jobs:
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
             echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
           fi
-               
+          
+          # SUSFS Configuration
           echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
+          #echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
-
-          # SUSFS Auto Mount Features
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
+          
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
-
-          # SUSFS Advanced Features
+          
           echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
-
-          # SUSFS Debugging and Security
+          
           echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
@@ -544,12 +541,12 @@ jobs:
           # Mountify Support
           echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$defconfig"
-
+          
           # Networking Configuration
           echo "CONFIG_IP_NF_TARGET_TTL=y" >> "$defconfig"
           echo "CONFIG_IP6_NF_TARGET_HL=y" >> "$defconfig"
           echo "CONFIG_IP6_NF_MATCH_HL=y" >> "$defconfig"
-
+          
           # BBR TCP Congestion Control
           echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$defconfig"
           echo "CONFIG_TCP_CONG_BBR=y" >> "$defconfig"
@@ -558,7 +555,7 @@ jobs:
           echo "CONFIG_TCP_CONG_BIC=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_HTCP=n" >> "$defconfig"
-
+          
           # IPSet support
           echo "CONFIG_IP_SET=y" >> "$defconfig"
           echo "CONFIG_IP_SET_MAX=256" >> "$defconfig"
@@ -573,16 +570,17 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
-
+          
           # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
-          echo "CONFIG_LTO_CLANG=y" >> "$defconfig"         
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "$defconfig"         
+          echo "CONFIG_LTO_CLANG=y" >> "$defconfig"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "$defconfig"
           echo "CONFIG_CCACHE=y" >> "$defconfig"          
-          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
+          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"       
           
           # Remove check_defconfig
-          sed -i 's/check_defconfig//g' ./common/build.config.gki
+          sed -i 's/check_defconfig//' ./common/build.config.gki
+
 
       - name: Change Kernel Name
         if: ${{ matrix.build_type == 'make' }}
@@ -937,6 +935,7 @@ jobs:
         with:
           name: ${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL || inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}-AK3
           path: "*.zip"
+          compression-level: 9
 
       - name: Upload Boot Image (Uncompressed)
         uses: actions/upload-artifact@v4
