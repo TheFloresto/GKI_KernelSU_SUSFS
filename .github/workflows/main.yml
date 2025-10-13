@@ -228,7 +228,7 @@ jobs:
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.5.11-r0"
+            LATEST_TAG="v1.5.12-r0"
           fi
           
           echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
@@ -298,7 +298,7 @@ jobs:
             VARIANT_TEXT=$(IFS=', '; echo "${VARIANTS[*]}")
           fi
           
-          echo "RELEASE_NAME=GKI Kernels With $VARIANT_TEXT & SUSFS v1.5.11" >> $GITHUB_ENV
+          echo "RELEASE_NAME=GKI Kernels With $VARIANT_TEXT & SUSFS v1.5.12" >> $GITHUB_ENV
 
       - name: Set release body
         run: |
@@ -311,7 +311,7 @@ jobs:
       
           Features:
           -> Multi Manager Support for WKSU Manager & KernelSU-Next Manager & KernelSU Manager & MKSU & RKSU & xxKSU (Only Install One)
-          -> SUSFS ඞ v1.5.11
+          -> SUSFS ඞ v1.5.12
           -> Scope-Minimized Manual hooks v1.5
           -> Magic Mount Support
           -> Simple Maphide for LineageOS Detections
