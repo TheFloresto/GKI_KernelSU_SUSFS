@@ -86,7 +86,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             git curl ca-certificates build-essential clang lld flex bison \
             libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils rsync unzip dwarves file python3 bc cpio kmod
+            libxml2-utils ccache rsync unzip dwarves file python3 bc cpio kmod
           sudo apt-get clean
           echo "::endgroup::"
 
@@ -120,6 +120,42 @@ jobs:
           if [ ! -z "$BOOT_SIGN_KEY" ]; then
             echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
           fi
+
+      - name: Setup ZyCromerZ Clang Toolchain
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}        
+        run: |
+          set -euo pipefail
+          echo "Fetching latest ZyCromerZ Clang release..."
+          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
+          if [ -z "$LATEST_CLANG_TAG" ]; then
+            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
+            exit 1
+          fi
+          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
+          
+          # Extract version info for environment variables
+          CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
+          
+          echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
+          mkdir -p clang-zyc
+          cd clang-zyc
+          
+          # Download the latest release asset (assuming the naming pattern is consistent)
+          DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
+          echo "Download URL: $DOWNLOAD_URL"
+          
+          curl -LO "$DOWNLOAD_URL"
+          tar -xzf "Clang-$CLANG_VERSION.tar.gz"
+          cd ..
+          
+          # Set environment variables
+          echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
+          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
+          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Other Dependencies
         shell: bash
@@ -897,5 +933,4 @@ jobs:
             *-boot.img
             *-boot-gz.img
             *-boot-lz4.img
-          compression-level: 9
-        
+          compression-level: 9    
