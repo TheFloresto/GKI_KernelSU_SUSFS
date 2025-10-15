@@ -156,7 +156,8 @@ jobs:
           echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
           echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-
+          echo "$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_PATH
+          
       - name: Clone AnyKernel3 and Other Dependencies
         shell: bash
         run: |
@@ -698,39 +699,6 @@ jobs:
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
-      - name: Detect Clang Toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          KP="$GITHUB_WORKSPACE/$CONFIG"
-          CLANG_FOUND=false
-          
-          # Search for prebuilt clang in kernel platform directories
-          for base in "$KP/prebuilts" "$KP/prebuilts-master"; do
-            [ -d "$base/clang/host/linux-x86" ] || continue
-            latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
-            if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
-              CLANG_BIN="$latest/bin"
-              CLANG_FOUND=true
-              echo "Found prebuilt clang at: $CLANG_BIN"
-              break
-            fi
-          done
-          
-          # Fallback to system clang if no prebuilt found
-          if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
-            CLANG_BIN="$(dirname "$(command -v clang)")"
-            CLANG_FOUND=true
-            echo "Using system clang."
-          fi
-          
-          $CLANG_FOUND || { echo "No clang toolchain found"; exit 1; }
-          
-          echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
-          CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
-          echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-          echo "Detected Clang: $CLANG_VERSION"
-
       - name: Customize Kernel Branding
         shell: bash
         run: |
@@ -741,7 +709,7 @@ jobs:
           CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
 
-      - name: Build Kernel
+      - name: Build Kernel with ZyCromerZ Clang
         shell: bash
         env:
           PYTHONWARNINGS: "ignore:invalid escape sequence"
@@ -752,13 +720,18 @@ jobs:
           COMMON="$KERNEL_PATH/common"
           cd "$COMMON"
           : > "$COMMON/.scmversion"
-          
+
           # Ensure Python warnings are suppressed for scripts invoked by make
           export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
-          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
-            export PATH="${CLANG_BIN_PATH}:$PATH"
-          fi
+          # ВАЖНО: Используем ZyCromerZ Clang из установленного пути
+          echo "Using ZyCromerZ Clang from: ${CLANG_BIN_PATH}"
+          export PATH="${CLANG_BIN_PATH}:$PATH"
+          
+          # Проверяем версию Clang
+          which clang
+          clang --version
+          
           export LLVM=1 LLVM_IAS=1
           export ARCH=arm64 SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
@@ -768,28 +741,27 @@ jobs:
           OUT=out
           mkdir -p "$OUT"
           make O="$OUT" gki_defconfig
-          
-          # LOCALVERSION branding
-          
+
+           # LOCALVERSION branding
           if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
             scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
             scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
             sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
           fi
-          
-          # Optimize level config and flags (default O2)
+
+          # Optimize level config and flags (default O3)
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
           KCFLAGS_EXTRA="-O3"
-          
+
           # Consistent flags; include -pipe and disable stack protector
           KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
           KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
-          
+
           # Regenerate defaults after config edits
           make O="$OUT" olddefconfig
           
-          echo "Starting build with $(nproc --all) threads..."
+          echo "Starting build with $(nproc --all) threads using ZyCromerZ Clang ${CLANG_VERSION}..."
           set -o pipefail
           make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
           
@@ -799,6 +771,7 @@ jobs:
             exit 1
           fi
           sha256sum "$IMG" | tee "$OUT/Image.sha256"
+          echo "Build completed successfully with ZyCromerZ Clang!"
           echo "::endgroup::"
 
       - name: Create AnyKernel3 ZIP
