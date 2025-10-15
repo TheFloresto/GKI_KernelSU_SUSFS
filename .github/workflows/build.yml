@@ -32,11 +32,6 @@ on:
 jobs:
   build-gki:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        apply_module_check_bypass: ["normal", "bypass"]
-        apply_susfs_v1_5_9: ["v1.5.9", "v1.5.12"]
 
     steps:
       - name: Maximize Build Space
@@ -169,32 +164,6 @@ jobs:
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
           git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main       
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          
-          # Checkout specific commits for SUSFS v1.5.9 if enabled
-          if [ "${{ matrix.apply_susfs_v1_5_9 }}" = "v1.5.9" ]; then
-            cd susfs4ksu
-            case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
-              "android15-6.6")
-                git checkout 2598fee8963adab11c255bf28521df32912e027f
-                ;;
-              "android14-6.1")
-                git checkout 646cfabce9d5dba5b806e9cbe2c198128ebd0e69
-                ;;
-              "android14-5.15")
-                git checkout ab4d9570a9494a67c290002f3b28e69dd370a0f5
-                ;;
-              "android13-5.15")
-                git checkout a21f265695f2869a6f3fc71a70328aa6d0f4a3ae
-                ;;
-              "android13-5.10")
-                git checkout 8acbd10775a447f546b14c6bded6f476a7f4733f
-                ;;
-              "android12-5.10")
-                git checkout 6f42c0e24e35a6fa0fc43051a5f1e7dfe568e8c2
-                ;;
-            esac
-            cd ..
-          fi         
 
       - name: Initialize and Sync Kernel Source
         shell: bash
@@ -413,30 +382,26 @@ jobs:
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
           
-              # Apply compatibility fixes
-              if [ "${{ matrix.apply_susfs_v1_5_9 }}" = "v1.5.9" ]; then
-               SUSFS_VERSION="1.5.9"
-              else
-               SUSFS_VERSION="1.5.12"
-              fi
+              # Apply compatibility fixes for v1.5.12
+              SUSFS_VERSION="1.5.12"
           
-               cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
-               patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
+              patch -p1 --forward < fix_core_hook.c.patch
           
-               ## Skip fix_rules.c.patch for Android 14 with kernel 6.1
-               #if [ "${{ inputs.android_version }}" != "android14" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
-               #  cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_rules.c.patch ./
-               #  patch -p1 --forward < fix_rules.c.patch
-               #fi
+              ## Skip fix_rules.c.patch for Android 14 with kernel 6.1
+              #if [ "${{ inputs.android_version }}" != "android14" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
+              #  cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_rules.c.patch ./
+              #  patch -p1 --forward < fix_rules.c.patch
+              #fi
 
-               cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch ./
-               patch -p1 --forward < fix_sucompat.c.patch
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch ./
+              patch -p1 --forward < fix_sucompat.c.patch
 
-               cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
-               patch -p1 --forward < fix_kernel_compat.c.patch              
+              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
+              patch -p1 --forward < fix_kernel_compat.c.patch              
 
-               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
-               patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch     
+              cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
+              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch     
               ;;
              "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
@@ -497,7 +462,6 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/landlock/landlock,baseband_guard/ } }' common/security/Kconfig
 
       - name: Apply Module Check Bypass
-        if: ${{ matrix.apply_module_check_bypass == 'bypass' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -657,7 +621,7 @@ jobs:
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           # Set artifact name base for consistent naming
-          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_${{ matrix.apply_susfs_v1_5_9 }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-${{ matrix.apply_module_check_bypass == 'bypass' && 'Module_Check_Bypass' || 'Normal' }}"        
+          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v1.5.12-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass"        
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
@@ -785,7 +749,7 @@ jobs:
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_${{ matrix.apply_susfs_v1_5_9 }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-${{ matrix.apply_module_check_bypass == 'bypass' && 'Module_Check_Bypass' || 'Normal' }}-AK3.zip"
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v1.5.12-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass-AK3.zip"
           echo "Creating flashable zip: $ZIP_NAME"
           zip -r "../$ZIP_NAME" ./* >/dev/null
           echo "AnyKernel3 ZIP created successfully"
@@ -892,4 +856,5 @@ jobs:
             *-boot.img
             *-boot-gz.img
             *-boot-lz4.img
-          compression-level: 9    
+          compression-level: 9
+          
