@@ -97,6 +97,7 @@ jobs:
           echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-a12-5-10:
+    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10'
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
@@ -109,6 +110,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
 
   build-a13-5-10:
+    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10'
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
@@ -121,6 +123,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
 
   build-a13-5-15:
+    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15'
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
@@ -133,6 +136,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
 
   build-a14-5-15:
+    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15'
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
@@ -145,6 +149,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
 
   build-a14-6-1:
+    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1'
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
@@ -157,6 +162,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
 
   build-a15-6-6:
+    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6'
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
@@ -182,7 +188,6 @@ jobs:
       
     env:        
       GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "!!TESTING!! GKI Kernels With WKSU & SUSFS v1.5.9/v1.5.12 !!!TESTING!!!"
       RELEASE_BODY: ""
     steps:
       - name: Maximize Build Space
@@ -327,7 +332,7 @@ jobs:
             VARIANT_TEXT=$(IFS=', '; echo "${VARIANTS[*]}")
           fi
           
-          echo "RELEASE_NAME=GKI Kernels With $VARIANT_TEXT & SUSFS v1.5.12" >> $GITHUB_ENV
+          echo "RELEASE_NAME=GKI Kernels With $VARIANT_TEXT & SUSFS v1.5.9/v1.5.12" >> $GITHUB_ENV
 
       - name: Set release body
         run: |
