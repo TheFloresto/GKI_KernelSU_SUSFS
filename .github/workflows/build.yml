@@ -736,6 +736,30 @@ jobs:
           echo "Build completed successfully with ZyCromerZ Clang!"
           echo "::endgroup::"
 
+      - name: Patch Image File for Android 12 and 13 (SukiSU only)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
+        run: |
+          echo "Patching Image file for Android 12/13..."
+          cd "$CONFIG/common/out/arch/arm64/boot/"
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod 777 patch
+          ./patch
+          rm -rf Image
+          mv oImage Image
+          cd ../../../../../..
+
+      - name: Patch Image File for Android 14 and 15 (SukiSU only)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
+        run: |
+          echo "Patching Image file for Android 14/15..."
+          cd "$CONFIG/common/out/arch/arm64/boot/"
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod 777 patch
+          ./patch
+          rm -rf Image
+          mv oImage Image
+          cd ../../../../../..
+
       - name: Create AnyKernel3 ZIP
         shell: bash
         run: |
