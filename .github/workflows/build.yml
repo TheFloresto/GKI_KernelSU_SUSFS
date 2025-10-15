@@ -53,7 +53,9 @@ jobs:
           verbose: 'true'                # Enable detailed logging
 
       - name: Setup SWAP
+        shell: bash
         run: |
+         set -euo pipefail
          sudo swapoff -a
          sudo fallocate -l 20G /swapfile
          sudo chmod 600 /swapfile
@@ -66,7 +68,9 @@ jobs:
          free -h
           
       - name: Set CONFIG Environment Variable
+        shell: bash
         run: |
+          set -euo pipefail
           # Set CONFIG dynamically based on inputs values
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
 
@@ -87,7 +91,9 @@ jobs:
           echo "::endgroup::"
 
       - name: Setup Build Environment
+        shell: bash
         run: |
+          set -euo pipefail
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
           git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
@@ -106,15 +112,19 @@ jobs:
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
       - name: Set boot sign key
+        shell: bash
         env:
           BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
         run: |
+          set -euo pipefail
           if [ ! -z "$BOOT_SIGN_KEY" ]; then
             echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
           fi
 
       - name: Clone AnyKernel3 and Other Dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           
@@ -146,11 +156,12 @@ jobs:
                 ;;
             esac
             cd ..
-          fi
-          
+          fi         
 
       - name: Initialize and Sync Kernel Source
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p "$CONFIG"
           cd "$CONFIG"
           
@@ -168,7 +179,9 @@ jobs:
 
       - name: Extract Actual Sublevel for LTS Builds
         if: inputs.sub_level == 'X'
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG/common"
           
           if [ -f "Makefile" ]; then
@@ -189,7 +202,9 @@ jobs:
           fi
 
       - name: Apply glibc 2.38 Compatibility Fix
+        shell: bash
         run: |
+          set -euo pipefail
           if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${{ inputs.sub_level }} <= 186 )) || [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 119 )); then
             GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}') 
             if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then 
@@ -206,7 +221,9 @@ jobs:
 
       - name: Fix Less Then 6.6.50 Builds
         if: inputs.android_version == 'android15' && inputs.kernel_version == '6.6'
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG/common"
           if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
               sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
@@ -214,12 +231,16 @@ jobs:
 
       - name: Apply ptrace patch for older kernels
         if: fromJSON(inputs.kernel_version) < 5.16
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG/common"
           patch -p1 -F 3 < "../../kernel_patches/gki_ptrace.patch"
 
       - name: Determine the branch for KernelSU
+        shell: bash
         run: |
+          set -euo pipefail
           case "${{ inputs.kernelsu_branch }}" in
             "Stable")
               if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
@@ -250,7 +271,9 @@ jobs:
           esac
 
       - name: Add KernelSU
+        shell: bash
         run: |
+          set -euo pipefail
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
       
@@ -278,7 +301,9 @@ jobs:
           esac
           
       - name: Getting KernelSU Version
+        shell: bash
         run: |
+          set -euo pipefail
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
           case "${{ inputs.kernelsu_variant }}" in
@@ -316,7 +341,9 @@ jobs:
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
       - name: Apply SUSFS Patches for KernelSU Variants
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG"
           
           # Apply core SUSFS patches
@@ -356,7 +383,9 @@ jobs:
 
 
       - name: Apply SUSFS Patches for KernelSU Variants
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG"
           
           cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
@@ -429,7 +458,9 @@ jobs:
           esac
           
       - name: Apply Hooks Patches
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG/common"
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
@@ -460,7 +491,9 @@ jobs:
           esac 
 
       - name: Add BBG
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG"
           echo "Adding BBG..."
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
@@ -469,7 +502,9 @@ jobs:
 
       - name: Apply Module Check Bypass
         if: ${{ matrix.apply_module_check_bypass == 'bypass' }}
+        shell: bash
         run: |
+          set -euo pipefail
           if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
             cd "$CONFIG/common/kernel/module"
             sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' version.c
@@ -480,7 +515,9 @@ jobs:
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
         if: ${{ ( inputs.kernel_version == '6.6' ) }}
+        shell: bash
         run: |
+          set -euo pipefail
           SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
           echo "kdp_set_cred_non_rcu" >> $SYMBOL_LIST
           echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST
@@ -497,7 +534,9 @@ jobs:
           echo "obj-y += min_kdp.o" >> Makefile
 
       - name: Apply Kernel Configuration
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG"
           
           defconfig="./common/arch/arm64/configs/gki_defconfig"
@@ -609,7 +648,9 @@ jobs:
           fi
 
       - name: Set file name
+        shell: bash
         run: |
+          set -euo pipefail
           # Set artifact name base for consistent naming
           # Prepare sublevel for naming
           SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
@@ -778,7 +819,9 @@ jobs:
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
+        shell: bash
         run: |
+          set -euo pipefail
           echo "Changing to configuration directory: $CONFIG..."
           cd bootimgs
           
@@ -825,7 +868,9 @@ jobs:
 
       - name: Android 13/14/15 boot image build script
         if: ${{ inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
+        shell: bash
         run: |
+          set -euo pipefail
           cd bootimgs
           
           echo "Building boot.img"
@@ -853,4 +898,4 @@ jobs:
             *-boot-gz.img
             *-boot-lz4.img
           compression-level: 9
-          
+        
