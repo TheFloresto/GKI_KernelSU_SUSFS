@@ -451,6 +451,26 @@ jobs:
               ;;
           esac 
 
+      - name: Apply FIX 22 clang Patches     
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG/common"
+          
+          # Получаем версию ядра
+          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
+          ANDROID_VERSION="${{ inputs.android_version }}"
+          FUSS_VERSION="${{ inputs.fuss_version }}"
+          
+          # Проверяем условие: НЕ применяем патч для Android 15 с ядром 6.6
+          if [ "$KERNEL_VERSION" == "6.6" ]; then
+            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
+          else
+            echo "Applying fix 22 clang..."
+            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
+            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
+          fi       
+
       - name: Add BBG
         shell: bash
         run: |
