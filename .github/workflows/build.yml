@@ -212,12 +212,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${{ inputs.sub_level }} <= 186 )) || [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 119 )); then
+          # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
+          SUBLEVEL_TO_CHECK="${ACTUAL_SUBLEVEL:-${{ inputs.sub_level }}}"
+          
+          if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $SUBLEVEL_TO_CHECK <= 186 ))) || ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 119 ))); then
             GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}') 
             if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then 
               cd $CONFIG/common/
               sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile 2>/dev/null || true
-              if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${{ inputs.sub_level }} <= 186 )) || [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 119 )); then
+              if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $SUBLEVEL_TO_CHECK <= 186 ))) || ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 119 ))); then
                 sed -i '/char \*buf = NULL;/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i 's/for (int i = 0; subcommands\[i\]; i++) {/for (i = 0; subcommands[i]; i++) {/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i '/if (subcommands) {/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
@@ -353,12 +356,16 @@ jobs:
           set -euo pipefail
           cd "$CONFIG"
           
-          cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
-          cd common
-          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
-          cd ..
           cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+
+          # Apply core SUSFS patches
+          cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
+          cd common
+          patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+
+          # Apply compatibility fixes for v1.5.12
+          SUSFS_VERSION="1.5.12"
           
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
@@ -382,23 +389,28 @@ jobs:
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
           
-              # Apply compatibility fixes for v1.5.12
-              SUSFS_VERSION="1.5.12"
-          
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
-              patch -p1 --forward < fix_core_hook.c.patch
-          
-              ## Skip fix_rules.c.patch for Android 14 with kernel 6.1
-              #if [ "${{ inputs.android_version }}" != "android14" ] && [ "${{ inputs.kernel_version }}" != "6.1" ]; then
-              #  cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_rules.c.patch ./
-              #  patch -p1 --forward < fix_rules.c.patch
-              #fi
+              # Apply additional SUSFS patches for Android 13 5.15 compatibility
+              if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
+               cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+               patch -p1 < fix_fdinfo.c.patch || true
+               cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+               patch -p1 < fix_namespace.c.patch || true
+               cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+               patch -p1 < fix_open.c.patch || true
+              fi              
 
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch ./
-              patch -p1 --forward < fix_sucompat.c.patch
+               cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
+               patch -p1 < 10_enable_susfs_for_ksu.patch || true
+          
+               cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
+               patch -p1 < fix_core_hook.c.patch
 
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
-              patch -p1 --forward < fix_kernel_compat.c.patch              
+               cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch ./
+               patch -p1 < fix_sucompat.c.patch
+
+               cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
+               patch -p1 < fix_kernel_compat.c.patch
+
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
               patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch     
