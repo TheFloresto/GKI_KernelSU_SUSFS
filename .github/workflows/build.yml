@@ -370,7 +370,7 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Applying SUSFS patches for WKSU..."
-              cd ./Wild_KSU
+              cd ../Wild_KSU
               cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch      
 
@@ -385,7 +385,7 @@ jobs:
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
-              cd ./KernelSU-Next
+              cd ../KernelSU-Next
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
           
