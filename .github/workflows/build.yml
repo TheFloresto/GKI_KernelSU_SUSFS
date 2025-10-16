@@ -722,7 +722,9 @@ jobs:
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
+        shell: bash
         run: |
+          set -euo pipefail
           echo "Patching Image file for Android 12/13..."
           cd "$CONFIG/common/out/arch/arm64/boot/"
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
@@ -734,7 +736,9 @@ jobs:
 
       - name: Patch Image File for Android 14 and 15 (SukiSU only)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
+        shell: bash
         run: |
+          set -euo pipefail
           echo "Patching Image file for Android 14/15..."
           cd "$CONFIG/common/out/arch/arm64/boot/"
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
@@ -876,5 +880,5 @@ jobs:
             *-boot.img
             *-boot-gz.img
             *-boot-lz4.img
-          compression-level: 9
+          compression-level: 9      
           
