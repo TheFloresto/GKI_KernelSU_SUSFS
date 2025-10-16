@@ -414,7 +414,7 @@ jobs:
               ;;
              "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
-              cd ./KernelSU              
+              cd .ю/KernelSU              
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
