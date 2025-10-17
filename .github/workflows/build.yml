@@ -46,21 +46,6 @@ jobs:
           remove-swapfile: 'true'        # Frees ~4 GB
           remove-cached-tools: 'false'   # Avoid unless confirmed safe
           verbose: 'true'                # Enable detailed logging
-
-      - name: Setup SWAP
-        shell: bash
-        run: |
-         set -euo pipefail
-         sudo swapoff -a
-         sudo fallocate -l 10G /swapfile
-         sudo chmod 600 /swapfile
-         sudo mkswap /swapfile
-         sudo swapon -p 1 /swapfile
-         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
-         sudo sysctl -p
-         free -h
           
       - name: Set CONFIG Environment Variable
         shell: bash
