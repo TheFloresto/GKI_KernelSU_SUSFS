@@ -558,11 +558,7 @@ jobs:
           echo "Applying kernel configurations one by one..."
           
           # KernelSU Core Configuration
-          echo "CONFIG_KSU=y" >> "$defconfig"
-          
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ]; then
-            echo "CONFIG_KSU_SWITCH_MANAGER=y" >> "$defconfig"        
-          fi
+          echo "CONFIG_KSU=y" >> "$defconfig"          
 
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
             echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$defconfig"        
