@@ -52,7 +52,7 @@ jobs:
         run: |
          set -euo pipefail
          sudo swapoff -a
-         sudo fallocate -l 20G /swapfile
+         sudo fallocate -l 10G /swapfile
          sudo chmod 600 /swapfile
          sudo mkswap /swapfile
          sudo swapon -p 1 /swapfile
