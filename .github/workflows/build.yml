@@ -115,6 +115,43 @@ jobs:
           if [ ! -z "$BOOT_SIGN_KEY" ]; then
             echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
           fi
+
+      - name: Setup ZyCromerZ Clang Toolchain
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}        
+        run: |
+          set -euo pipefail
+          echo "Fetching latest ZyCromerZ Clang release..."
+          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
+          if [ -z "$LATEST_CLANG_TAG" ]; then
+            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
+            exit 1
+          fi
+          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
+          
+          # Extract version info for environment variables
+          CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
+          
+          echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
+          mkdir -p clang-zyc
+          cd clang-zyc
+          
+          # Download the latest release asset (assuming the naming pattern is consistent)
+          DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
+          echo "Download URL: $DOWNLOAD_URL"
+          
+          curl -LO "$DOWNLOAD_URL"
+          tar -xzf "Clang-$CLANG_VERSION.tar.gz"
+          cd ..
+          
+          # Set environment variables
+          echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
+          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
+          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+          echo "$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_PATH
           
       - name: Clone AnyKernel3 and Other Dependencies
         shell: bash
@@ -351,6 +388,7 @@ jobs:
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
+              
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
                cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
@@ -424,7 +462,27 @@ jobs:
               cp ../../kernel_patches/sultan/ksu_hooks.patch ./
               patch -p1 --forward -F 3 < ksu_hooks.patch             
               ;;
-          esac        
+          esac 
+
+      - name: Apply FIX 22 clang Patches     
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG/common"
+          
+          # Получаем версию ядра
+          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
+          ANDROID_VERSION="${{ inputs.android_version }}"
+          FUSS_VERSION="${{ inputs.fuss_version }}"
+          
+          # Проверяем условие: НЕ применяем патч для Android 15 с ядром 6.6
+          if [ "$KERNEL_VERSION" == "6.6" ]; then
+            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
+          else
+            echo "Applying fix 22 clang..."
+            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
+            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
+          fi       
 
       - name: Add BBG
         shell: bash
@@ -439,8 +497,8 @@ jobs:
           echo "=== Before sed ==="
           sed -n '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ p }' common/security/Kconfig
           
-          # Apply the sed (your original command)
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/landlock/landlock,baseband_guard/ } }' common/security/Kconfig
+          # Apply the sed command to add baseband_guard to default security configurations
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! { s/default ""/default "baseband_guard"/; s/default "\([^"]*\)"/default "baseband_guard,\1"/ } } }' common/security/Kconfig
           
           # After sed: Show the updated LSM default line
           echo "=== After sed ==="
@@ -448,13 +506,12 @@ jobs:
           
           # Confirm baseband_guard is now present (should output the line if successful)
           echo "=== Confirmation: grep for baseband_guard ==="
-          grep "baseband_guard" common/security/Kconfig || echo "WARNING: baseband_guard not found after sed"
-          
-          # Optional: Show exit status of sed (0 = success)
-          if [ $? -eq 0 ]; then
-            echo "sed command succeeded (exit 0)."
+          if ! grep -q "baseband_guard" common/security/Kconfig; then
+            echo "ERROR: baseband_guard not found after sed - stopping workflow"
+            exit 1
           else
-            echo "sed command failed (exit $?)."
+            echo "SUCCESS: baseband_guard found in security configuration"
+            grep "baseband_guard" common/security/Kconfig
           fi
 
       - name: Apply Module Check Bypass
@@ -631,40 +688,7 @@ jobs:
           CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
 
-      - name: Detect Clang Toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          KP="$GITHUB_WORKSPACE/$CONFIG"
-          CLANG_FOUND=false
-          
-          # Search for prebuilt clang in kernel platform directories
-          for base in "$KP/prebuilts" "$KP/prebuilts-master"; do
-            [ -d "$base/clang/host/linux-x86" ] || continue
-            latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
-            if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
-              CLANG_BIN="$latest/bin"
-              CLANG_FOUND=true
-              echo "Found prebuilt clang at: $CLANG_BIN"
-              break
-            fi
-          done
-          
-          # Fallback to system clang if no prebuilt found
-          if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
-            CLANG_BIN="$(dirname "$(command -v clang)")"
-            CLANG_FOUND=true
-            echo "Using system clang."
-          fi
-          
-          $CLANG_FOUND || { echo "No clang toolchain found"; exit 1; }
-          
-          echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
-          CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
-          echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-          echo "Detected Clang: $CLANG_VERSION"
-
-      - name: Build Kernel
+      - name: Build Kernel with ZyCromerZ Clang
         shell: bash
         env:
           PYTHONWARNINGS: "ignore:invalid escape sequence"
@@ -679,9 +703,14 @@ jobs:
           # Ensure Python warnings are suppressed for scripts invoked by make
           export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
-          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
-            export PATH="${CLANG_BIN_PATH}:$PATH"
-          fi          
+          # ВАЖНО: Используем ZyCromerZ Clang из установленного пути
+          echo "Using ZyCromerZ Clang from: ${CLANG_BIN_PATH}"
+          export PATH="${CLANG_BIN_PATH}:$PATH"
+          
+          # Проверяем версию Clang
+          which clang
+          clang --version
+          
           export LLVM=1 LLVM_IAS=1
           export ARCH=arm64 SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
