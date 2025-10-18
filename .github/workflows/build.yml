@@ -691,7 +691,7 @@ jobs:
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           # Set artifact name base for consistent naming
-          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v1.5.12-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass"        
+          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v${SUSFS_VERSION}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass"        
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
