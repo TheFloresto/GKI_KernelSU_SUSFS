@@ -437,11 +437,11 @@ jobs:
               
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
-               cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+               cp -v ../../kernel_patches/next/susfs_fix_patches/${SUSFS_VERSION}/fix_fdinfo.c.patch ./
                patch -p1 < fix_fdinfo.c.patch || true
-               cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+               cp -v ../../kernel_patches/next/susfs_fix_patches/${SUSFS_VERSION}/fix_namespace.c.patch ./
                patch -p1 < fix_namespace.c.patch || true
-               cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+               cp -v ../../kernel_patches/next/susfs_fix_patches/${SUSFS_VERSION}/fix_open.c.patch ./
                patch -p1 < fix_open.c.patch || true
               fi
 
@@ -450,13 +450,13 @@ jobs:
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
           
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
+              cp -v ../../kernel_patches/next/susfs_fix_patches/${SUSFS_VERSION}/fix_core_hook.c.patch ./
               patch -p1 < fix_core_hook.c.patch
 
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch ./
+              cp -v ../../kernel_patches/next/susfs_fix_patches/${SUSFS_VERSION}/fix_sucompat.c.patch ./
               patch -p1 < fix_sucompat.c.patch
 
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
+              cp -v ../../kernel_patches/next/susfs_fix_patches/${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
               patch -p1 < fix_kernel_compat.c.patch
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
