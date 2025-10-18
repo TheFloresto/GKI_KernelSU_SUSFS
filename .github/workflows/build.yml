@@ -512,19 +512,17 @@ jobs:
           set -euo pipefail
           cd "$CONFIG/common"
           
-          # Получаем версию ядра
+          # Get kernel version
           KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
-          ANDROID_VERSION="${{ inputs.android_version }}"
-          FUSS_VERSION="${{ inputs.fuss_version }}"
           
-          # Проверяем условие: НЕ применяем патч для Android 15 с ядром 6.6
-          if [ "$KERNEL_VERSION" == "6.6" ]; then
+          # Skip patch ONLY for Android 15 with kernel 6.6
+          if [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "$KERNEL_VERSION" == "6.6" ]]; then
             echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
           else
-            echo "Applying fix 22 clang..."
+            echo "Applying fix 22 clang patch for ${{ inputs.android_version }} kernel $KERNEL_VERSION..."
             cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
             patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
-          fi       
+          fi
 
       - name: Apply Module Check Bypass
         shell: bash
