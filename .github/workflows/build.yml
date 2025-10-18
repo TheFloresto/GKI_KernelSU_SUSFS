@@ -157,7 +157,7 @@ jobs:
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           cd susfs4ksu
 
-          COMMIT=$(git log --all --grep="$Bump version to v" --format="%H" | head -n 1)
+          COMMIT=$(git log --all --grep="Bump version to v" --format="%H" | head -n 1)
 
           if [ -z "$COMMIT" ]; then
             echo "Not found any version. Abort.."
