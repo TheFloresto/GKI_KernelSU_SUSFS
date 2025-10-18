@@ -408,8 +408,8 @@ jobs:
           cd common
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
-          # Apply compatibility fixes for ${{ env.SUSFS_VERSION }}
-          SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
+          # Apply compatibility fixes for v1.5.12
+          SUSFS_VERSION=v1.5.12
           
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
