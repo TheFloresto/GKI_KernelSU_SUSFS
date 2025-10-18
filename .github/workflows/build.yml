@@ -932,7 +932,11 @@ jobs:
         run: |
           set -euo pipefail
           
-          cd "$CONFIG"
+          # Save starting directory
+          START_DIR="$GITHUB_WORKSPACE"
+          CONFIG_PATH="$START_DIR/$CONFIG"
+          
+          cd "$CONFIG_PATH"
           
           # Get actual KernelSU commit hash based on variant
           case "${{ inputs.kernelsu_variant }}" in
@@ -942,7 +946,7 @@ jobs:
                 ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
                 ACTUAL_KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$ACTUAL_KSU_REF"
                 KSU_NAME="WKSU (Wild KernelSU)"
-                cd ..
+                cd "$CONFIG_PATH"
               else
                 ACTUAL_KSU_REF="not-cloned"
                 ACTUAL_KSU_URL="N/A"
@@ -955,7 +959,7 @@ jobs:
                 ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
                 ACTUAL_KSU_URL="https://github.com/tiann/KernelSU/commit/$ACTUAL_KSU_REF"
                 KSU_NAME="KSU (Official KernelSU)"
-                cd ..
+                cd "$CONFIG_PATH"
               else
                 ACTUAL_KSU_REF="not-cloned"
                 ACTUAL_KSU_URL="N/A"
@@ -968,7 +972,7 @@ jobs:
                 ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
                 ACTUAL_KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$ACTUAL_KSU_REF"
                 KSU_NAME="NEXT (KernelSU Next)"
-                cd ..
+                cd "$CONFIG_PATH"
               else
                 ACTUAL_KSU_REF="not-cloned"
                 ACTUAL_KSU_URL="N/A"
@@ -981,7 +985,7 @@ jobs:
                 ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
                 ACTUAL_KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/$ACTUAL_KSU_REF"
                 KSU_NAME="SukiSU"
-                cd ..
+                cd "$CONFIG_PATH"
               else
                 ACTUAL_KSU_REF="not-cloned"
                 ACTUAL_KSU_URL="N/A"
@@ -994,7 +998,7 @@ jobs:
                 ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
                 ACTUAL_KSU_URL="https://github.com/5ec1cff/KernelSU/commit/$ACTUAL_KSU_REF"
                 KSU_NAME="MKSU"
-                cd ..
+                cd "$CONFIG_PATH"
               else
                 ACTUAL_KSU_REF="not-cloned"
                 ACTUAL_KSU_URL="N/A"
@@ -1009,27 +1013,27 @@ jobs:
           esac
           
           # Get actual SUSFS commit hash from the applied patches
-          if [ -d "../susfs4ksu" ]; then
-            cd ../susfs4ksu
+          if [ -d "$START_DIR/susfs4ksu" ]; then
+            cd "$START_DIR/susfs4ksu"
             ACTUAL_SUSFS_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
             ACTUAL_SUSFS_URL="https://gitlab.com/simonpunk/susfs4ksu/-/commit/$ACTUAL_SUSFS_REF"
-            cd "$CONFIG"
           else
             ACTUAL_SUSFS_REF="not-cloned"
             ACTUAL_SUSFS_URL="N/A"
           fi
           
           # Get actual BBG commit hash from the applied patches
-          if [ -d "../baseband_guard" ]; then
-            cd ../baseband_guard
+          if [ -d "$START_DIR/baseband_guard" ]; then
+            cd "$START_DIR/baseband_guard"
             ACTUAL_BBG_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
             ACTUAL_BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$ACTUAL_BBG_REF"
-            cd ..
           else
             ACTUAL_BBG_REF="not-cloned"
             ACTUAL_BBG_URL="N/A"
-            cd ..
           fi
+          
+          # Return to start directory for artifact counting
+          cd "$START_DIR"
           
           # Build end time
           BUILD_END_TIME=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
@@ -1049,7 +1053,7 @@ jobs:
           - **OS Patch Level:** ${{ inputs.os_patch_level }}
           - **KernelSU Variant:** $KSU_NAME
           - **KernelSU Version:** ${{ env.KSUVER }}
-          - **SUSFS Version:** v${SUSFS_VERSION}
+          - **SUSFS Version:** 1.5.12
           - **Module Check:** Bypass
           
           ### Build Timeline
@@ -1073,8 +1077,6 @@ jobs:
           
           ### Generated Artifacts ($ARTIFACT_COUNT items)
           $ARTIFACT_LIST
-          
-          cat >> $GITHUB_STEP_SUMMARY << EOF
           
           ---
           *Build completed with actual commit hashes.*
