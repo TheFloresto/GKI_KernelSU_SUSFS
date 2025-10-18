@@ -230,7 +230,8 @@ jobs:
           
           if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $SUBLEVEL_TO_CHECK <= 186 ))) || 
               ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 119 ))) || 
-              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 110 ))); then
+              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 110 ))) || 
+              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $SUBLEVEL_TO_CHECK <= 43 ))); then
             GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}') 
             if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then 
               cd $CONFIG/common/
