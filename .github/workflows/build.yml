@@ -26,7 +26,7 @@ on:
         type: string
       kernelsu_branch_other:
         required: false
-        type: string        
+        type: string
       # revision input removed; A12 boot image download uses fixed r1
 
 jobs:
@@ -57,19 +57,6 @@ jobs:
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
-      - name: Install Minimal Dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::group::Install deps"
-          sudo apt-get -o Acquire::Retries=3 update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git curl ca-certificates build-essential clang lld flex bison \
-            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils ccache rsync unzip dwarves file python3 bc cpio kmod pahole
-          sudo apt-get clean
-          echo "::endgroup::"
-
       - name: Setup Build Environment
         shell: bash
         run: |
@@ -90,6 +77,19 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
+
+      - name: Install Minimal Dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Install deps"
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git curl ca-certificates build-essential clang lld flex bison \
+            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+            libxml2-utils rsync unzip dwarves file python3
+          sudo apt-get clean
+          echo "::endgroup::"
 
       - name: Set boot sign key
         shell: bash
@@ -137,7 +137,7 @@ jobs:
           echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
           echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
           echo "$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_PATH
-          
+
       - name: Clone AnyKernel3 and Other Dependencies
         shell: bash
         run: |
@@ -146,9 +146,8 @@ jobs:
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-          git clone https://github.com/TheFloresto/kernel_patches.git -b main
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main       
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://github.com/TheFloresto/kernel_patches.git
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH" 
           
           # Checkout specific commits for SUSFS v1.5.12 if enabled
             cd susfs4ksu
@@ -212,7 +211,16 @@ jobs:
               
               cd ../..
               if [ -d "$OLD_CONFIG" ]; then
+                echo "Renaming directory from $OLD_CONFIG to $NEW_CONFIG"
                 mv "$OLD_CONFIG" "$NEW_CONFIG"
+                if [ ! -d "$NEW_CONFIG" ]; then
+                  echo "Error: Directory rename failed, $NEW_CONFIG does not exist"
+                  exit 1
+                fi
+                echo "Directory successfully renamed to $NEW_CONFIG"
+              else
+                echo "Error: Source directory $OLD_CONFIG does not exist"
+                exit 1
               fi
             fi
           fi
@@ -364,6 +372,24 @@ jobs:
           echo "KSUVER=$KSU_VERSION"
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
+      - name: Apply FIX 22 clang Patches     
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG/common"
+          
+          # Get kernel version
+          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
+          
+          # Skip patch ONLY for Android 15 with kernel 6.6
+          if [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "$KERNEL_VERSION" == "6.6" ]]; then
+            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
+          else
+            echo "Applying fix 22 clang patch for ${{ inputs.android_version }} kernel $KERNEL_VERSION..."
+            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
+            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
+          fi
+
       - name: Add BBG
         shell: bash
         run: |
@@ -400,6 +426,9 @@ jobs:
           set -euo pipefail
           cd "$CONFIG"
           
+          # Apply compatibility fixes
+           SUSFS_VERSION="1.5.12"
+
           cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
 
@@ -408,9 +437,7 @@ jobs:
           cd common
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
-          # Apply compatibility fixes for v1.5.12
-          SUSFS_VERSION=v1.5.12
-          
+
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Applying SUSFS patches for WKSU..."
@@ -432,31 +459,31 @@ jobs:
               
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
-               cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.12/fix_fdinfo.c.patch ./
+               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
                patch -p1 < fix_fdinfo.c.patch || true
-               cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.12/fix_namespace.c.patch ./
+               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
                patch -p1 < fix_namespace.c.patch || true
-               cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.12/fix_open.c.patch ./
+               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
                patch -p1 < fix_open.c.patch || true
                sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
-              fi
+             fi
 
-              # Apply KSU integration patches
-              cd ../KernelSU-Next
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+               # Apply KSU integration patches
+               cd ../KernelSU-Next
+               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
+               patch -p1 < 10_enable_susfs_for_ksu.patch || true
           
-              cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.12/fix_core_hook.c.patch ./
-              patch -p1 < fix_core_hook.c.patch
+               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
+               patch -p1 < fix_core_hook.c.patch
 
-              cp -v ../../kernel_patches/next/susfs_fix_patches/v1.5.12/fix_sucompat.c.patch ./
-              patch -p1 < fix_sucompat.c.patch
+               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch ./
+               patch -p1 < fix_sucompat.c.patch
+           
+               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
+               patch -p1 < fix_kernel_compat.c.patch
 
-              cp -v ../../kernel_patches/wild/susfs_fix_patches/v1.5.12/fix_kernel_compat.c.patch ./
-              patch -p1 < fix_kernel_compat.c.patch
-
-              cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
-              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch     
+               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
+               patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch     
               ;;
              "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
@@ -472,7 +499,7 @@ jobs:
               patch -p1 --forward < 0001-Susfs-1.5.9.patch             
               ;;
           esac
-          
+
       - name: Apply Hooks Patches
         shell: bash
         run: |
@@ -505,24 +532,6 @@ jobs:
               patch -p1 --forward -F 3 < ksu_hooks.patch             
               ;;
           esac 
-
-      - name: Apply FIX 22 clang Patches     
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$CONFIG/common"
-          
-          # Get kernel version
-          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
-          
-          # Skip patch ONLY for Android 15 with kernel 6.6
-          if [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "$KERNEL_VERSION" == "6.6" ]]; then
-            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
-          else
-            echo "Applying fix 22 clang patch for ${{ inputs.android_version }} kernel $KERNEL_VERSION..."
-            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
-            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
-          fi
 
       - name: Apply Module Check Bypass
         shell: bash
@@ -567,8 +576,8 @@ jobs:
           echo "Applying kernel configurations one by one..."
           
           # KernelSU Core Configuration
-          echo "CONFIG_KSU=y" >> "$defconfig"          
-
+          echo "CONFIG_KSU=y" >> "$defconfig"
+          
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
             echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$defconfig"        
             echo "CONFIG_KPM=y" >> "$defconfig"
@@ -576,13 +585,34 @@ jobs:
 
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
             echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
-          fi
-
+          fi         
+          
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "$defconfig"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "$defconfig"
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "$defconfig"
           echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "$defconfig"          
+
+          # SUSFS Configuration
+          echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
+          #echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
+
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
+          
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
+          
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
           
           # Mountify Support
           echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
@@ -597,6 +627,7 @@ jobs:
           echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$defconfig"
           echo "CONFIG_TCP_CONG_BBR=y" >> "$defconfig"
           echo "CONFIG_NET_SCH_FQ=y" >> "$defconfig"
+          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "$defconfig"   
           echo "CONFIG_TCP_CONG_BIC=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_HTCP=n" >> "$defconfig"
@@ -615,35 +646,13 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
-
-          # SUSFS Configuration
-          echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
-          #echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
-          
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
-          
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
-          
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
           
           # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
           echo "CONFIG_LTO_CLANG=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$defconfig"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "$defconfig"
-          echo "CONFIG_CCACHE=y" >> "$defconfig"          
-          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"           
+          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -669,7 +678,7 @@ jobs:
               
           #Remove Abi Exports and Error
           rm -rf ./common/android/abi_gki_protected_exports_*
-          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel          
+          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
 
       - name: Set file name
         shell: bash
@@ -720,11 +729,6 @@ jobs:
           export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
           export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
           export CC=clang
-          
-          # Флаги для хост-компиляции (для BTF tools)
-          export HOSTCFLAGS="-O3 -Wno-error"
-          export HOSTCXXFLAGS="-O3 -Wno-error"
-          
           OUT=out
           mkdir -p "$OUT"
           make O="$OUT" gki_defconfig
@@ -750,7 +754,7 @@ jobs:
           
           echo "Starting build with $(nproc --all) threads..."
           set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" HOSTCFLAGS="$HOSTCFLAGS" HOSTCXXFLAGS="$HOSTCXXFLAGS" 2>&1 | tee build.log
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
           
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
@@ -813,7 +817,7 @@ jobs:
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           
-          ZIP_NAME="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v1.5.12-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass-AK3.zip"
+          ZIP_NAME="${{ env.FILE_NAME }}-AK3.zip"
           echo "Creating flashable zip: $ZIP_NAME"
           zip -r "../$ZIP_NAME" ./* >/dev/null
           echo "AnyKernel3 ZIP created successfully"
@@ -910,7 +914,7 @@ jobs:
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ env.FILE_NAME }}-boot-lz4.img
-          
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -920,5 +924,158 @@ jobs:
             *-boot.img
             *-boot-gz.img
             *-boot-lz4.img
-          compression-level: 9      
+          compression-level: 9
+
+      - name: Create Comprehensive Build Summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
           
+          cd "$CONFIG"
+          
+          # Get actual KernelSU commit hash based on variant
+          case "${{ inputs.kernelsu_variant }}" in
+            "WKSU")
+              if [ -d "Wild_KSU" ]; then
+                cd Wild_KSU
+                ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                ACTUAL_KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$ACTUAL_KSU_REF"
+                KSU_NAME="WKSU (Wild KernelSU)"
+                cd ..
+              else
+                ACTUAL_KSU_REF="not-cloned"
+                ACTUAL_KSU_URL="N/A"
+                KSU_NAME="WKSU (Wild KernelSU)"
+              fi
+              ;;
+            "KSU")
+              if [ -d "KernelSU" ]; then
+                cd KernelSU
+                ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                ACTUAL_KSU_URL="https://github.com/tiann/KernelSU/commit/$ACTUAL_KSU_REF"
+                KSU_NAME="KSU (Official KernelSU)"
+                cd ..
+              else
+                ACTUAL_KSU_REF="not-cloned"
+                ACTUAL_KSU_URL="N/A"
+                KSU_NAME="KSU (Official KernelSU)"
+              fi
+              ;;
+            "NEXT")
+              if [ -d "KernelSU-Next" ]; then
+                cd KernelSU-Next
+                ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                ACTUAL_KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$ACTUAL_KSU_REF"
+                KSU_NAME="NEXT (KernelSU Next)"
+                cd ..
+              else
+                ACTUAL_KSU_REF="not-cloned"
+                ACTUAL_KSU_URL="N/A"
+                KSU_NAME="NEXT (KernelSU Next)"
+              fi
+              ;;
+            "SukiSU")
+              if [ -d "KernelSU" ]; then
+                cd KernelSU
+                ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                ACTUAL_KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/$ACTUAL_KSU_REF"
+                KSU_NAME="SukiSU"
+                cd ..
+              else
+                ACTUAL_KSU_REF="not-cloned"
+                ACTUAL_KSU_URL="N/A"
+                KSU_NAME="SukiSU"
+              fi
+              ;;
+            "MKSU")
+              if [ -d "KernelSU" ]; then
+                cd KernelSU
+                ACTUAL_KSU_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                ACTUAL_KSU_URL="https://github.com/5ec1cff/KernelSU/commit/$ACTUAL_KSU_REF"
+                KSU_NAME="MKSU"
+                cd ..
+              else
+                ACTUAL_KSU_REF="not-cloned"
+                ACTUAL_KSU_URL="N/A"
+                KSU_NAME="MKSU"
+              fi
+              ;;
+            *)
+              ACTUAL_KSU_REF="unknown-variant"
+              ACTUAL_KSU_URL="N/A"
+              KSU_NAME="Unknown"
+              ;;
+          esac
+          
+          # Get actual SUSFS commit hash from the applied patches
+          if [ -d "../susfs4ksu" ]; then
+            cd ../susfs4ksu
+            ACTUAL_SUSFS_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+            ACTUAL_SUSFS_URL="https://gitlab.com/simonpunk/susfs4ksu/-/commit/$ACTUAL_SUSFS_REF"
+            cd "$CONFIG"
+          else
+            ACTUAL_SUSFS_REF="not-cloned"
+            ACTUAL_SUSFS_URL="N/A"
+          fi
+          
+          # Get actual BBG commit hash from the applied patches
+          if [ -d "../baseband_guard" ]; then
+            cd ../baseband_guard
+            ACTUAL_BBG_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+            ACTUAL_BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$ACTUAL_BBG_REF"
+            cd ..
+          else
+            ACTUAL_BBG_REF="not-cloned"
+            ACTUAL_BBG_URL="N/A"
+            cd ..
+          fi
+          
+          # Build end time
+          BUILD_END_TIME=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          
+          # Count artifacts
+          ARTIFACT_COUNT=$(ls -1 *-AK3.zip *-boot*.img 2>/dev/null | wc -l || echo "0")
+          ARTIFACT_LIST=$(ls -1 *-AK3.zip *-boot*.img 2>/dev/null | sed 's/^/- /' || echo "- No artifacts found")
+          
+          # Create comprehensive build summary
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## Comprehensive Kernel Build Summary
+          
+          ### Build Configuration
+          - **Android Version:** ${{ inputs.android_version }}
+          - **Kernel Version:** ${{ inputs.kernel_version }}
+          - **Sub Level:** ${{ inputs.sub_level }}${ACTUAL_SUBLEVEL:+ (Actual: $ACTUAL_SUBLEVEL)}
+          - **OS Patch Level:** ${{ inputs.os_patch_level }}
+          - **KernelSU Variant:** $KSU_NAME
+          - **KernelSU Version:** ${{ env.KSUVER }}
+          - **SUSFS Version:** v${SUSFS_VERSION}
+          - **Module Check:** Bypass
+          
+          ### Build Timeline
+          - **Build Started:** $(date -d '@${{ github.event.head_commit.timestamp }}' +'%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "Unknown")
+          - **Build Completed:** $BUILD_END_TIME
+          - **Build Status:** ${{ job.status }}
+          
+          ### Actual Commit Hashes (Used in Build)
+          > These are the actual commits that were used in this build
+          
+          → **$KSU_NAME:** [$ACTUAL_KSU_REF]($ACTUAL_KSU_URL)
+          
+          → **Baseband-guard:** [$ACTUAL_BBG_REF]($ACTUAL_BBG_URL)
+          
+          → **SUSFS4KSU:** [$ACTUAL_SUSFS_REF]($ACTUAL_SUSFS_URL)
+          
+          ### Workflow Information
+          - **Workflow:** ${{ github.workflow }}
+          - **Run ID:** ${{ github.run_id }}
+          - **Run Number:** ${{ github.run_number }}
+          
+          ### Generated Artifacts ($ARTIFACT_COUNT items)
+          $ARTIFACT_LIST
+          
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          
+          ---
+          *Build completed with actual commit hashes.*
+          EOF
