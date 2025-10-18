@@ -720,6 +720,11 @@ jobs:
           export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
           export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
           export CC=clang
+          
+          # Флаги для хост-компиляции (для BTF tools)
+          export HOSTCFLAGS="-O3 -Wno-error"
+          export HOSTCXXFLAGS="-O3 -Wno-error"
+          
           OUT=out
           mkdir -p "$OUT"
           make O="$OUT" gki_defconfig
@@ -745,7 +750,7 @@ jobs:
           
           echo "Starting build with $(nproc --all) threads..."
           set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" HOSTCFLAGS="$HOSTCFLAGS" HOSTCXXFLAGS="$HOSTCXXFLAGS" 2>&1 | tee build.log
           
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
