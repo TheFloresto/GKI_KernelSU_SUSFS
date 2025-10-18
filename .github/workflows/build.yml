@@ -172,8 +172,7 @@ jobs:
                 git checkout c49b1dab205bbc4ef20b120e84c5b7530355961d
                 ;;
             esac
-            cd ..
-          fi
+            cd ..          
 
       - name: Initialize and Sync Kernel Source
         shell: bash
