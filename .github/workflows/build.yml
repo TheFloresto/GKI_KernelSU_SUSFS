@@ -735,7 +735,7 @@ jobs:
           
           echo "Starting build with $(nproc --all) threads..."
           set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" PAHOLE="$PAHOLE_BIN" RUSTC="$RUSTC BIN" 2>&1 | tee build.log
           
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
