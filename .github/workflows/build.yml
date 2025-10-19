@@ -335,24 +335,6 @@ jobs:
           echo "KSUVER=$KSU_VERSION"
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
-      - name: Apply FIX 22 clang Patches     
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$CONFIG/common"
-          
-          # Get kernel version
-          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
-          
-          # Skip patch ONLY for Android 15 with kernel 6.6
-          if [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "$KERNEL_VERSION" == "6.6" ]]; then
-            echo "Skipping fix 22 clang patch for Android 15 with kernel 6.6"
-          else
-            echo "Applying fix 22 clang patch for ${{ inputs.android_version }} kernel $KERNEL_VERSION..."
-            cp -v ../../kernel_patches/fix-clidr-uninitialized.patch ./
-            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch
-          fi
-
       - name: Add BBG
         shell: bash
         run: |
@@ -670,42 +652,34 @@ jobs:
           CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
 
-      - name: Setup ZyCromerZ Clang Toolchain
+      - name: Detect Clang (toolchain for build)
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}        
         run: |
           set -euo pipefail
-          echo "Fetching latest ZyCromerZ Clang release..."
-          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
-          if [ -z "$LATEST_CLANG_TAG" ]; then
-            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
-            exit 1
+          KP="$GITHUB_WORKSPACE/$CONFIG"
+          CLANG_FOUND=false
+          
+          for base in "$KP/prebuilts" "$KP/prebuilts-master"; do
+            [ -d "$base/clang/host/linux-x86" ] || continue
+            latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
+            if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
+              CLANG_BIN="$latest/bin"
+              CLANG_FOUND=true
+            fi
+          done
+          
+          if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
+            CLANG_BIN="$(dirname "$(command -v clang)")"
+            CLANG_FOUND=true
+            echo "Using system clang."
           fi
-          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
           
-          # Extract version info for environment variables
-          CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
+          $CLANG_FOUND || { echo "No clang toolchain found"; exit 1; }
           
-          echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
-          mkdir -p clang-zyc
-          cd clang-zyc
-          
-          # Download the latest release asset (assuming the naming pattern is consistent)
-          DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
-          echo "Download URL: $DOWNLOAD_URL"
-          
-          curl -LO "$DOWNLOAD_URL"
-          tar -xzf "Clang-$CLANG_VERSION.tar.gz"
-          cd ..
-          
-          # Set environment variables
-          echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
-          echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
-          echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-          echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
-          echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
-          echo "$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_PATH
+          echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
+          CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
+          echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
+          echo "Detected Clang: $CLANG_VERSION"
 
       - name: Build Kernel
         shell: bash
