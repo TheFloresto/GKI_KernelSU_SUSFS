@@ -685,7 +685,7 @@ jobs:
         run: |
           set -euo pipefail
           # Apply compatibility fixes
-          SUSFS_VERSION="1.5.12
+          SUSFS_VERSION="1.5.12"
           # Set artifact name base for consistent naming
           # Prepare sublevel for naming
           SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
