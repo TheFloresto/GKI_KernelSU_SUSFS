@@ -698,6 +698,11 @@ jobs:
           if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
             export PATH="${CLANG_BIN_PATH}:$PATH"
           fi
+
+          # Use prebuilt tools to avoid BTF issues
+          export PAHOLE="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
+          export RUSTC="$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc"
+          
           export LLVM=1 LLVM_IAS=1
           export ARCH=arm64 SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-android-
