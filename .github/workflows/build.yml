@@ -60,7 +60,7 @@ jobs:
       - name: Setup Build Environment
         shell: bash
         run: |
-          set -euo pipefail       
+          set -euo pipefail
           AOSP_MIRROR=https://android.googlesource.com
           BRANCH=main-kernel-2025
           git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
@@ -109,8 +109,8 @@ jobs:
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-          git clone https://github.com/TheFloresto/kernel_patches.git
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH" 
+          git clone https://github.com/TheFloresto/kernel_patches.git -b main
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           
           # Checkout specific commits for SUSFS v1.5.12 if enabled
             cd susfs4ksu
@@ -134,7 +134,7 @@ jobs:
                 git checkout c49b1dab205bbc4ef20b120e84c5b7530355961d
                 ;;
             esac
-            cd ..          
+            cd ..
 
       - name: Initialize and Sync Kernel Source
         shell: bash
@@ -536,7 +536,7 @@ jobs:
           echo "CONFIG_KSU_DEBUG=n" >> "$defconfig"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "$defconfig"
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "$defconfig"
-          echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "$defconfig"          
+          echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "$defconfig"
 
           # SUSFS Configuration
           echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
@@ -544,7 +544,7 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
-
+          
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
@@ -557,8 +557,8 @@ jobs:
           
           echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"
-          
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"          
+
           # Mountify Support
           echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$defconfig"
@@ -572,7 +572,7 @@ jobs:
           echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$defconfig"
           echo "CONFIG_TCP_CONG_BBR=y" >> "$defconfig"
           echo "CONFIG_NET_SCH_FQ=y" >> "$defconfig"
-          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "$defconfig"   
+          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "$defconfig"
           echo "CONFIG_TCP_CONG_BIC=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "$defconfig"
           echo "CONFIG_TCP_CONG_HTCP=n" >> "$defconfig"
@@ -591,6 +591,7 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
+
           
           # Build Optimization Configuration
           echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
@@ -634,11 +635,11 @@ jobs:
           # Set artifact name base for consistent naming
           # Prepare sublevel for naming
           SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
-          if [ -n "${ACTUAL_SUBLEVEL:-}" ]; then
+          if [ -n "$ACTUAL_SUBLEVEL" ]; then
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
           # Set artifact name base for consistent naming
-          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v${SUSFS_VERSION}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass"        
+          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v${SUSFS_VERSION}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
@@ -778,12 +779,11 @@ jobs:
           mv oImage Image
           cd ../../../../../..
 
-      - name: Create AnyKernel3 ZIP
+      - name: Prepare AnyKernel3
         shell: bash
         run: |
           set -euo pipefail
-          
-          # Try different Image locations based on build type
+          # Copy Image from normal build locations
           if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
             cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image
           elif [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
@@ -795,40 +795,39 @@ jobs:
             exit 1
           fi
 
-          cd AnyKernel3
-          
-          # Use actual sublevel for LTS builds if available
-          SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
-          if [ -n "${ACTUAL_SUBLEVEL:-}" ]; then
-            SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
-          fi
-          
-          ZIP_NAME="${{ env.FILE_NAME }}-AK3.zip"
-          echo "Creating flashable zip: $ZIP_NAME"
-          zip -r "../$ZIP_NAME" ./* >/dev/null
-          echo "AnyKernel3 ZIP created successfully"
-
-      - name: Create Bootimgs Folder and Copy Images
+      - name: Create Bootimgs Folder and Copy Images for Android 12/13
+        if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p bootimgs
-          
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          COMMON="$KERNEL_PATH/common"
-          OUT="$COMMON/out"
-          
+          mkdir bootimgs
+
           echo "Creating bootimgs folder and copying images..."
-          cp "$OUT/arch/arm64/boot/Image" ./bootimgs/
-          cp "$OUT/arch/arm64/boot/Image" ./
-          
-          # Create Image.lz4
-          lz4 -f -12 --favor-decSpeed "$OUT/arch/arm64/boot/Image" ./bootimgs/Image.lz4
-          lz4 -f -12 --favor-decSpeed "$OUT/arch/arm64/boot/Image" ./Image.lz4
-          
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
+
           # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
-          cp ./Image.gz ./bootimgs/Image.gz
+          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
+
+      - name: Create Bootimgs Folder and Copy Images for Android 14/15
+        if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir bootimgs
+
+          echo "Creating bootimgs folder and copying images..."
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
+          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
+
+          # Create gzip of the Image file
+          gzip -n -k -f -9 ./Image > ./Image.gz
+          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
@@ -904,9 +903,17 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.FILE_NAME }}-Complete-Build
+          name: ${{ env.FILE_NAME }}-AnyKernel3
           path: |
-            *-AK3.zip
+            AnyKernel3/
+          compression-level: 9
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-Boot
+          path: |
+            AnyKernel3/
             *-boot.img
             *-boot-gz.img
             *-boot-lz4.img
