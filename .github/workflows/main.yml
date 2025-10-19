@@ -5,7 +5,7 @@ permissions:
   actions: write
 
 on:
-  # push:
+# push:
   #   branches:
   #     - main
   #   paths:
@@ -26,45 +26,6 @@ on:
           - Pre-Release
           - Release
         default: Actions
-      include_wksu:
-        description: 'Include WKSU?'
-        required: true
-        type: boolean
-        default: false
-      include_ksu:
-        description: 'Include KSU?'
-        required: true
-        type: boolean
-        default: false
-      include_next:
-        description: 'Include NEXT?'
-        required: true
-        type: boolean
-        default: true
-      include_sukisu:
-        description: 'Include SukiSU?'
-        required: true
-        type: boolean
-        default: false      
-      include_mksu:
-        description: 'Include MKSU?'
-        required: true
-        type: boolean
-        default: false
-      kernelsu_branch:
-        description: "Choose ksu branch"
-        required: true
-        type: choice
-        options:
-          - Stable
-          - Dev
-          - Other
-        default: Dev
-      kernelsu_branch_other:
-        description: "If 'Other' is selected, specify your custom branch"
-        required: false
-        type: string
-        default: ""        
       build_selection:
         description: "Choose which kernels to build"
         required: true
@@ -78,102 +39,87 @@ on:
           - Android14-6.1
           - Android15-6.6
         default: All
+      kernelsu_variant:
+        description: "Choose KernelSU Variant"
+        required: true
+        type: choice
+        options:
+          - WKSU
+          - NEXT
+          - MKSU
+          - KSU
+          - SukiSU
+        default: NEXT
+      kernelsu_branch:
+        description: "Choose ksu branch"
+        required: true
+        type: choice
+        options:
+          - Stable
+          - Dev
+          - Other
+        default: Dev
+      kernelsu_branch_other:
+        description: "If 'Other' is selected, specify your custom branch"
+        required: false
+        type: string
+        default: ""
 
 jobs:
-  set-matrix:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          VARIANTS=()
-          [[ "${{ inputs.include_wksu }}" == "true" ]] && VARIANTS+=("\"WKSU\"")
-          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("\"KSU\"")
-          [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("\"NEXT\"")
-          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("\"SukiSU\"")          
-          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("\"MKSU\"")                     
-          echo "matrix={\"kernelsu_variant\": [$(IFS=,; echo "${VARIANTS[*]}")]}" >> $GITHUB_OUTPUT
 
   build-a12-5-10:
-    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10'
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a13-5-10:
-    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10'
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a13-5-15:
-    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15'
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a14-5-15:
-    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15'
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a14-6-1:
-    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1'
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}        
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a15-6-6:
-    needs: set-matrix
     if: inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6'
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}  
-    
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   release:
     runs-on: ubuntu-latest
@@ -185,16 +131,24 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
-      
-    env:        
-      GH_TOKEN: ${{ github.token }}
+
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
       RELEASE_BODY: ""
     steps:
-      - name: Maximize Build Space
-        uses: AdityaGarg8/remove-unwanted-software@v5
-        with:
-          remove-swapfile: 'true'
-          verbose: 'true'
+      # # - name: Maximize Build Space
+        # uses: AdityaGarg8/remove-unwanted-software@v5
+        # with:
+          # remove-dotnet: 'true'          # Frees ~2 GB
+          # remove-android: 'true'         # Frees ~9 GB
+          # remove-haskell: 'true'         # Frees ~5.2 GB
+          # remove-codeql: 'true'          # Frees ~5.4 GB
+          # remove-docker-images: 'true'   # Frees ~3.2 GB
+          # remove-large-packages: 'true'  # Frees ~3.1 GB
+          # remove-swapfile: 'true'        # Frees ~4 GB
+          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          # verbose: 'true'                # Enable detailed logging
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -229,81 +183,50 @@ jobs:
 
       - name: Get KernelSU variant refs and links
         run: |
-          BRANCH="${{ inputs.kernelsu_branch }}"
-      
-          get_ref() {
-            local name="$1" repo="$2" path="$3" mode="$4"
-            if [[ "$mode" == "tag" ]]; then
-              ref=$(git ls-remote --tags --sort=-v:refname "$repo" | grep -o 'refs/tags/.*' | cut -d/ -f3 | head -n1)
-              url="https://github.com/$path/releases/tag/$ref"
-            else
-              ref=$(git ls-remote "$repo" HEAD | awk '{print $1}')
-              url="https://github.com/$path/commit/$ref"
-            fi
-            echo "${name}_REF=$ref" >> $GITHUB_ENV
-            echo "${name}_URL=$url" >> $GITHUB_ENV
-          }
-          [[ "$BRANCH" == "Dev" ]] && MODE="tag" || MODE="commit"
-          get_ref "WKSU" "https://github.com/WildKernels/Wild_KSU.git" "WildKernels/Wild_KSU" "$MODE"
-          get_ref "KSU" "https://github.com/tiann/KernelSU.git" "tiann/KernelSU" "$MODE"
-          get_ref "NEXT" "https://github.com/KernelSU-Next/KernelSU-Next.git" "KernelSU-Next/KernelSU-Next" "$MODE"
-          get_ref "SukiSU" "https://github.com/SukiSU-Ultra/SukiSU-Ultra" "SukiSU-Ultra/SukiSU-Ultra" "$MODE"
-          get_ref "MKSU" "https://github.com/5ec1cff/KernelSU.git" "5ec1cff/KernelSU" "$MODE"
-
+          case "${{ inputs.kernelsu_variant }}" in
+            "WKSU")
+              KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
+              KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
+              ;;
+            "NEXT")
+              KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/next | awk '{print $1}')
+              KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
+              ;;
+            "MKSU")
+              KSU_REF=$(git ls-remote "https://github.com/5ec1cff/KernelSU.git" refs/heads/main | awk '{print $1}')
+              KSU_URL="https://github.com/5ec1cff/KernelSU/commit/$KSU_REF"
+              ;;
+            "KSU")
+              KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
+              KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
+              ;;
+            "SukiSU")
+              KSU_REF=$(git ls-remote "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" refs/heads/main | awk '{print $1}')
+              KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/$KSU_REF"
+              ;;
+          esac
+          
+          echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
+          echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
+          
+          # Get Baseband-guard latest commit from main branch
+          BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
+          BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
+          echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
+          echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
+          
       - name: Generate New Tag
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        if: inputs.release_type != 'Actions'
         run: |
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-          
           if [ -z "$LATEST_TAG" ]; then
             LATEST_TAG="v1.5.12-r0"
           fi
-          
-          echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
-          
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{
-            if (NF > 1) {
-              suffix = $NF + 1
-              gsub(/-r[0-9]+$/, "", $0)
-              printf "%s-r%d", $0, suffix
-            } else {
-              printf "%s-r1", $0
-            }
-          }')
-          
-          echo "Proposed new tag: $NEW_TAG"
-          
-          TAG_EXISTS=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$NEW_TAG\") | .name" 2>/dev/null || echo "")
-          
-          if [ -n "$TAG_EXISTS" ]; then
-            echo "Tag $NEW_TAG already exists in NerestKernels repository, finding next available tag"
-            
-            BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
-            BASE_REVISION=$(echo "$LATEST_TAG" | grep -o 'r[0-9]*$' | sed 's/r//' || echo "0")
-            COUNTER=$((BASE_REVISION + 1))
-            
-            while true; do
-              CANDIDATE_TAG="${BASE_VERSION}-r${COUNTER}"
-              TAG_CHECK=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$CANDIDATE_TAG\") | .name" 2>/dev/null || echo "")
-              
-              if [ -z "$TAG_CHECK" ]; then
-                NEW_TAG="$CANDIDATE_TAG"
-                echo "Found available tag: $NEW_TAG"
-                break
-              fi
-              
-              COUNTER=$((COUNTER + 1))
-              
-              if [ "$COUNTER" -gt $((BASE_REVISION + 100)) ]; then
-                echo "Error: Could not find available tag after 100 attempts"
-                exit 1
-              fi
-            done
-          fi
-          
-          echo "Final new tag: $NEW_TAG"
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+          echo "New tag: $NEW_TAG"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Set tag for Actions only
         if: inputs.release_type == 'Actions'
@@ -314,25 +237,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-
-      - name: Set Release Name
-        run: |
-          VARIANTS=()
-          [[ "${{ inputs.include_wksu }}" == "true" ]] && VARIANTS+=("WKSU")
-          [[ "${{ inputs.include_ksu }}" == "true" ]] && VARIANTS+=("KSU")
-          [[ "${{ inputs.include_next }}" == "true" ]] && VARIANTS+=("NEXT")
-          [[ "${{ inputs.include_sukisu }}" == "true" ]] && VARIANTS+=("SukiSU")
-          [[ "${{ inputs.include_mksu }}" == "true" ]] && VARIANTS+=("MKSU")
-          
-          if [ ${#VARIANTS[@]} -eq 0 ]; then
-            VARIANT_TEXT="KernelSU"
-          elif [ ${#VARIANTS[@]} -eq 1 ]; then
-            VARIANT_TEXT="${VARIANTS[0]}"
-          else
-            VARIANT_TEXT=$(IFS=', '; echo "${VARIANTS[*]}")
-          fi
-          
-          echo "RELEASE_NAME=GKI Kernels With $VARIANT_TEXT & SUSFS v1.5.9/v1.5.12" >> $GITHUB_ENV
+          pattern: '${{ inputs.kernelsu_variant }}-*-AnyKernel3'
 
       - name: Set release body
         run: |
@@ -344,12 +249,12 @@ jobs:
           Please ensure you have proper backups before installation.
 
           NEW:
-          -> **Module Check Bypass Variant**: Normal build with additional hack for compatibility, if you encounter any issues with the normal build try this!
+          -> **Module Check Bypass Variant**
       
           Features:
-          -> Wild KSU
-          -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
-          -> SUSFS ඞ v1.5.9/v1.5.12
+          -> ${{ inputs.kernelsu_variant }} KernelSU Variant
+          -> Multi Manager Support (compatibility varies by variant)
+          -> SUSFS ඞ v1.5.12
           -> Scope-Minimized Manual hooks v1.4
           -> Ptrace Patch Support for Older Kernels (<5.16)
           -> IPSet Support for Advanced Network Filtering
@@ -368,17 +273,13 @@ jobs:
       
           Managers:
           -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
-          -> KernelSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
           -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
-          -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
           -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
-      
+          -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
+          -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
+
           Commit Hashes (at the time of release):
-          -> WKSU: [${{ env.WKSU_REF }}](${{ env.WKSU_URL }})
-          -> KernelSU: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
-          -> NEXT: [${{ env.NEXT_REF }}](${{ env.NEXT_URL }})
-          -> SukiSU: [${{ env.SukiSU_REF }}](${{ env.SukiSU_URL }})
-          -> MKSU: [${{ env.MKSU_REF }}](${{ env.MKSU_URL }})
+          -> ${{ inputs.kernelsu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
 
           -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
 
@@ -391,76 +292,32 @@ jobs:
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
 
-      - name: Create GitHub Release in NerestKernels Repository
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          UPLOAD_FILES=()
-          
-          # Debug: Show downloaded artifacts structure
-          echo "Downloaded artifacts structure:"
-          ls -laR ./downloaded-artifacts/
-          
-          # Find all .zip and .img files, excluding directories
-          while IFS= read -r -d '' file; do
-            UPLOAD_FILES+=("$file")
-          done < <(find ./downloaded-artifacts -type f \( -name "*.zip" -o -name "*.img" \) -print0)
-          
-          # Debug: Show found files
-          echo "Found ${#UPLOAD_FILES[@]} files to upload:"
-          printf '%s\n' "${UPLOAD_FILES[@]}"
-          
-          if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
-            echo "ERROR: No files found to upload!"
-            echo "Full artifacts directory structure:"
-            find ./downloaded-artifacts -type f -ls
-            exit 1
-          fi
-          
-          echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS with ${#UPLOAD_FILES[@]} files..."
-          
-          # Create release with first file
-          gh release create "$NEW_TAG" \
-            --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-            --title "$RELEASE_NAME" \
-            --notes-file release_body.md \
-            $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
-            "${UPLOAD_FILES[0]}"
-          
-          # Upload remaining files if any
-          if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
-            echo "Uploading additional ${#UPLOAD_FILES[@]} files..."
-            for i in "${!UPLOAD_FILES[@]}"; do
-              if [ $i -gt 0 ]; then
-                echo "Uploading file $((i+1))/${#UPLOAD_FILES[@]}: ${UPLOAD_FILES[$i]}..."
-                gh release upload "$NEW_TAG" \
-                  --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-                  "${UPLOAD_FILES[$i]}" \
-                  --clobber
-              fi
-            done
-          fi
-          
-          echo "✅ Release created successfully with ${#UPLOAD_FILES[@]} files!"
-
       - name: Create GitHub Release
         if: inputs.release_type != 'Actions'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.NEW_TAG }}
+          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
+          files: ""
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release_body.md
+          repository: NerestKernels/GKI_KernelSU_SUSFS
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Upload Release Assets
         if: inputs.release_type != 'Actions'
         run: |
           for dir in ./downloaded-artifacts/*/; do
-            if [ -d "$dir" ]; then
-              # Upload only AnyKernel3 ZIP files (created in build.yml)
-              for zipfile in "$dir"/*-AnyKernel3.zip; do
-                if [ -f "$zipfile" ]; then
-                  echo "Uploading $(basename "$zipfile")..."
-                  gh release upload ${{ env.NEW_TAG }} "$zipfile"
-                fi
-              done
+            # Create ZIP files from AnyKernel3 directories
+            if [ -d "$dir/AnyKernel3" ]; then
+              artifact_name=$(basename "$dir")
+              echo "Creating ZIP for $artifact_name..."
+              cd "$dir"
+              zip -r -9 "${artifact_name}-AnyKernel3.zip" AnyKernel3/
+              echo "Uploading ${artifact_name}.zip to NerestKernels repository..."
+              gh release upload ${{ env.NEW_TAG }} "${artifact_name}-AnyKernel3.zip" --repo NerestKernels/GKI_KernelSU_SUSFS
+              cd - > /dev/null
             fi
           done
 
@@ -485,7 +342,8 @@ jobs:
             -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
             -F text="
             🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
-            📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
-            ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+            📦 *Variant:* ${{ inputs.kernelsu_variant }}
+            📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
+            ✏️ *Source Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
