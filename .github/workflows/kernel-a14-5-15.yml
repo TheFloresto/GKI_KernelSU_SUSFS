@@ -1,12 +1,10 @@
 name: Kernel Config - A14 5.15
-
 permissions:
   contents: write  # Allow writing to repository contents
   actions: write   # Allows triggering actions
-
 on:
   workflow_call:
-     inputs:
+    inputs:
       kernelsu_variant:
         required: true
         type: string
@@ -16,8 +14,7 @@ on:
       kernelsu_branch_other:
         required: false
         type: string
-        default: "" 
-
+        default: ""
 jobs:
   build-kernels-a14-5-15:
     strategy:
@@ -73,4 +70,4 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}     
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
