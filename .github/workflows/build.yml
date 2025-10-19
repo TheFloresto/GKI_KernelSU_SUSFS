@@ -686,6 +686,7 @@ jobs:
         env:
           PYTHONWARNINGS: "ignore:invalid escape sequence"
         run: |
+          set -euo pipefail
           echo "::group::Build kernel"
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           COMMON="$KERNEL_PATH/common"
