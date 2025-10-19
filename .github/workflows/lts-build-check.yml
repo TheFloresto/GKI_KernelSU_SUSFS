@@ -1,60 +1,112 @@
-name: Build Check - All LTS Kernels
-
+name: Kernel Build Check
 permissions:
-  contents: write
-  actions: write
-
+  contents: write  # Allow writing to repository contents
+  actions: write   # Allows triggering actions
 on:
   workflow_dispatch:
-
+    inputs:
+      kernelsu_variant:
+        description: 'KernelSU Variant'
+        required: true
+        type: choice
+        options:
+          - WKSU
+          - NEXT
+          - MKSU
+          - KSU
+          - SukiSU
+        default: NEXT
+      kernelsu_branch:
+        description: 'KernelSU Branch'
+        required: true
+        type: choice
+        options:
+          - Stable
+          - Dev
+          - Other
+        default: Dev
+      kernelsu_branch_other:
+        description: "If 'Other' is selected, specify your custom branch"
+        required: false
+        type: string
+        default: ""
 jobs:
   build-check:
     strategy:
       fail-fast: false
       matrix:
         kernel_config:
-          # Android 12 - Kernel 5.10 LTS
+          # Android 12 - Kernel 5.10.43 (Oldest)
+          - android_version: "android12"
+            kernel_version: "5.10"
+            sub_level: "43"
+            os_patch_level: "2021-08"
+          
+          # Android 12 - Kernel 5.10 LTS (Latest)
           - android_version: "android12"
             kernel_version: "5.10"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 13 - Kernel 5.10 LTS
+          # Android 13 - Kernel 5.10.107 (Oldest)
+          - android_version: "android13"
+            kernel_version: "5.10"
+            sub_level: "107"
+            os_patch_level: "2022-04"
+          
+          # Android 13 - Kernel 5.10 LTS (Latest)
           - android_version: "android13"
             kernel_version: "5.10"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 13 - Kernel 5.15 LTS
+          # Android 13 - Kernel 5.15.41 (Oldest)
+          - android_version: "android13"
+            kernel_version: "5.15"
+            sub_level: "41"
+            os_patch_level: "2022-06"
+          
+          # Android 13 - Kernel 5.15 LTS (Latest)
           - android_version: "android13"
             kernel_version: "5.15"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 14 - Kernel 5.15 LTS
+          # Android 14 - Kernel 5.15.110 (Oldest)
+          - android_version: "android14"
+            kernel_version: "5.15"
+            sub_level: "110"
+            os_patch_level: "2023-06"
+          
+          # Android 14 - Kernel 5.15 LTS (Latest)
           - android_version: "android14"
             kernel_version: "5.15"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 14 - Kernel 6.1 LTS
+          # Android 14 - Kernel 6.1.25 (Oldest)
+          - android_version: "android14"
+            kernel_version: "6.1"
+            sub_level: "25"
+            os_patch_level: "2023-06"
+          
+          # Android 14 - Kernel 6.1 LTS (Latest)
           - android_version: "android14"
             kernel_version: "6.1"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 14 - Kernel 6.1.134 Testing
-          - android_version: "android14"
-            kernel_version: "6.1"
-            sub_level: "134"
-            os_patch_level: "2025-05"
+          # Android 15 - Kernel 6.6.30 (Oldest)
+          - android_version: "android15"
+            kernel_version: "6.6"
+            sub_level: "30"
+            os_patch_level: "2024-07"
           
-          # Android 15 - Kernel 6.6 LTS
+          # Android 15 - Kernel 6.6 LTS (Latest)
           - android_version: "android15"
             kernel_version: "6.6"
             sub_level: "X"
             os_patch_level: "lts"
-
     name: Build Check
     uses: ./.github/workflows/build.yml
     secrets: inherit
@@ -63,3 +115,6 @@ jobs:
       kernel_version: ${{ matrix.kernel_config.kernel_version }}
       sub_level: ${{ matrix.kernel_config.sub_level }}
       os_patch_level: ${{ matrix.kernel_config.os_patch_level }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
