@@ -314,9 +314,9 @@ jobs:
               artifact_name=$(basename "$dir")
               echo "Creating ZIP for $artifact_name..."
               cd "$dir"
-              zip -r -9 "${artifact_name}-AnyKernel3.zip" AnyKernel3/
+              zip -r -9 "${artifact_name}-AK3.zip" AnyKernel3/
               echo "Uploading ${artifact_name}.zip to NerestKernels repository..."
-              gh release upload ${{ env.NEW_TAG }} "${artifact_name}-AnyKernel3.zip" --repo NerestKernels/GKI_KernelSU_SUSFS
+              gh release upload ${{ env.NEW_TAG }} "${artifact_name}-AK3.zip" --repo NerestKernels/GKI_KernelSU_SUSFS
               cd - > /dev/null
             fi
           done
