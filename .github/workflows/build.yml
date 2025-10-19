@@ -632,12 +632,15 @@ jobs:
           set -euo pipefail
           # Apply compatibility fixes
           SUSFS_VERSION="1.5.12"
+          
           # Set artifact name base for consistent naming
           # Prepare sublevel for naming
           SUBLEVEL_FOR_NAME="${{ inputs.sub_level }}"
-          if [ -n "$ACTUAL_SUBLEVEL" ]; then
+          
+          if [ -n "${ACTUAL_SUBLEVEL:-}" ]; then
             SUBLEVEL_FOR_NAME="$ACTUAL_SUBLEVEL"
           fi
+          
           # Set artifact name base for consistent naming
           ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-SUSFS_v${SUSFS_VERSION}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-Module_Check_Bypass"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
