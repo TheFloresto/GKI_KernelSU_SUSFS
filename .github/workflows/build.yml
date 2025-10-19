@@ -693,13 +693,14 @@ jobs:
           cd "$COMMON"
           : > "$COMMON/.scmversion"
           
+          # Ensure Python warnings are suppressed for scripts invoked by make
           export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
           if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
             export PATH="${CLANG_BIN_PATH}:$PATH"
           fi
           
-          # Define prebuilt tool paths
+          # Use prebuilt tools to avoid BTF issues
           PAHOLE_BIN="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
           RUSTC_BIN="$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc"
           
@@ -725,9 +726,11 @@ jobs:
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
           KCFLAGS_EXTRA="-O3"
           
+          # Consistent flags; include -pipe and disable stack protector
           KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
           KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
           
+          # Regenerate defaults after config edits
           make O="$OUT" olddefconfig
           
           echo "Starting build with $(nproc --all) threads..."
