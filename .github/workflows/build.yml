@@ -378,7 +378,7 @@ jobs:
       - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
-          set -euo pipefail
+          set -eo pipefail
           cd "$CONFIG"
           
           # Apply compatibility fixes
