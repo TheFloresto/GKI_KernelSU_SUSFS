@@ -798,39 +798,27 @@ jobs:
             exit 1
           fi
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13
-        if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
+      - name: Create Bootimgs Folder and Copy Images
         shell: bash
         run: |
           set -euo pipefail
-          mkdir bootimgs
-
+          mkdir -p bootimgs
+          
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          COMMON="$KERNEL_PATH/common"
+          OUT="$COMMON/out"
+          
           echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
-
+          cp "$OUT/arch/arm64/boot/Image" ./bootimgs/
+          cp "$OUT/arch/arm64/boot/Image" ./
+          
+          # Create Image.lz4
+          lz4 -f -12 --favor-decSpeed "$OUT/arch/arm64/boot/Image" ./bootimgs/Image.lz4
+          lz4 -f -12 --favor-decSpeed "$OUT/arch/arm64/boot/Image" ./Image.lz4
+          
           # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
-          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
-
-      - name: Create Bootimgs Folder and Copy Images for Android 14/15
-        if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir bootimgs
-
-          echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
+          cp ./Image.gz ./bootimgs/Image.gz
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
