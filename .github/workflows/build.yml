@@ -653,7 +653,7 @@ jobs:
           cd "$KERNEL_PATH/common"
           mkdir -p out
           CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV""
+          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
 
       - name: Detect Clang (toolchain for build)
         shell: bash
