@@ -713,8 +713,14 @@ jobs:
             scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
             scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
             sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-            sed -i 's/-maybe-dirty//g' "$KERNEL_PATH/build/kernel/kleaf/impl/stamp.bzl"
-          fi
+            KLEAF_FILE="$KERNEL_PATH/build/kernel/kleaf/impl/stamp.bzl"    
+          if [ -f "$KLEAF_FILE" ]; then
+            echo "Kleaf/Bazel file found, applying patch..."
+            sed -i 's/-maybe-dirty//g' "$KLEAF_FILE"
+          else
+           echo "Kleaf/Bazel file ($KLEAF_FILE) not found, skipping patch."
+           fi
+          fi         
           
           # Optimize level config and flags
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
