@@ -217,6 +217,8 @@ jobs:
           
       - name: Generate New Tag
         if: inputs.release_type != 'Actions'
+        env:
+         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
           if [ -z "$LATEST_TAG" ]; then
@@ -225,8 +227,6 @@ jobs:
           NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
           echo "New tag: $NEW_TAG"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Set tag for Actions only
         if: inputs.release_type == 'Actions'
