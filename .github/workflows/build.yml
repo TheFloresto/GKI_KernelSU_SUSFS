@@ -57,6 +57,19 @@ jobs:
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
+      - name: Install Minimal Dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Install deps"
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git curl ca-certificates build-essential clang lld flex bison \
+            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+            libxml2-utils rsync unzip dwarves file python3
+          sudo apt-get clean
+          echo "::endgroup::"
+
       - name: Setup Build Environment
         shell: bash
         run: |
@@ -77,20 +90,6 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
-
-      - name: Install Minimal Dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::group::Install deps"
-          sudo apt-get -o Acquire::Retries=3 update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git curl ca-certificates build-essential clang lld flex bison \
-            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils ccache rsync unzip dwarves file python3 bc cpio kmod pahole rustc cargo
-          sudo apt-get clean
-          echo "::endgroup::"
-
 
       - name: Set boot sign key
         shell: bash
@@ -537,6 +536,17 @@ jobs:
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"
 
+      - name: Configure SukiSU
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # SukiSU Support
+          echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
+
       - name: Configure SUSFS
         shell: bash
         run: |
@@ -641,20 +651,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd "$CONFIG"
-          
-          perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-
-          #Set Kernel Timestamp
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
-          
-          #Set Kernel Timestamp
-          perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
-
-          #Set Custom Hostname and Username
-          perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
-          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
+          cd "$CONFIG"        
               
           #Remove Abi Exports and Error
           rm -rf ./common/android/abi_gki_protected_exports_*
@@ -696,7 +693,6 @@ jobs:
           set -euo pipefail
           KP="$GITHUB_WORKSPACE/$CONFIG"
           CLANG_FOUND=false
-          
           for base in "$KP/prebuilts" "$KP/prebuilts-master"; do
             [ -d "$base/clang/host/linux-x86" ] || continue
             latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
@@ -705,129 +701,75 @@ jobs:
               CLANG_FOUND=true
             fi
           done
-          
           if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
             CLANG_BIN="$(dirname "$(command -v clang)")"
             CLANG_FOUND=true
             echo "Using system clang."
           fi
-          
           $CLANG_FOUND || { echo "No clang toolchain found"; exit 1; }
-          
           echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
           CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
           echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
           echo "Detected Clang: $CLANG_VERSION"
          
-      - name: Detect pahole and rustc
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          # ===== PAHOLE DETECTION =====
-          if command -v pahole >/dev/null 2>&1; then
-            PAHOLE_BIN="$(command -v pahole)"
-            PAHOLE_VERSION="$("$PAHOLE_BIN" --version 2>&1 | head -n1 || echo 'unknown')"
-            echo "PAHOLE_BIN=$PAHOLE_BIN" >> "$GITHUB_ENV"
-            echo "PAHOLE_VERSION=$PAHOLE_VERSION" >> "$GITHUB_ENV"
-            echo "Using system pahole: $PAHOLE_BIN ($PAHOLE_VERSION)"
-          else
-            echo "ERROR: pahole not found in system"
-            exit 1
-          fi
-          
-          # ===== RUSTC DETECTION =====
-          if command -v rustc >/dev/null 2>&1; then
-            RUSTC_BIN="$(command -v rustc)"
-            RUSTC_VERSION="$("$RUSTC_BIN" --version || echo 'unknown')"
-            echo "RUSTC_BIN=$RUSTC_BIN" >> "$GITHUB_ENV"
-            echo "RUSTC_VERSION=$RUSTC_VERSION" >> "$GITHUB_ENV"
-            echo "Using system rustc: $RUSTC_BIN ($RUSTC_VERSION)"
-          else
-            echo "WARNING: rustc not found (building without Rust support)"
-            echo "RUSTC_BIN=" >> "$GITHUB_ENV"
-          fi
-
       - name: Build Kernel
         shell: bash
         env:
-          PYTHONWARNINGS: "ignore:invalid escape sequence"
+            PYTHONWARNINGS: "ignore:invalid escape sequence"
         run: |
-          set -euo pipefail
-          echo "::group::Build kernel"
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          COMMON="$KERNEL_PATH/common"
-          cd "$COMMON"
-          : > "$COMMON/.scmversion"
-          
-          export PYTHONWARNINGS="${PYTHONWARNINGS}"
-          
-          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
-            export PATH="${CLANG_BIN_PATH}:$PATH"
-          fi
-          
-          # ===== Используем системные инструменты =====
-          echo "Using system pahole: ${PAHOLE_BIN} (${PAHOLE_VERSION})"
-          if [ -n "${RUSTC_BIN:-}" ]; then
-            echo "Using system rustc: ${RUSTC_BIN} (${RUSTC_VERSION})"
-          else
-            echo "Building without Rust support"
-          fi
-          
-          export LLVM=1 LLVM_IAS=1
-          export ARCH=arm64 SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-android-
-          export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
-          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
-          export CC=clang
-          OUT=out
-          mkdir -p "$OUT"
-          make O="$OUT" gki_defconfig
-          
-          # LOCALVERSION branding
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-          fi         
-          
-          # Optimize level config and flags
-          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
-          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          KCFLAGS_EXTRA="-O3"
-          
-          # Consistent flags
-          KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
-          KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
-          
-          make O="$OUT" olddefconfig
-          
-          echo "Starting build with $(nproc --all) threads..."
-          set -o pipefail
-          
-          # ===== Build с условным RUSTC =====
-          BUILD_ARGS=(
-            -j"$(nproc --all)"
-            O="$OUT"
-            KCFLAGS="$KCFLAGS"
-            KCPPFLAGS="$KCPPFLAGS"
-            PAHOLE="$PAHOLE_BIN"
-          )
-          
-          # Добавляем RUSTC только если найден
-          if [ -n "${RUSTC_BIN:-}" ]; then
-            BUILD_ARGS+=(RUSTC="$RUSTC_BIN")
-          fi
-          
-          make "${BUILD_ARGS[@]}" 2>&1 | tee build.log
-          
-          IMG="$OUT/arch/arm64/boot/Image"
-          if [ ! -f "$IMG" ]; then
-            echo "Kernel Image missing"
-            exit 1
-          fi
-          sha256sum "$IMG" | tee "$OUT/Image.sha256"
-          echo "::endgroup::"
+            set -euo pipefail
+            echo "::group::Build kernel"
+            KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG/kernel_platform"
+            COMMON="$KERNEL_PATH/common"
+            cd "$COMMON"
+            : > "$COMMON/.scmversion"
+            
+            # Ensure Python warnings are suppressed for scripts invoked by make
+            export PYTHONWARNINGS="${PYTHONWARNINGS}"
+            
+            if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
+                export PATH="${CLANG_BIN_PATH}:$PATH"
+            fi
+            export LLVM=1 LLVM_IAS=1
+            export ARCH=arm64 SUBARCH=arm64
+            export CROSS_COMPILE=aarch64-linux-android-
+            export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
+            export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
+            export CC=clang
+            OUT=out
+            mkdir -p "$OUT"
+            make O="$OUT" gki_defconfig
+            
+            # LOCALVERSION branding
+            if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
+                scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
+                scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+                sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
+            fi
+            
+            # Optimize level config and flags
+                scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
+                scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
+                KCFLAGS_EXTRA="-O3"
+            
+            # Consistent flags; include -pipe and disable stack protector
+            KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
+            KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
+            
+            # Regenerate defaults after config edits
+            make O="$OUT" olddefconfig
+            
+            echo "Starting build with $(nproc --all) threads..."
+            set -o pipefail
+            make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+            
+            IMG="$OUT/arch/arm64/boot/Image"
+            if [ ! -f "$IMG" ]; then
+                echo "Kernel Image missing"
+                exit 1
+            fi
+            sha256sum "$IMG" | tee "$OUT/Image.sha256"
+            echo "::endgroup::"
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
@@ -966,7 +908,7 @@ jobs:
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ env.FILE_NAME }}-boot-lz4.img
 
-      - name: Upload Build Artifacts
+      - name: Upload AnyKernel3 Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.FILE_NAME }}-AnyKernel3
@@ -974,12 +916,50 @@ jobs:
             AnyKernel3/
           compression-level: 9
 
-      - name: Upload Build Artifacts
+      - name: Upload Boot Image
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.FILE_NAME }}-Boot
+          name: ${{ env.FILE_NAME }}-boot.img
           path: |
             *-boot.img
+          compression-level: 9
+          
+      - name: Upload Boot Image (GZ)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-boot-gz.img
+          path: |
             *-boot-gz.img
+          compression-level: 9
+          
+      - name: Upload Boot Image (LZ4)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-boot-lz4.img
+          path: |
             *-boot-lz4.img
+          compression-level: 9
+          
+      - name: Upload Raw Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-Image
+          path: |
+            Image
+          compression-level: 9
+          
+      - name: Upload Raw Image (GZ)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-Image.gz
+          path: |
+            Image.gz
+          compression-level: 9
+          
+      - name: Upload Raw Image (LZ4)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-Image.lz4
+          path: |
+            Image.lz4
           compression-level: 9
