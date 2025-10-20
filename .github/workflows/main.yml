@@ -302,8 +302,7 @@ jobs:
           name: ${{ env.RELEASE_NAME }}
           body_path: release_body.md
           repository: NerestKernels/GKI_KernelSU_SUSFS
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Upload Release Assets
         if: inputs.release_type != 'Actions'
