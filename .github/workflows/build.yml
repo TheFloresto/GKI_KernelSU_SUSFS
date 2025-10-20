@@ -511,97 +511,120 @@ jobs:
           cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
           echo "obj-y += min_kdp.o" >> Makefile
 
-      - name: Apply Kernel Configuration
+      - name: Set Kernel Configuration Variables
         shell: bash
         run: |
           set -euo pipefail
           cd "$CONFIG"
-          
-          defconfig="./common/arch/arm64/configs/gki_defconfig"
-          
-          echo "Applying kernel configurations one by one..."
-          
-          # KernelSU Core Configuration
-          echo "CONFIG_KSU=y" >> "$defconfig"
-          
-          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$defconfig"        
-            echo "CONFIG_KPM=y" >> "$defconfig"
-          fi
-
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WKSU" ] || [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then               
-            echo "CONFIG_KSU_KPROBES_HOOK=n" >> "$defconfig"
-          fi         
-          
-          # BBG Support
-          echo "CONFIG_KSU_DEBUG=n" >> "$defconfig"
-          echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "$defconfig"
-          echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "$defconfig"
-          echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "$defconfig"
-
-          # SUSFS Configuration
-          echo "CONFIG_KSU_SUSFS=y" >> "$defconfig"
-          #echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "$defconfig"
-          
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$defconfig"
-          
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "$defconfig"
-          
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "$defconfig"
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$defconfig"          
-
-          # Mountify Support
-          echo "CONFIG_TMPFS_XATTR=y" >> "$defconfig"
-          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$defconfig"
-          
-          # Networking Configuration
-          echo "CONFIG_IP_NF_TARGET_TTL=y" >> "$defconfig"
-          echo "CONFIG_IP6_NF_TARGET_HL=y" >> "$defconfig"
-          echo "CONFIG_IP6_NF_MATCH_HL=y" >> "$defconfig"
-          
-          # BBR TCP Congestion Control
-          echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$defconfig"
-          echo "CONFIG_TCP_CONG_BBR=y" >> "$defconfig"
-          echo "CONFIG_NET_SCH_FQ=y" >> "$defconfig"
-          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "$defconfig"
-          echo "CONFIG_TCP_CONG_BIC=n" >> "$defconfig"
-          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "$defconfig"
-          echo "CONFIG_TCP_CONG_HTCP=n" >> "$defconfig"
-          
-          # IPSet support
-          echo "CONFIG_IP_SET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_MAX=256" >> "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_IP=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_BITMAP_PORT=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IP=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORT=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETNET=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "$defconfig"
-          echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "$defconfig"
-          
-          # Build Optimization Configuration
-          echo "CONFIG_LTO_CLANG_THIN=y" >> "$defconfig"
-          echo "CONFIG_LTO_CLANG=y" >> "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$defconfig"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "$defconfig"
-          echo "CONFIG_OPTIMIZE_INLINING=y" >> "$defconfig"
+          echo "Initializing kernel configuration..."
+          echo "DEFCONFIG=./common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+
+      - name: Configure KernelSU Core
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # KernelSU Configuration
+          echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
+          # BBG Support
+          echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure SUSFS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # SUSFS Configuration
+          echo "# SUSFS Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS=y" >> "${{ env.DEFCONFIG }}"
+          echo "#CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "${{ env.DEFCONFIG }}"
+
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "${{ env.DEFCONFIG }}"
+
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "${{ env.DEFCONFIG }}"
+
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure Mountify Support
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # Mountify Support
+          echo "# Mountify Support" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_TMPFS_XATTR=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure Networking
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # Networking Configuration
+          echo "# Networking Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_NF_TARGET_TTL=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP6_NF_TARGET_HL=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP6_NF_MATCH_HL=y" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure TCP Congestion Control
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # BBR TCP Congestion Control
+          echo "# BBR TCP Congestion Control" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_TCP_CONG_ADVANCED=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_TCP_CONG_BBR=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_NET_SCH_FQ=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_TCP_CONG_BIC=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_TCP_CONG_HTCP=n" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure IPSet Support
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # IPSet support
+          echo "# IPSet Support" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_MAX=65534" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_BITMAP_IP=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_BITMAP_IPMAC=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_BITMAP_PORT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_IP=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_IPMARK=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_IPPORT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_IPPORTIP=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_IPPORTNET=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_IPMAC=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_MAC=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_NETPORTNET=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_NET=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_NETNET=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
 
       - name: Change Kernel Name
         shell: bash
