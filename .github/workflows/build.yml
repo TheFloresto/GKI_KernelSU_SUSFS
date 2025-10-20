@@ -57,19 +57,6 @@ jobs:
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
-      - name: Install Minimal Dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::group::Install deps"
-          sudo apt-get -o Acquire::Retries=3 update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git curl ca-certificates build-essential clang lld flex bison \
-            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils ccache rsync unzip dwarves file python3 bc cpio kmod pahole
-          sudo apt-get clean
-          echo "::endgroup::"
-
       - name: Setup Build Environment
         shell: bash
         run: |
@@ -90,6 +77,20 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
+
+      - name: Install Minimal Dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Install deps"
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git curl ca-certificates build-essential clang lld flex bison \
+            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+            libxml2-utils ccache rsync unzip dwarves file python3 bc cpio kmod pahole rustc cargo
+          sudo apt-get clean
+          echo "::endgroup::"
+
 
       - name: Set boot sign key
         shell: bash
@@ -145,7 +146,7 @@ jobs:
           
           FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
           
-          $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
+          $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=stable
           
           REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
@@ -683,6 +684,35 @@ jobs:
           CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
           echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
           echo "Detected Clang: $CLANG_VERSION"
+         
+      - name: Detect pahole and rustc
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          # ===== PAHOLE DETECTION =====
+          if command -v pahole >/dev/null 2>&1; then
+            PAHOLE_BIN="$(command -v pahole)"
+            PAHOLE_VERSION="$("$PAHOLE_BIN" --version 2>&1 | head -n1 || echo 'unknown')"
+            echo "PAHOLE_BIN=$PAHOLE_BIN" >> "$GITHUB_ENV"
+            echo "PAHOLE_VERSION=$PAHOLE_VERSION" >> "$GITHUB_ENV"
+            echo "Using system pahole: $PAHOLE_BIN ($PAHOLE_VERSION)"
+          else
+            echo "ERROR: pahole not found in system"
+            exit 1
+          fi
+          
+          # ===== RUSTC DETECTION =====
+          if command -v rustc >/dev/null 2>&1; then
+            RUSTC_BIN="$(command -v rustc)"
+            RUSTC_VERSION="$("$RUSTC_BIN" --version || echo 'unknown')"
+            echo "RUSTC_BIN=$RUSTC_BIN" >> "$GITHUB_ENV"
+            echo "RUSTC_VERSION=$RUSTC_VERSION" >> "$GITHUB_ENV"
+            echo "Using system rustc: $RUSTC_BIN ($RUSTC_VERSION)"
+          else
+            echo "WARNING: rustc not found (building without Rust support)"
+            echo "RUSTC_BIN=" >> "$GITHUB_ENV"
+          fi
 
       - name: Build Kernel
         shell: bash
@@ -696,16 +726,19 @@ jobs:
           cd "$COMMON"
           : > "$COMMON/.scmversion"
           
-          # Ensure Python warnings are suppressed for scripts invoked by make
           export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
           if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
             export PATH="${CLANG_BIN_PATH}:$PATH"
           fi
           
-          # Use prebuilt tools to avoid BTF issues
-          PAHOLE_BIN="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
-          RUSTC_BIN="$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc"
+          # ===== Используем системные инструменты =====
+          echo "Using system pahole: ${PAHOLE_BIN} (${PAHOLE_VERSION})"
+          if [ -n "${RUSTC_BIN:-}" ]; then
+            echo "Using system rustc: ${RUSTC_BIN} (${RUSTC_VERSION})"
+          else
+            echo "Building without Rust support"
+          fi
           
           export LLVM=1 LLVM_IAS=1
           export ARCH=arm64 SUBARCH=arm64
@@ -729,21 +762,30 @@ jobs:
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
           KCFLAGS_EXTRA="-O3"
           
-          # Consistent flags; include -pipe and disable stack protector
+          # Consistent flags
           KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
           KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
           
-          # Regenerate defaults after config edits
           make O="$OUT" olddefconfig
           
           echo "Starting build with $(nproc --all) threads..."
           set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" \
-            KCFLAGS="$KCFLAGS" \
-            KCPPFLAGS="$KCPPFLAGS" \
-            PAHOLE="$PAHOLE_BIN" \
-            RUSTC="$RUSTC_BIN" \
-            2>&1 | tee build.log
+          
+          # ===== Build с условным RUSTC =====
+          BUILD_ARGS=(
+            -j"$(nproc --all)"
+            O="$OUT"
+            KCFLAGS="$KCFLAGS"
+            KCPPFLAGS="$KCPPFLAGS"
+            PAHOLE="$PAHOLE_BIN"
+          )
+          
+          # Добавляем RUSTC только если найден
+          if [ -n "${RUSTC_BIN:-}" ]; then
+            BUILD_ARGS+=(RUSTC="$RUSTC_BIN")
+          fi
+          
+          make "${BUILD_ARGS[@]}" 2>&1 | tee build.log
           
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
