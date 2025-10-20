@@ -5,7 +5,7 @@ permissions:
   actions: write
 
 on:
-# push:
+  # push:
   #   branches:
   #     - main
   #   paths:
@@ -25,6 +25,7 @@ on:
           - Actions
           - Pre-Release
           - Release
+          - Release (No Artifacts)
         default: Actions
       build_selection:
         description: "Choose which kernels to build"
@@ -68,7 +69,7 @@ on:
 jobs:
 
   build-a12-5-10:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
@@ -77,7 +78,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a13-5-10:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     with:
@@ -86,7 +87,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a13-5-15:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
@@ -95,7 +96,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a14-5-15:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     with:
@@ -104,7 +105,7 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a14-6-1:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
@@ -113,8 +114,17 @@ jobs:
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a15-6-6:
-    if: inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a15-6-6.yml
+    secrets: inherit
+    with:
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
+  build-test:
+    if: inputs.build_selection == 'Build Test'
+    uses: ./.github/workflows/kernel-build-check.yml
     secrets: inherit
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
@@ -123,7 +133,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.build_selection == 'All' && inputs.release_type != 'Actions'
+    if: inputs.build_selection == 'All' && inputs.release_type != 'Actions' && (inputs.release_type == 'Release (No Artifacts)' || success())
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -214,63 +224,21 @@ jobs:
           BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
           echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
           echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
-          
+
       - name: Generate New Tag
         if: inputs.release_type != 'Actions'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-          
           if [ -z "$LATEST_TAG" ]; then
             LATEST_TAG="v1.5.12-r0"
           fi
           
-          echo "Latest tag from NerestKernels/GKI_KernelSU_SUSFS: $LATEST_TAG"
-          
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{
-            if (NF > 1) {
-              suffix = $NF + 1
-              gsub(/-r[0-9]+$/, "", $0)
-              printf "%s-r%d", $0, suffix
-            } else {
-              printf "%s-r1", $0
-            }
-          }')
-          
-          echo "Proposed new tag: $NEW_TAG"
-          
-          TAG_EXISTS=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$NEW_TAG\") | .name" 2>/dev/null || echo "")
-          
-          if [ -n "$TAG_EXISTS" ]; then
-            echo "Tag $NEW_TAG already exists in NerestKernels repository, finding next available tag"
-            
-            BASE_VERSION=$(echo "$NEW_TAG" | sed 's/-r[0-9]*$//')
-            BASE_REVISION=$(echo "$LATEST_TAG" | grep -o 'r[0-9]*$' | sed 's/r//' || echo "0")
-            COUNTER=$((BASE_REVISION + 1))
-            
-            while true; do
-              CANDIDATE_TAG="${BASE_VERSION}-r${COUNTER}"
-              TAG_CHECK=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq ".[] | select(.name == \"$CANDIDATE_TAG\") | .name" 2>/dev/null || echo "")
-              
-              if [ -z "$TAG_CHECK" ]; then
-                NEW_TAG="$CANDIDATE_TAG"
-                echo "Found available tag: $NEW_TAG"
-                break
-              fi
-              
-              COUNTER=$((COUNTER + 1))
-              
-              if [ "$COUNTER" -gt $((BASE_REVISION + 100)) ]; then
-                echo "Error: Could not find available tag after 100 attempts"
-                exit 1
-              fi
-            done
-          fi
-          
-          echo "Final new tag: $NEW_TAG"
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+
+          echo "New tag: $NEW_TAG"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-          
 
       - name: Set tag for Actions only
         if: inputs.release_type == 'Actions'
@@ -278,9 +246,11 @@ jobs:
             echo "NEW_TAG=actions-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
 
       - name: Download Artifacts
+        if: inputs.release_type != 'Release (No Artifacts)'
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
+          pattern: '${{ inputs.kernelsu_variant }}-*-AK3'
 
       - name: Set release body
         run: |
@@ -289,17 +259,24 @@ jobs:
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
-          Please ensure you have proper backups before installation.
+          Please ensure you have proper backups before installation. 
 
           🔹 Bypass 
           - Includes module check bypass modifications 
           - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
           - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
           - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
-      
+
+          🔹 BBG (Baseband-guard)
+          - A lightweight LSM (Linux Security Module) for Android kernel
+          - Blocks unauthorized writes to critical partitions/device nodes
+          - Prevents malicious tampering with baseband and boot chain
+          - Kernel-level protection via LSM hooks
+          - Reduces risk of soft-brick/hard-brick issues
+
           Features:
           -> ${{ inputs.kernelsu_variant }} KernelSU Variant
-          -> Multi Manager Support (compatibility varies by variant)
+          -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
           -> SUSFS ඞ v1.5.12
           -> Scope-Minimized Manual hooks v1.4
           -> Ptrace Patch Support for Older Kernels (<5.16)
@@ -312,8 +289,9 @@ jobs:
           -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
           -> **boot.img files**: Available as CI artifacts only (not included in releases) - download from the Actions tab 
-          -> **Warning**: boot.img files may not boot on some Android 16 devices
-      
+          -> **Warning**: boot.img files may not boot on some devices
+          -> **Note:** For detailed commit information and component versions, please check the [build summary](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) in the GitHub Actions workflow that generated this release.
+
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
       
@@ -338,61 +316,37 @@ jobs:
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
 
-      - name: Create GitHub Release in NerestKernels Repository
+      - name: Create GitHub Release
         if: inputs.release_type != 'Actions'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: NerestKernels/GKI_KernelSU_SUSFS
+          token: ${{ secrets.RELEASE_TOKEN }}
+          tag_name: ${{ env.NEW_TAG }}
+          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
+          files: ""
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release_body.md
+
+      - name: Upload Release Assets
+        if: inputs.release_type != 'Actions' && inputs.release_type != 'Release (No Artifacts)'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          UPLOAD_FILES=()
-          
-          # Debug: Show downloaded artifacts structure
-          echo "Downloaded artifacts structure:"
-          ls -laR ./downloaded-artifacts/
-          
-          # Find all .zip and .img files, excluding directories
-          while IFS= read -r -d '' file; do
-            UPLOAD_FILES+=("$file")
-          done < <(find ./downloaded-artifacts -type f \( -name "*.zip" -o -name "*.img" \) -print0)
-          
-          # Debug: Show found files
-          echo "Found ${#UPLOAD_FILES[@]} files to upload:"
-          printf '%s\n' "${UPLOAD_FILES[@]}"
-          
-          if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
-            echo "ERROR: No files found to upload!"
-            echo "Full artifacts directory structure:"
-            find ./downloaded-artifacts -type f -ls
-            exit 1
-          fi
-          
-          echo "Creating release in NerestKernels/GKI_KernelSU_SUSFS with ${#UPLOAD_FILES[@]} files..."
-          
-          # Create release with first file
-          gh release create "$NEW_TAG" \
-            --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-            --title "$RELEASE_NAME" \
-            --notes-file release_body.md \
-            $([ "${{ inputs.release_type }}" == "Pre-Release" ] && echo "--prerelease") \
-            "${UPLOAD_FILES[0]}"
-          
-          # Upload remaining files if any
-          if [ ${#UPLOAD_FILES[@]} -gt 1 ]; then
-            echo "Uploading additional ${#UPLOAD_FILES[@]} files..."
-            for i in "${!UPLOAD_FILES[@]}"; do
-              if [ $i -gt 0 ]; then
-                echo "Uploading file $((i+1))/${#UPLOAD_FILES[@]}: ${UPLOAD_FILES[$i]}..."
-                gh release upload "$NEW_TAG" \
-                  --repo "NerestKernels/GKI_KernelSU_SUSFS" \
-                  "${UPLOAD_FILES[$i]}" \
-                  --clobber
-              fi
-            done
-          fi
-          
-          echo "✅ Release created successfully with ${#UPLOAD_FILES[@]} files!"
+          for dir in ./downloaded-artifacts/*/; do
+            if [ -d "$dir/AnyKernel3" ]; then
+              artifact_name=$(basename "$dir")
+              echo "Creating ZIP for $artifact_name..."
+              cd "$dir"
+              zip -r -9 "${artifact_name}-AK3.zip" AnyKernel3/
+              echo "Uploading ${artifact_name}-AK3.zip..."
+              gh release upload NerestKernels/GKI_KernelSU_SUSFS ${{ env.NEW_TAG }} "${artifact_name}-AK3.zip"
+              cd - > /dev/null
+            fi
+          done
 
       - name: Display Files Uploaded
-        if: inputs.release_type != 'Actions'
+        if: inputs.release_type != 'Actions' && inputs.release_type != 'Release (No Artifacts)'
         run: |
           echo "GitHub release created with the following files:"
           ls ./downloaded-artifacts/**/*
@@ -403,6 +357,8 @@ jobs:
           RELEASE_TYPE_TEXT=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
             RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
+          elif [ "${{ inputs.release_type }}" == "Release (No Artifacts)" ]; then
+            RELEASE_TYPE_TEXT="🚀 *Release*"
           else
             RELEASE_TYPE_TEXT="🚀 *Release*"
           fi
