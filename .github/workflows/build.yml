@@ -719,7 +719,7 @@ jobs:
         run: |
             set -euo pipefail
             echo "::group::Build kernel"
-            KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG/kernel_platform"
+            KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
             COMMON="$KERNEL_PATH/common"
             cd "$COMMON"
             : > "$COMMON/.scmversion"
