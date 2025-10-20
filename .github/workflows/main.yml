@@ -281,7 +281,6 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-          pattern: '${{ inputs.kernelsu_variant }}-*-AnyKernel3'
 
       - name: Set release body
         run: |
