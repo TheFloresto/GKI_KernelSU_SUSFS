@@ -911,7 +911,7 @@ jobs:
       - name: Upload AnyKernel3 Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.FILE_NAME }}-AnyKernel3
+          name: ${{ env.FILE_NAME }}-AK3
           path: |
             AnyKernel3/
           compression-level: 9
