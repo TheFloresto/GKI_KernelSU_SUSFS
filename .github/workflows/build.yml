@@ -979,7 +979,6 @@ jobs:
         with:
           name: ${{ env.FILE_NAME }}-Boot
           path: |
-            AnyKernel3/
             *-boot.img
             *-boot-gz.img
             *-boot-lz4.img
