@@ -292,8 +292,11 @@ jobs:
           The developers are not responsible for any damage, data loss, or issues that may occur.
           Please ensure you have proper backups before installation.
 
-          NEW:
-          -> **Module Check Bypass Variant**
+          🔹 Bypass 
+          - Includes module check bypass modifications 
+          - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
+          - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
+          - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
       
           Features:
           -> ${{ inputs.kernelsu_variant }} KernelSU Variant
