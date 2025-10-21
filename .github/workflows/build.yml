@@ -685,11 +685,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+
+          KERNELPATH="$GITHUBWORKSPACE/$CONFIG"
           cd "$KERNEL_PATH/common"
           mkdir -p out
-          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
+
+          CUSTOMLOCALVERSION="-${{ inputs.android.version }}-@NoFloresto"
+          echo "CONFIGLOCALVERSION=\"$CUSTOMLOCALVERSION\"" >> arch/arm64/configs/gki_defconfig
+          echo "CUSTOMLOCALVERSION=$CUSTOMLOCALVERSION" >> "$GITHUB_ENV"
 
       - name: Detect Clang (toolchain for build)
         shell: bash
@@ -715,68 +718,85 @@ jobs:
           CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
           echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
           echo "Detected Clang: $CLANG_VERSION"
-         
+
       - name: Build Kernel
         shell: bash
         env:
-            PYTHONWARNINGS: "ignore:invalid escape sequence"
+          PYTHONWARNINGS: "ignore:invalid escape sequence"
         run: |
-            set -euo pipefail
-            echo "::group::Build kernel"
-            KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-            COMMON="$KERNEL_PATH/common"
-            cd "$COMMON"
-            : > "$COMMON/.scmversion"
-            export KBUILD_BUILD_TIMESTAMP="Mon Apr 20 08:09:31 UTC 2025"
-            export KBUILD_BUILD_USER="thefloresto"
-            export KBUILD_BUILD_HOST="thefloresto-labs"    
-            
-            # Ensure Python warnings are suppressed for scripts invoked by make
-            export PYTHONWARNINGS="${PYTHONWARNINGS}"
-            
-            if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
-                export PATH="${CLANG_BIN_PATH}:$PATH"
-            fi
-            export LLVM=1 LLVM_IAS=1
-            export ARCH=arm64 SUBARCH=arm64
-            export CROSS_COMPILE=aarch64-linux-android-
-            export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
-            export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
-            export CC=clang
-            OUT=out
-            mkdir -p "$OUT"
-            make O="$OUT" gki_defconfig
-            
-            # LOCALVERSION branding
-            if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-                scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-                scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-                sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-            fi
-            
-            # Optimize level config and flags
-                scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
-                scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-                KCFLAGS_EXTRA="-O3"
-            
-            # Consistent flags; include -pipe and disable stack protector
-            KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
-            KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
-            
-            # Regenerate defaults after config edits
-            make O="$OUT" olddefconfig
-            
-            echo "Starting build with $(nproc --all) threads..."
-            set -o pipefail
-            make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
-            
-            IMG="$OUT/arch/arm64/boot/Image"
-            if [ ! -f "$IMG" ]; then
-                echo "Kernel Image missing"
-                exit 1
-            fi
-            sha256sum "$IMG" | tee "$OUT/Image.sha256"
-            echo "::endgroup::"
+          set -euo pipefail
+          echo "::group::Build kernel"
+
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          COMMON="$KERNEL_PATH/common"
+          cd "$COMMON"
+          : > "$COMMON/.scmversion"
+
+          export KBUILD_BUILD_TIMESTAMP="Mon Apr 20 08:09:31 UTC 2025"
+          export KBUILD_BUILD_USER="thefloresto"
+          export KBUILD_BUILD_HOST="thefloresto-labs"
+
+          # Ensure Python warnings are suppressed for scripts invoked by make
+          export PYTHONWARNINGS="${PYTHONWARNINGS}"
+
+          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
+            export PATH="${CLANG_BIN_PATH}:$PATH"
+          fi
+
+          export LLVM=1 LLVM_IAS=1
+          export ARCH=arm64 SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-android-
+          export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
+          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
+          export CC=clang
+
+          OUT=out
+          mkdir -p "$OUT"
+          make O="$OUT" gki_defconfig
+
+          # LOCALVERSION branding
+          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
+            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
+            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
+          fi
+
+          # Debug CONFIG_LOCALVERSION
+          echo "Checking CONFIG_LOCALVERSION in $OUT/.config"
+          grep CONFIG_LOCALVERSION "$OUT/.config" || true
+
+          # Optimize level config and flags
+          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          KCFLAGS_EXTRA="-O3"
+
+          # Consistent flags; include -pipe and disable stack protector
+          KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
+          KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
+
+          # Regenerate defaults after config edits
+          make O="$OUT" olddefconfig
+
+          # Debug kernel.release
+          echo "Checking kernel.release"
+          cat "$OUT/include/config/kernel.release" || true
+
+          echo "Starting build with $(nproc --all) threads..."
+          set -o pipefail
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" LOCALVERSION="${CUSTOM_LOCALVERSION}" 2>&1 | tee build.log
+
+          IMG="$OUT/arch/arm64/boot/Image"
+          if [ ! -f "$IMG" ]; then
+            echo "Kernel Image missing"
+            exit 1
+          fi
+
+          sha256sum "$IMG" | tee "$OUT/Image.sha256"
+
+          # Debug version string in Image
+          echo "Checking version string in Image"
+          strings "$IMG" | grep "Linux version" || true
+          echo "::endgroup::"
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
