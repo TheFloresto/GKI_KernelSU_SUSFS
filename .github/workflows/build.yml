@@ -689,9 +689,9 @@ jobs:
           cd "$KERNELPATH/common"
           mkdir -p out
 
-          CUSTOMLOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
-          echo "CONFIGLOCALVERSION=\"$CUSTOMLOCALVERSION\"" >> arch/arm64/configs/gki_defconfig
-          echo "CUSTOMLOCALVERSION=$CUSTOMLOCALVERSION" >> "$GITHUB_ENV"
+          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
+          echo "CONFIG_LOCALVERSION=\"$CUSTOM_LOCALVERSION\"" >> arch/arm64/configs/gki_defconfig
+          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
 
       - name: Detect Clang (toolchain for build)
         shell: bash
