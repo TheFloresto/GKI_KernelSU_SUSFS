@@ -685,11 +685,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          KERNELPATH="$GITHUBWORKSPACE/$CONFIG"
-          cd "$KERNEL_PATH/common"
+          KERNELPATH="$GITHUB_WORKSPACE/$CONFIG"
+          cd "$KERNELPATH/common"
           mkdir -p out
 
-          CUSTOMLOCALVERSION="-${{ inputs.android.version }}-@NoFloresto"
+          CUSTOMLOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
           echo "CONFIGLOCALVERSION=\"$CUSTOMLOCALVERSION\"" >> arch/arm64/configs/gki_defconfig
           echo "CUSTOMLOCALVERSION=$CUSTOMLOCALVERSION" >> "$GITHUB_ENV"
 
