@@ -650,8 +650,14 @@ jobs:
       - name: Change Kernel Name
         shell: bash
         run: |
-          set -euo pipefail
           cd "$CONFIG"        
+          
+          if [ -f "build/build.sh" ]; then
+          #Remove Dirty Flag
+           sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          else
+          #Remove Dirty Flag
+           sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
 
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
@@ -659,7 +665,8 @@ jobs:
               
           #Remove Abi Exports and Error
           rm -rf ./common/android/abi_gki_protected_exports_*
-          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel          
+          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+          fi
 
       - name: Set file name
         shell: bash
@@ -766,7 +773,7 @@ jobs:
             
             echo "Starting build with $(nproc --all) threads..."
             set -o pipefail
-            make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+            make -j"$(nproc --all)" O="$OUT" LOCALVERSION="${CUSTOM_LOCALVERSION:-}" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
             
             IMG="$OUT/arch/arm64/boot/Image"
             if [ ! -f "$IMG" ]; then
