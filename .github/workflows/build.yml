@@ -650,7 +650,6 @@ jobs:
       - name: Change Kernel Name
         shell: bash
         run: |
-          set -euo pipefail
           cd "$CONFIG"
             #Remove Dirty Flag
             sed -i 's/-dirty//' ./common/scripts/setlocalversion
