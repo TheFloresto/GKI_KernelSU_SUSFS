@@ -1,7 +1,9 @@
 name: Kernel Config - A13 5.15
+
 permissions:
   contents: write  # Allow writing to repository contents
   actions: write   # Allows triggering actions
+
 on:
   workflow_call:
     inputs:
@@ -15,6 +17,7 @@ on:
         required: false
         type: string
         default: ""
+
 jobs:
   build-kernels-a13-5-15:
     strategy:
