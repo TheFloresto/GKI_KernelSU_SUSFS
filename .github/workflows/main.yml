@@ -101,11 +101,11 @@ jobs:
   build-a14-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a14-5-15.yml
-  . with:
+    secrets: inherit
+    with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}   secrets: inherit
-    
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
 
   build-a14-6-1:
