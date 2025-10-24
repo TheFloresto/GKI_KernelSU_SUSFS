@@ -1,7 +1,9 @@
 name: Kernel Config - A14 6.1
+
 permissions:
   contents: write  # Allow writing to repository contents
   actions: write   # Allows triggering actions
+
 on:
   workflow_call:
     inputs:
@@ -15,6 +17,7 @@ on:
         required: false
         type: string
         default: ""
+
 jobs:
   build-kernels-a14-6-1:
     strategy:
@@ -85,7 +88,7 @@ jobs:
       android_version: "android14"
       kernel_version: "6.1"
       sub_level: ${{ matrix.sub_level }}
-      os_patch_level: ${{ matrix.os_patch_level }}
+      os_patch_level: ${{ matrix.os_patch_level }}           
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
