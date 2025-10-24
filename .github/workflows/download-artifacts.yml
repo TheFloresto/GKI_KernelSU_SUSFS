@@ -1,0 +1,176 @@
+name: Download Artifacts from Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'GitHub Actions Run ID to download artifacts from'
+        required: true
+        type: string
+      release_tag:
+        description: 'Release tag to upload to'
+        required: true
+        type: string
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+    
+    env:
+      GH_TOKEN: ${{ github.token }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set target release tag
+        id: get_release
+        run: |
+          echo "tag=${{ inputs.release_tag }}" >> $GITHUB_OUTPUT
+          echo "Using release tag: ${{ inputs.release_tag }}"
+          
+          # Verify the release exists
+          if ! gh release view "${{ inputs.release_tag }}" >/dev/null 2>&1; then
+            echo "Error: Release '${{ inputs.release_tag }}' does not exist"
+            echo "Available releases:"
+            gh release list --limit 10
+            exit 1
+          fi
+          
+          echo "Release '${{ inputs.release_tag }}' found and verified"
+
+      - name: Download AnyKernel3 artifacts from specified run
+        run: |
+          echo "Downloading AnyKernel3 artifacts from run ID: ${{ inputs.run_id }}"
+          
+          # Create directory for downloaded artifacts
+          mkdir -p ./downloaded-artifacts
+          
+          # Get list of ALL artifacts from the run (with pagination support)
+          echo "Getting complete artifact list from run..."
+          page=1
+          all_artifacts=""
+          
+          while true; do
+            echo "Fetching artifacts page $page..."
+            response=$(gh api repos/${{ github.repository }}/actions/runs/${{ inputs.run_id }}/artifacts?page=$page&per_page=100)
+            artifacts_on_page=$(echo "$response" | jq '.artifacts | length')
+            
+            if [ "$artifacts_on_page" -eq 0 ]; then
+              echo "No more artifacts found on page $page"
+              break
+            fi
+            
+            echo "Found $artifacts_on_page artifacts on page $page"
+            page_artifacts=$(echo "$response" | jq '.artifacts[]')
+            
+            if [ -z "$all_artifacts" ]; then
+              all_artifacts="$page_artifacts"
+            else
+              all_artifacts="$all_artifacts"$'\n'"$page_artifacts"
+            fi
+            
+            page=$((page + 1))
+          done
+          
+          # Filter for AnyKernel3 artifacts
+          echo "Filtering for AnyKernel3 artifacts..."
+          echo "$all_artifacts" | jq -s 'map(select(.name | endswith("-AnyKernel3") or endswith("AnyKernel3"))) | map({name: .name, id: .id})' > artifacts.json
+          
+          # Show all available artifacts for debugging
+          echo "All available artifacts in run:"
+          echo "$all_artifacts" | jq -s 'map(.name)' | jq -r '.[]'
+          
+          # Check if any AnyKernel3 artifacts were found
+          anykernel_count=$(cat artifacts.json | jq 'length')
+          if [ "$anykernel_count" -eq 0 ]; then
+            echo "Error: No AnyKernel3 artifacts found in run ${{ inputs.run_id }}"
+            echo "Total artifacts found: $(echo "$all_artifacts" | jq -s 'length')"
+            exit 1
+          fi
+          
+          echo "Found $anykernel_count AnyKernel3 artifacts:"
+          cat artifacts.json | jq -r '.[].name'
+          
+          # Download only the AnyKernel3 artifacts
+          cat artifacts.json | jq -c '.[]' | while IFS= read -r artifact; do
+            artifact_name=$(echo "$artifact" | jq -r '.name')
+            artifact_id=$(echo "$artifact" | jq -r '.id')
+            echo "Downloading artifact: $artifact_name (ID: $artifact_id)"
+            gh api repos/${{ github.repository }}/actions/artifacts/$artifact_id/zip > "${artifact_name}.zip"
+            
+            # Extract the artifact
+            unzip -q "${artifact_name}.zip" -d "./downloaded-artifacts/${artifact_name}/"
+            rm "${artifact_name}.zip"
+            echo "✅ Downloaded and extracted: $artifact_name"
+          done
+          
+          echo "Downloaded AnyKernel3 artifacts:"
+          ls -la ./downloaded-artifacts/
+
+      - name: Prepare and upload AnyKernel3 artifacts to release
+        run: |
+          echo "Preparing AnyKernel3 artifacts for upload..."
+          
+          # Check if we have any downloaded artifacts
+          if [ ! -d "./downloaded-artifacts" ] || [ -z "$(ls -A ./downloaded-artifacts)" ]; then
+            echo "Error: No artifacts were downloaded"
+            exit 1
+          fi
+          
+          # Process each AnyKernel3 artifact directory
+          for artifact_dir in ./downloaded-artifacts/*/; do
+            if [ -d "$artifact_dir" ]; then
+              # Get the artifact name (remove path and trailing slash)
+              artifact_name=$(basename "$artifact_dir")
+              
+              echo "Processing artifact: $artifact_name"
+              
+              # Create ZIP file with the artifact name
+              # The ZIP will contain all subfolders and subfiles from the artifact
+              cd "$artifact_dir"
+              zip -r "../../${artifact_name}.zip" . -x "*.git*"
+              cd - > /dev/null
+              
+              echo "Created ZIP: ${artifact_name}.zip"
+              
+              # Upload to release
+               echo "Uploading ${artifact_name}.zip to release ${{ steps.get_release.outputs.tag }}..."
+               gh release upload "${{ steps.get_release.outputs.tag }}" "${artifact_name}.zip" --clobber --repo ${{ github.repository }}
+              
+              echo "Successfully uploaded: ${artifact_name}.zip"
+            fi
+          done
+          
+          echo "All AnyKernel3 artifacts have been processed and uploaded!"
+          
+          # Show final summary
+          echo "## Upload Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          for artifact_dir in ./downloaded-artifacts/*/; do
+            if [ -d "$artifact_dir" ]; then
+              artifact_name=$(basename "$artifact_dir")
+              echo "| ${artifact_name}.zip | ✅ Uploaded |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Summary
+        run: |
+          echo "## Artifact Download and Upload Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Run ID**: ${{ inputs.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Release**: ${{ env.RELEASE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts Processed" >> $GITHUB_STEP_SUMMARY
+          
+          for dir in ./downloaded-artifacts/*/; do
+            if [[ "$(basename "$dir")" == *"-AnyKernel3" ]]; then
+              artifact_name=$(basename "$dir")
+              echo "- ✅ $artifact_name" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[🔗 View Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.RELEASE_TAG }})" >> $GITHUB_STEP_SUMMARY
