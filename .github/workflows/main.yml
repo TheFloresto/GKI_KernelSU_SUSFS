@@ -39,6 +39,7 @@ on:
           - Android14-5.15
           - Android14-6.1
           - Android15-6.6
+          - Build Test
         default: All
       kernelsu_variant:
         description: "Choose KernelSU Variant"
@@ -64,7 +65,7 @@ on:
         description: "If 'Other' is selected, specify your custom branch"
         required: false
         type: string
-        default: ""
+        default: ""      
 
 jobs:
 
@@ -73,9 +74,10 @@ jobs:
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+     kernelsu_variant: ${{ inputs.kernelsu_variant }}
+     kernelsu_branch: ${{ inputs.kernelsu_branch }}
+     kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
 
   build-a13-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10') && inputs.release_type != 'Release (No Artifacts)'
@@ -84,7 +86,7 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   build-a13-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15') && inputs.release_type != 'Release (No Artifacts)'
@@ -95,14 +97,16 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
+
   build-a14-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15') && inputs.release_type != 'Release (No Artifacts)'
     uses: ./.github/workflows/kernel-a14-5-15.yml
-    secrets: inherit
-    with:
+  . with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}   secrets: inherit
+    
+
 
   build-a14-6-1:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1') && inputs.release_type != 'Release (No Artifacts)'
@@ -111,7 +115,8 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }} 
+
 
   build-a15-6-6:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6') && inputs.release_type != 'Release (No Artifacts)'
@@ -129,11 +134,12 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.build_selection == 'All' && inputs.release_type != 'Actions' && (inputs.release_type == 'Release (No Artifacts)' || success())
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Build Test') && (inputs.release_type == 'Release (No Artifacts)' || inputs.release_type != 'Actions')
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -147,19 +153,6 @@ jobs:
       RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
       RELEASE_BODY: ""
     steps:
-      # # - name: Maximize Build Space
-        # uses: AdityaGarg8/remove-unwanted-software@v5
-        # with:
-          # remove-dotnet: 'true'          # Frees ~2 GB
-          # remove-android: 'true'         # Frees ~9 GB
-          # remove-haskell: 'true'         # Frees ~5.2 GB
-          # remove-codeql: 'true'          # Frees ~5.4 GB
-          # remove-docker-images: 'true'   # Frees ~3.2 GB
-          # remove-large-packages: 'true'  # Frees ~3.1 GB
-          # remove-swapfile: 'true'        # Frees ~4 GB
-          # remove-cached-tools: 'false'   # Avoid unless confirmed safe
-          # verbose: 'true'                # Enable detailed logging
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -240,11 +233,6 @@ jobs:
           echo "New tag: $NEW_TAG"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-      - name: Set tag for Actions only
-        if: inputs.release_type == 'Actions'
-        run: |
-            echo "NEW_TAG=actions-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
-
       - name: Download Artifacts
         if: inputs.release_type != 'Release (No Artifacts)'
         uses: actions/download-artifact@v5
@@ -259,20 +247,18 @@ jobs:
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
-          Please ensure you have proper backups before installation. 
+          Please ensure you have proper backups before installation.
+
+          🔹 Normal 
+          - Default kernel configuration 
+          - Standard kernel module loading behavior 
+          - Recommended for most users 
 
           🔹 Bypass 
           - Includes module check bypass modifications 
           - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
           - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
           - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
-
-          🔹 BBG (Baseband-guard)
-          - A lightweight LSM (Linux Security Module) for Android kernel
-          - Blocks unauthorized writes to critical partitions/device nodes
-          - Prevents malicious tampering with baseband and boot chain
-          - Kernel-level protection via LSM hooks
-          - Reduces risk of soft-brick/hard-brick issues
 
           Features:
           -> ${{ inputs.kernelsu_variant }} KernelSU Variant
@@ -285,8 +271,15 @@ jobs:
           -> BBR v1 Support
           -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
 
+          🔹 BBG (Baseband-guard)
+          - A lightweight LSM (Linux Security Module) for Android kernel
+          - Blocks unauthorized writes to critical partitions/device nodes
+          - Prevents malicious tampering with baseband and boot chain
+          - Kernel-level protection via LSM hooks
+          - Reduces risk of soft-brick/hard-brick issues
+
           Notes:
-          -> SUS SU Mode 2 will show as disabled or not compatble due to non-kprobe hooks and is not needed anymore!
+          -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
           -> **boot.img files**: Available as CI artifacts only (not included in releases) - download from the Actions tab 
           -> **Warning**: boot.img files may not boot on some devices
@@ -329,34 +322,36 @@ jobs:
           body_path: release_body.md
 
       - name: Upload Release Assets
-        if: inputs.release_type != 'Actions' && inputs.release_type != 'Release (No Artifacts)'
+        if: inputs.release_type != 'Release (No Artifacts)'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           for dir in ./downloaded-artifacts/*/; do
-            if [ -d "$dir/AnyKernel3" ]; then
+            # Check if this is an AnyKernel3 artifact directory
+            if [[ "$(basename "$dir")" == *"-AK3" ]]; then
               artifact_name=$(basename "$dir")
               echo "Creating ZIP for $artifact_name..."
-              cd "$dir"
-              zip -r -9 "${artifact_name}-AK3.zip" AnyKernel3/
-              echo "Uploading ${artifact_name}-AK3.zip..."
-              gh release upload NerestKernels/GKI_KernelSU_SUSFS ${{ env.NEW_TAG }} "${artifact_name}-AK3.zip"
-              cd - > /dev/null
+              # The entire directory IS the AnyKernel3 content, so zip it directly
+              zip -r -9 "${artifact_name}.zip" "$dir"
+              echo "Uploading ${artifact_name}.zip..."
+              gh release upload NerestKernels/GKI_KernelSU_SUSFS ${{ env.NEW_TAG }} "${artifact_name}.zip"
             fi
           done
 
       - name: Display Files Uploaded
-        if: inputs.release_type != 'Actions' && inputs.release_type != 'Release (No Artifacts)'
+        if: inputs.release_type != 'Release (No Artifacts)'
         run: |
           echo "GitHub release created with the following files:"
           ls ./downloaded-artifacts/**/*
             
       - name: Send Telegram Notification
-        if: inputs.release_type != 'Actions'
+        if: inputs.release_type != 'Build Test'
         run: |
           RELEASE_TYPE_TEXT=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
             RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
+          elif [ "${{ inputs.build_selection }}" == "Build Test" ]; then
+            RELEASE_TYPE_TEXT="🔧 *Build Test*"
           elif [ "${{ inputs.release_type }}" == "Release (No Artifacts)" ]; then
             RELEASE_TYPE_TEXT="🚀 *Release*"
           else
