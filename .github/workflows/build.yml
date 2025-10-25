@@ -691,7 +691,6 @@ jobs:
       - name: Change Kernel Name
         shell: bash
         run: |
-          set -euo pipefail
           cd "$CONFIG"
           #Add Custom name to Kernel Version
           sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
