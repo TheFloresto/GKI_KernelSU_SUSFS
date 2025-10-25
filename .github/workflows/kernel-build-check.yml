@@ -5,30 +5,15 @@ permissions:
   actions: write
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       kernelsu_variant:
-        description: 'KernelSU Variant'
         required: true
-        type: choice
-        options:
-          - WKSU
-          - NEXT
-          - MKSU
-          - KSU
-          - SukiSU
-        default: NEXT
+        type: string
       kernelsu_branch:
-        description: 'KernelSU Branch'
         required: true
-        type: choice
-        options:
-          - Stable
-          - Dev
-          - Other
-        default: Dev
+        type: string
       kernelsu_branch_other:
-        description: "If 'Other' is selected, specify your custom branch"
         required: false
         type: string
         default: ""
