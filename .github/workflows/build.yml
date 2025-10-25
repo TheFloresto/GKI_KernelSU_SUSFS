@@ -399,6 +399,11 @@ jobs:
                 patch -p1 < fix_base.c.patch || true
                fi
 
+               if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK <= 58 )); } ); then
+                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
+                patch -p1 < fix_task_mmu.c.patch || true
+               fi
+
                 # Apply KSU integration patches
                 cd ../KernelSU-Next
                 cp -fv ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
