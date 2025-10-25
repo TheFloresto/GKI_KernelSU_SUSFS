@@ -348,7 +348,7 @@ jobs:
       - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
-          set -eo pipefail
+          set -euo pipefail
           cd "$CONFIG"
           
           # Apply compatibility fixes
@@ -366,16 +366,16 @@ jobs:
             "WKSU")
               echo "Applying SUSFS patches for WKSU..."
               cd ../Wild_KSU
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
+              cp -fv ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
               patch -p1 --forward < 0001-Susfs-1.5.9.patch      
 
-              cp -v ../../kernel_patches/next/0001-james.patch ./
+              cp -fv ../../kernel_patches/next/0001-james.patch ./
               patch -p1 --forward < 0001-james.patch 
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ../KernelSU
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              cp -fv ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true          
               ;;
             "NEXT")
@@ -393,15 +393,12 @@ jobs:
 
                # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
                SUBLEVEL_TO_CHECK="${ACTUAL_SUBLEVEL:-${{ inputs.sub_level }}}"
-               if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && { [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 145 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && { [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 98 )) ); then
+               
+               # Check for fix_base.c.patch requirement
+               if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 145 )) ) \
+                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 98 )) ); then
                 cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_base.c.patch ./
                 patch -p1 < fix_base.c.patch || true
-               fi
-
-               if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK <= 58 )) ); then
-                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
-                patch -p1 < fix_task_mmu.c.patch || true
                fi
 
                 # Apply KSU integration patches
@@ -418,7 +415,7 @@ jobs:
                 cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
                 patch -p1 < fix_kernel_compat.c.patch
 
-               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
+               cp -fv ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
                patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch     
               ;;
              "SukiSU")
@@ -428,13 +425,8 @@ jobs:
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ../KernelSU
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true       
-              
-              cp -v ../../kernel_patches/next/0001-Susfs-1.5.9.patch ./
-              patch -p1 --forward < 0001-Susfs-1.5.9.patch             
-              ;;
-          esac
+              cp -fv ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true          
 
 
       - name: Apply Hooks Patches
