@@ -123,6 +123,30 @@ jobs:
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
+          # Checkout specific commits for SUSFS v1.5.12 if enabled
+            cd susfs4ksu
+            case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
+              "android12-5.10")
+                git checkout ed19454a4b5905e6718c9a22fad769b906837931
+                ;;
+              "android13-5.10")
+                git checkout 8919927b63d95e62d33842452b9a60546187fb7b
+                ;;
+              "android13-5.15")
+                git checkout 700b9316b5a1cab174401b57f4198782a17154fb
+                ;;
+              "android14-5.15")
+                git checkout e1b1bba04b3cada700b8fd5bda4cfd4c59de07a2
+                ;;
+              "android14-6.1")
+                git checkout f16560ce8263fbfa9b2f259e9531f72d6fda4e3f
+                ;;
+              "android15-6.6")
+                git checkout c49b1dab205bbc4ef20b120e84c5b7530355961d
+                ;;
+            esac
+            cd ..
+
       - name: Initialize and Sync Kernel Source
         shell: bash
         run: |
