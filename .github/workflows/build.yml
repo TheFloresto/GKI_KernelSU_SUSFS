@@ -547,14 +547,14 @@ jobs:
       - name: Set Kernel Configuration Variables
         shell: bash
         run: |
-          set -euo pipefail
+          set -eo pipefail
           cd "$CONFIG"
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=./common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
-          sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
+          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
       - name: Configure KernelSU Core
         shell: bash
@@ -691,6 +691,7 @@ jobs:
       - name: Change Kernel Name
         shell: bash
         run: |
+          set -eo pipefail
           cd "$CONFIG"
           #Add Custom name to Kernel Version
           sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
