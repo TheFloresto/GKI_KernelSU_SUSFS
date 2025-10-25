@@ -416,11 +416,17 @@ jobs:
 
                # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
                SUBLEVEL_TO_CHECK="${ACTUAL_SUBLEVEL:-${{ inputs.sub_level }}}"
-               if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 145 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 98 )) ); then
+               if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( SUBLEVEL_TO_CHECK >= 145 )); } ) \
+                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK >= 98 )); } ); then
                 cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_base.c.patch ./
-                patch -p1 < fix_base.c.patch || true
+                patch -p1 < 1_fix_base.c.patch || true
                fi
+               
+               #if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( SUBLEVEL_TO_CHECK >= 145 )); } ) \
+               #  || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK >= 98 )); } ); then
+               #  cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_base.c.patch ./
+               #  patch -p1 < 2_fix_base.c.patch || true
+               #fi
 
                if [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK <= 58 )); then
                 cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
@@ -827,6 +833,107 @@ jobs:
             exit 1
           fi
 
+      - name: Patch Image File for Android 12 and 13 (SukiSU only)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Patching Image file for Android 12/13..."
+          cd "$CONFIG/common/out/arch/arm64/boot/"
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod 777 patch
+          ./patch
+          rm -rf Image
+          mv oImage Image
+          cd ../../../../../..
+
+      - name: Patch Image File for Android 14 and 15 (SukiSU only)
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android14' || inputs.android_version == 'android15') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Patching Image file for Android 14/15..."
+          cd "$CONFIG/common/out/arch/arm64/boot/"
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod 777 patch
+          ./patch
+          rm -rf Image
+          mv oImage Image
+          cd ../../../../../..
+
+      - name: Prepare AnyKernel3
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Copy Image from normal build locations
+          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
+            cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image
+          elif [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
+            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image AnyKernel3/Image
+          elif [ -f "./$CONFIG/bazel-bin/common/kernel_aarch64/Image" ]; then
+            cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image AnyKernel3/Image
+          else
+            echo "Error: Image file not found in any expected location"
+            exit 1
+          fi
+
+      - name: Search for Kernel Modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Searching for kernel modules (.ko files)..."
+          
+          # Function to scan for modules (search only)
+          scan_modules() {
+            local search_dir="$1"
+            local module_count=0
+            
+            if [ -d "$search_dir" ]; then
+              echo "Scanning directory: $search_dir"
+              
+              # Find all .ko files and report their locations
+              while IFS= read -r -d '' module_file; do
+                if [ -f "$module_file" ]; then
+                  module_name=$(basename "$module_file")
+                  echo "Found module: $module_name in $(dirname "$module_file")"
+                  ((module_count++))
+                fi
+              done < <(find "$search_dir" -name "*.ko" -type f -print0 2>/dev/null)
+            fi
+            
+            return $module_count
+          }
+          
+          # Scan common build output directories
+          total_modules=0
+          
+          # Scan bazel-bin directory
+          if scan_modules "./$CONFIG/bazel-bin"; then
+            total_modules=$((total_modules + $?))
+          fi
+          
+          # Scan out directory
+          if scan_modules "./$CONFIG/out"; then
+            total_modules=$((total_modules + $?))
+          fi
+          
+          # Scan dist directory specifically
+          if scan_modules "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"; then
+            total_modules=$((total_modules + $?))
+          fi
+          
+          # Look for snd-aloop.ko specifically
+          echo "Searching specifically for snd-aloop.ko..."
+          snd_aloop_found=$(find ./$CONFIG -name "snd-aloop.ko" -type f 2>/dev/null | head -1)
+          if [ -n "$snd_aloop_found" ]; then
+            echo "Found snd-aloop.ko at: $snd_aloop_found"
+          else
+            echo "snd-aloop.ko not found"
+          fi
+          
+          echo "Total kernel modules found: $total_modules"
+
+
       - name: Create Bootimgs Folder and Copy Images
         shell: bash
         run: |
@@ -1062,24 +1169,56 @@ jobs:
           SUSFS_URL="https://gitlab.com/simonpunk/susfs4ksu/-/commit/$SUSFS_COMMIT"
           echo "- **SUSFS4KSU (v1.5.12)**: [$SUSFS_COMMIT]($SUSFS_URL)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-      
+
       - name: Add Build Artifacts
+        if: ${{ always() }}
         shell: bash
         run: |
           set -euo pipefail
-          # Add links to the artifacts for this build
+          # Add artifact summary with presence verification
           echo "## Build Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- **AnyKernel3**: [${{ env.FILE_NAME }}-AnyKernel3](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
-          
+      
+          # Verify AnyKernel3 contents
+          if [ -d "AnyKernel3" ] && [ "$(find AnyKernel3 -type f | wc -l)" -gt 0 ]; then
+            AK3_STATUS="✅"
+          else
+            AK3_STATUS="❌"
+          fi
+          echo "- **AnyKernel3**: $AK3_STATUS ${{ env.FILE_NAME }}-AnyKernel3" >> $GITHUB_STEP_SUMMARY
+      
           echo "### Boot Images" >> $GITHUB_STEP_SUMMARY
-          echo "- **Boot Image (RAW)**: [${{ env.FILE_NAME }}-boot.img](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
-          echo "- **Boot Image (GZ)**: [${{ env.FILE_NAME }}-boot-gz.img](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
-          echo "- **Boot Image (LZ4)**: [${{ env.FILE_NAME }}-boot-lz4.img](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
-          
+          for f in "${{ env.FILE_NAME }}-boot.img" "${{ env.FILE_NAME }}-boot-gz.img" "${{ env.FILE_NAME }}-boot-lz4.img"; do
+            if [ -f "$f" ]; then status="✅"; else status="❌"; fi
+            case "$f" in
+              *boot.img) name="Boot Image (RAW)";;
+              *boot-gz.img) name="Boot Image (GZ)";;
+              *boot-lz4.img) name="Boot Image (LZ4)";;
+            esac
+            echo "- **$name**: $status $f" >> $GITHUB_STEP_SUMMARY
+          done
+      
           echo "### Kernel Images" >> $GITHUB_STEP_SUMMARY
-          echo "- **Kernel Image (RAW)**: [${{ env.FILE_NAME }}-Image](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
-          echo "- **Kernel Image (GZ)**: [${{ env.FILE_NAME }}-Image.gz](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
-          echo "- **Kernel Image (LZ4)**: [${{ env.FILE_NAME }}-Image.lz4](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
-          
+          for f in "Image" "Image.gz" "Image.lz4"; do
+            if [ -f "$f" ]; then status="✅"; else status="❌"; fi
+            case "$f" in
+              Image) name="Kernel Image (RAW)";;
+              Image.gz) name="Kernel Image (GZ)";;
+              Image.lz4) name="Kernel Image (LZ4)";;
+            esac
+            echo "- **$name**: $status $f" >> $GITHUB_STEP_SUMMARY
+          done
+      
           echo "### Diagnostics" >> $GITHUB_STEP_SUMMARY
-          echo "- **Rejected Patches**: [${{ env.FILE_NAME }}-Rejected-Patches](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rejected Patches**: ${{ env.FILE_NAME }}-Rejected-Patches" >> $GITHUB_STEP_SUMMARY
+          if [ -f patch-rejects/index.txt ]; then
+            if [ -s patch-rejects/index.txt ]; then
+              echo "  Rejected files:" >> $GITHUB_STEP_SUMMARY
+              while IFS= read -r line; do
+                echo "    - $line" >> $GITHUB_STEP_SUMMARY
+              done < patch-rejects/index.txt
+            else
+              echo "  Rejected file list is empty." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "  No rejected patches found." >> $GITHUB_STEP_SUMMARY
+          fi
