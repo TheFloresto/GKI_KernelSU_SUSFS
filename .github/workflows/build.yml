@@ -392,13 +392,13 @@ jobs:
 
                # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
                SUBLEVEL_TO_CHECK="${ACTUAL_SUBLEVEL:-${{ inputs.sub_level }}}"
-               if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && { [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 145 )); } ) \
-                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && { [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 98 )); } ); then
+               if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 145 )) ) \
+                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK >= 98 )) ); then
                 cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_base.c.patch ./
                 patch -p1 < fix_base.c.patch || true
                fi
 
-               if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK <= 58 )); } ); then
+               if [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && [[ "$SUBLEVEL_TO_CHECK" =~ ^[0-9]+$ ]] && (( SUBLEVEL_TO_CHECK <= 58 )); then
                 cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
                 patch -p1 < fix_task_mmu.c.patch || true
                fi
