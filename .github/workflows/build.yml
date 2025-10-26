@@ -221,19 +221,18 @@ jobs:
         run: |
           set -euo pipefail
           # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
-          SUBLEVEL_TO_CHECK="${ACTUAL_SUBLEVEL:-${{ inputs.sub_level }}}"
           
-          if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $SUBLEVEL_TO_CHECK <= 186 ))) || 
-              ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 119 ))) || 
-              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 110 ))) || 
-              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $SUBLEVEL_TO_CHECK <= 43 ))); then
+          if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 186 ))) || 
+              ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 119 ))) || 
+              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 110 ))) || 
+              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL <= 43 ))); then
             GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}') 
             if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then 
               cd $CONFIG/common/
               sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile 2>/dev/null || true
-              if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $SUBLEVEL_TO_CHECK <= 186 ))) || 
-                  ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 119 ))) || 
-                  ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $SUBLEVEL_TO_CHECK <= 110 ))); then
+              if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 186 ))) || 
+                  ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 119 ))) || 
+                  ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 110 ))); then
                 sed -i '/char \*buf = NULL;/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i 's/for (int i = 0; subcommands\[i\]; i++) {/for (i = 0; subcommands[i]; i++) {/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i '/if (subcommands) {/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
@@ -405,32 +404,31 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."           
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
-                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
-                patch -p1 < fix_fdinfo.c.patch || true
-                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
-                patch -p1 < fix_namespace.c.patch || true
-                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
-                patch -p1 < fix_open.c.patch || true
-                sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
+               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+               patch -p1 < fix_fdinfo.c.patch || true
+               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+               patch -p1 < fix_namespace.c.patch || true
+               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+               patch -p1 < fix_open.c.patch || true
+               sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
               fi
 
               # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
-              SUBLEVEL_TO_CHECK="${ACTUAL_SUBLEVEL:-${{ inputs.sub_level }}}"
-              if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( SUBLEVEL_TO_CHECK >= 145 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK >= 98 )) ); then
-                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_base.c.patch ./
-                patch -p1 < 1_fix_base.c.patch || true
+              if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL >= 145 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ); then
+               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
+               patch -p1 < 1_fix_base.c.patch || true
               fi
 
-              #if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( SUBLEVEL_TO_CHECK >= 145 )) ) \
-              #  || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK >= 98 )) ); then
-              #  cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_base.c.patch ./
+              #if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL >= 145 )) ) \
+              #  || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ); then
+              #  cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
               #  patch -p1 < 2_fix_base.c.patch || true
               #fi
 
-              if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( SUBLEVEL_TO_CHECK <= 58 )) ); then
-                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
-                patch -p1 < fix_task_mmu.c.patch || true
+              if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL <= 58 )) ); then
+               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
+               patch -p1 < fix_task_mmu.c.patch || true
               fi
 
               # Apply KSU integration patches
@@ -703,6 +701,33 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure Sound
+        if: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          # Sound Configuration
+          echo "# Sound Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_SND=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_SND_DRIVERS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_SND_PCM=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_SND_TIMER=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_SND_DYNAMIC_MINORS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_SND_PROC_FS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_SND_ALOOP=m" >> "${{ env.DEFCONFIG }}"
+          
+          # Add snd-aloop.ko to modules list
+          if [ -f "build/build.sh" ]; then
+            echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
+          else
+            sed -i '/_COMMON_GKI_MODULES_LIST = \\[/,/\\]/ s/\\]/    "sound\/drivers\/snd-aloop.ko",\\n&/' common/modules.bzl
+          fi
+          
+          # Add symbols to abi_gki_aarch64
+          SYMBOL_LIST=common/android/abi_gki_aarch64
+          cat Wild_KSU/kernel/export_symbol.txt | awk '{sub("[ \t]+","");print "  "$0}' >> $SYMBOL_LIST
 
       - name: Configure Build Optimization
         shell: bash
