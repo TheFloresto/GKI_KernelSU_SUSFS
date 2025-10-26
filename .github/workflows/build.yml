@@ -748,7 +748,6 @@ jobs:
       - name: Change Kernel Name
         shell: bash
         run: |
-          set -eo pipefail
           cd "$CONFIG"
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
