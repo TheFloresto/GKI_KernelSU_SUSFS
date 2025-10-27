@@ -46,8 +46,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             git curl ca-certificates build-essential clang lld flex bison \
             libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils rsync unzip dwarves file python3 bc cpio kmod \
-            zip xz-utils pahole
+            libxml2-utils rsync unzip dwarves file python3
           sudo apt-get clean
 
       - name: Check Initial Disk Space
@@ -826,56 +825,56 @@ jobs:
           CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
           echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
           echo "Detected Clang: $CLANG_VERSION"
-
-      - name: Build Kernel with Clang
+          
+      - name: Build Kernel
         shell: bash
+        env:
+          PYTHONWARNINGS: "ignore:invalid escape sequence"
         run: |
           set -euo pipefail
-          echo "Building the kernel with Clang..."
-          cd "$CONFIG/common"
+          echo "::group::Build kernel"
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          COMMON="$KERNEL_PATH/common"
+          cd "$COMMON"
+          : > "$COMMON/.scmversion"     
           
-          # Set up build environment
-          export PATH="${CLANG_BIN_PATH}:$PATH"
+          # Ensure Python warnings are suppressed for scripts invoked by make
+          export PYTHONWARNINGS="${PYTHONWARNINGS}"
+          
+          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
+            export PATH="${CLANG_BIN_PATH}:$PATH"
+          fi
           export LLVM=1 LLVM_IAS=1
           export ARCH=arm64 SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-          
-          # Use LLVM tools
-          export LD=ld.lld
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
+          export CROSS_COMPILE=aarch64-linux-android-
+          export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
+          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
           export CC=clang
-          export HOSTCC=clang
-          export HOSTCXX=clang++
-          export HOSTLD=ld.lld
-          
           OUT=out
           mkdir -p "$OUT"
-          
-          # Configure
           make O="$OUT" gki_defconfig
           
-          # Apply O2 optimization
-          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
-          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          
-          # Apply LOCALVERSION branding
+          # LOCALVERSION branding
           if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-            echo "Applying custom LOCALVERSION: ${CUSTOM_LOCALVERSION}"
             scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
             scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
             sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
           fi
           
+          # Optimize level config and flags
+            scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+            scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+            KCFLAGS_EXTRA="-O2 -flto=thin"
+          
+          # Consistent flags; include -pipe and disable stack protector
+          KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
+          KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
+          
+          # Regenerate defaults after config edits
           make O="$OUT" olddefconfig
           
-          # Build with O3 optimization flags
-          KCFLAGS="-O3 -flto=thin -Wno-error -pipe -fno-stack-protector"
-          KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
+          echo "Starting build with $(nproc --all) threads..."
+          set -o pipefail
           make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
           
           IMG="$OUT/arch/arm64/boot/Image"
@@ -883,6 +882,8 @@ jobs:
             echo "Kernel Image missing"
             exit 1
           fi
+          sha256sum "$IMG" | tee "$OUT/Image.sha256"
+          echo "::endgroup::"
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only)
         if: ${{ inputs.kernelsu_variant == 'SukiSU' && (inputs.android_version == 'android12' || inputs.android_version == 'android13') }}
