@@ -46,7 +46,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             git curl ca-certificates build-essential clang lld flex bison \
             libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils rsync unzip dwarves file python3 pahole
+            libxml2-utils rsync unzip dwarves file python3 pahole rustc cargo
           sudo apt-get clean
 
       - name: Check Initial Disk Space
