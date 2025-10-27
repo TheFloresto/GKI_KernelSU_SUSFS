@@ -46,7 +46,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             git curl ca-certificates build-essential clang lld flex bison \
             libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils rsync unzip dwarves file python3 pahole rustc cargo
+            libxml2-utils rsync unzip dwarves file python3
           sudo apt-get clean
 
       - name: Check Initial Disk Space
@@ -123,28 +123,28 @@ jobs:
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
           # Checkout specific commits for SUSFS v1.5.12 if enabled
-            cd susfs4ksu
-            case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
-              "android12-5.10")
-                git checkout ed19454a4b5905e6718c9a22fad769b906837931
-                ;;
-              "android13-5.10")
-                git checkout 8919927b63d95e62d33842452b9a60546187fb7b
-                ;;
-              "android13-5.15")
-                git checkout 700b9316b5a1cab174401b57f4198782a17154fb
-                ;;
-              "android14-5.15")
-                git checkout e1b1bba04b3cada700b8fd5bda4cfd4c59de07a2
-                ;;
-              "android14-6.1")
-                git checkout f16560ce8263fbfa9b2f259e9531f72d6fda4e3f
-                ;;
-              "android15-6.6")
-                git checkout c49b1dab205bbc4ef20b120e84c5b7530355961d
-                ;;
-            esac
-            cd ..
+          cd susfs4ksu
+          case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
+            "android12-5.10")
+              git checkout ed19454a4b5905e6718c9a22fad769b906837931
+              ;;
+            "android13-5.10")
+              git checkout 8919927b63d95e62d33842452b9a60546187fb7b
+              ;;
+            "android13-5.15")
+              git checkout 700b9316b5a1cab174401b57f4198782a17154fb
+              ;;
+            "android14-5.15")
+              git checkout e1b1bba04b3cada700b8fd5bda4cfd4c59de07a2
+              ;;
+            "android14-6.1")
+              git checkout f16560ce8263fbfa9b2f259e9531f72d6fda4e3f
+              ;;
+            "android15-6.6")
+              git checkout c49b1dab205bbc4ef20b120e84c5b7530355961d
+              ;;
+          esac
+          cd ..
 
       - name: Initialize and Sync Kernel Source
         shell: bash
@@ -164,50 +164,6 @@ jobs:
           fi
           
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-
-      - name: Detect Latest Rust and Pahole Versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          RUSTC_FOUND=""
-          PAHOLE_FOUND=""
-          
-          # Найти последнюю версию Rust
-          if [ -d "$KERNEL_PATH/prebuilts/rust/linux-x86" ]; then
-            RUST_VERSION=$(ls -1 "$KERNEL_PATH/prebuilts/rust/linux-x86" | grep -E '^[0-9]+\.[0-9]+' | sort -V | tail -n1)
-            if [ -n "$RUST_VERSION" ]; then
-              RUSTC_PATH="$KERNEL_PATH/prebuilts/rust/linux-x86/$RUST_VERSION/bin/rustc"
-              if [ -x "$RUSTC_PATH" ]; then
-                echo "RUSTC=$RUSTC_PATH" >> $GITHUB_ENV
-                RUSTC_FOUND="$RUSTC_PATH"
-                echo "Found Rust version: $RUST_VERSION at $RUSTC_PATH"
-              fi
-            fi
-          fi
-          
-          # Найти Pahole
-          if [ -d "$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin" ]; then
-            PAHOLE_PATH="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
-            if [ -x "$PAHOLE_PATH" ]; then
-              echo "PAHOLE=$PAHOLE_PATH" >> $GITHUB_ENV
-              PAHOLE_FOUND="$PAHOLE_PATH"
-              echo "Found Pahole at: $PAHOLE_PATH"
-            fi
-          fi
-          
-          # Вывести версии для логов
-          if [ -n "$RUSTC_FOUND" ]; then
-            echo "Rust version: $($RUSTC_FOUND --version)"
-          else
-            echo "Rust not found in prebuilts"
-          fi
-          
-          if [ -n "$PAHOLE_FOUND" ]; then
-            echo "Pahole version: $($PAHOLE_FOUND --version 2>&1 || echo 'version info unavailable')"
-          else
-            echo "Pahole not found in prebuilts"
-          fi
           
       - name: Check Directory Space Usage
         shell: bash
@@ -625,6 +581,7 @@ jobs:
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
       - name: Configure KernelSU Core
         shell: bash
@@ -867,7 +824,7 @@ jobs:
           echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
           CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
           echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-          echo "Detected Clang: $CLANG_VERSION"
+          echo "Detected Clang: $CLANG_VERSION"    
           
       - name: Build Kernel
         shell: bash
@@ -879,45 +836,51 @@ jobs:
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           COMMON="$KERNEL_PATH/common"
           cd "$COMMON"
-          : > "$COMMON/.scmversion"     
-          
-          # Ensure Python warnings are suppressed for scripts invoked by make
-          export PYTHONWARNINGS="${PYTHONWARNINGS}"
-
-          # Export Rust and Pahole if found
-          if [ -n "${RUSTC:-}" ]; then
-            export RUSTC="$RUSTC"
-            echo "Using Rust compiler: $RUSTC"
-          fi
-          
-          if [ -n "${PAHOLE:-}" ]; then
-            export PAHOLE="$PAHOLE"
-            echo "Using Pahole: $PAHOLE"
-          fi
+          : > "$COMMON/.scmversion"
           
           if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
             export PATH="${CLANG_BIN_PATH}:$PATH"
           fi
-          export LLVM=1 LLVM_IAS=1
+          
+          # Setup prebuilt tools (critical for GKI!)
+          RUSTC_PATH="$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc"
+          PAHOLE_PATH="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
+          
+          if [ -x "$RUSTC_PATH" ]; then
+            export RUSTC="$RUSTC_PATH"
+            echo "Using prebuilt rustc: $RUSTC"
+          fi
+          
+          if [ -x "$PAHOLE_PATH" ]; then
+            export PAHOLE="$PAHOLE_PATH"
+            echo "Using prebuilt pahole: $PAHOLE"
+          else
+            echo "ERROR: pahole not found at $PAHOLE_PATH"
+            exit 1
+          fi
+          
+          # LLVM toolchain setup
+          export LLVM=1
           export ARCH=arm64 SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-android-
           export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
-          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
+          export LD=ld.lld HOSTLD=ld.lld 
+          export AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip 
+          export HOSTCC=clang HOSTCXX=clang++
           export CC=clang
+          
+          # LLVM_IAS: Use LLVM integrated assembler
+          # Required for kernel 5.10 (has bugs with GNU as on ARM64)
+          # Kernel 5.15+ enables this automatically via LLVM=1
+          KERNEL_VERSION="${{ inputs.kernel_version }}"
+          if [[ "$KERNEL_VERSION" == "5.10" ]]; then
+            export LLVM_IAS=1
+            echo "Enabled LLVM_IAS for kernel 5.10"
+          fi
+          
           OUT=out
           mkdir -p "$OUT"
           make O="$OUT" gki_defconfig
-
-          # Prepare MAKE_OPTS with optional RUSTC and PAHOLE
-          MAKE_OPTS="O=$OUT"
-          if [ -n "${RUSTC:-}" ]; then
-            MAKE_OPTS="$MAKE_OPTS RUSTC=$RUSTC"
-          fi
-          if [ -n "${PAHOLE:-}" ]; then
-            MAKE_OPTS="$MAKE_OPTS PAHOLE=$PAHOLE"
-          fi
-          
-          make $MAKE_OPTS gki_defconfig
           
           # LOCALVERSION branding
           if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
@@ -927,9 +890,9 @@ jobs:
           fi
           
           # Optimize level config and flags
-            scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
-            scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-            KCFLAGS_EXTRA="-O2 -flto=thin"
+          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          KCFLAGS_EXTRA="-O2 -flto=thin"
           
           # Consistent flags; include -pipe and disable stack protector
           KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
@@ -939,8 +902,14 @@ jobs:
           make O="$OUT" olddefconfig
           
           echo "Starting build with $(nproc --all) threads..."
+          echo "Build configuration:"
+          echo "  PAHOLE: $PAHOLE"
+          echo "  RUSTC: ${RUSTC:-system}"
+          echo "  LLVM_IAS: ${LLVM_IAS:-auto}"
+          echo "  KCFLAGS: $KCFLAGS"
+          
           set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" MAKE_OPTS="$MAKE_OPTS" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
           
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
