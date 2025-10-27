@@ -170,6 +170,8 @@ jobs:
         run: |
           set -euo pipefail
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          RUSTC_FOUND=""
+          PAHOLE_FOUND=""
           
           # Найти последнюю версию Rust
           if [ -d "$KERNEL_PATH/prebuilts/rust/linux-x86" ]; then
@@ -178,7 +180,8 @@ jobs:
               RUSTC_PATH="$KERNEL_PATH/prebuilts/rust/linux-x86/$RUST_VERSION/bin/rustc"
               if [ -x "$RUSTC_PATH" ]; then
                 echo "RUSTC=$RUSTC_PATH" >> $GITHUB_ENV
-                echo "Found Rust version: $RUST_VERSION"
+                RUSTC_FOUND="$RUSTC_PATH"
+                echo "Found Rust version: $RUST_VERSION at $RUSTC_PATH"
               fi
             fi
           fi
@@ -188,19 +191,20 @@ jobs:
             PAHOLE_PATH="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
             if [ -x "$PAHOLE_PATH" ]; then
               echo "PAHOLE=$PAHOLE_PATH" >> $GITHUB_ENV
+              PAHOLE_FOUND="$PAHOLE_PATH"
               echo "Found Pahole at: $PAHOLE_PATH"
             fi
           fi
           
           # Вывести версии для логов
-          if [ -n "${RUSTC:-}" ]; then
-            echo "Rust version: $($RUSTC --version)"
+          if [ -n "$RUSTC_FOUND" ]; then
+            echo "Rust version: $($RUSTC_FOUND --version)"
           else
             echo "Rust not found in prebuilts"
           fi
           
-          if [ -n "${PAHOLE:-}" ]; then
-            echo "Pahole version: $($PAHOLE --version || echo 'version info unavailable')"
+          if [ -n "$PAHOLE_FOUND" ]; then
+            echo "Pahole version: $($PAHOLE_FOUND --version 2>&1 || echo 'version info unavailable')"
           else
             echo "Pahole not found in prebuilts"
           fi
