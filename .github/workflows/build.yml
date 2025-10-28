@@ -582,7 +582,6 @@ jobs:
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
-          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
       - name: Configure KernelSU Core
         shell: bash
@@ -741,30 +740,39 @@ jobs:
           echo "CONFIG_LTO_CLANG=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CCACHE=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
 
       - name: Change Kernel Name
         shell: bash
         run: |
+          set -euo pipefail
           cd "$CONFIG"
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
-          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h
-          #Set Kernel Timestamp
-          perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
+          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h                  
           #Set Kernel Timestamp
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
-          #Remove Dirty Flag
-          sed -i 's/-dirty//' ./common/scripts/setlocalversion
-          if [ -f "./build/kernel/kleaf/impl/stamp.bzl" ]; then
-          sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-          fi
-          #Remove Abi Exports and Error
-          rm -rf ./common/android/abi_gki_protected_exports_*
-          if [ -f "./common/BUILD.bazel" ]; then
+          if [ -f "build/build.sh" ]; then
+            #Remove Dirty Flag
+            sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          else
+            #Remove Dirty Flag
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+            #Remove Abi Exports and Error
+            rm -rf ./common/android/abi_gki_protected_exports_*
             perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
+
+      - name: Customize Kernel Branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          cd "$KERNEL_PATH/common"
+          mkdir -p out
+          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
+          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
 
       - name: Set file name
         shell: bash
@@ -780,20 +788,6 @@ jobs:
           ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${SUBLEVEL_FOR_NAME}-${{ inputs.os_patch_level }}-${{ matrix.apply_bypass == 'bypass' && 'Bypass' || 'Normal' }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
-
-      - name: Customize Kernel Branding
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Setting up kernel branding..."
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG/common"
-          cd "$KERNEL_PATH"
-          mkdir -p out
-          
-          # Set custom LOCALVERSION
-          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
-          echo "Kernel will be branded as: $CUSTOM_LOCALVERSION"
 
       - name: Detect Clang Toolchain
         shell: bash
@@ -827,7 +821,7 @@ jobs:
           echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
           echo "Detected Clang: $CLANG_VERSION"    
           
-      - name: Build Kernel
+      - name: Build Kernel 
         shell: bash
         env:
           PYTHONWARNINGS: "ignore:invalid escape sequence"
@@ -838,77 +832,40 @@ jobs:
           COMMON="$KERNEL_PATH/common"
           cd "$COMMON"
           : > "$COMMON/.scmversion"
+
+          # Ensure Python warnings are suppressed for scripts invoked by make
+          export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
-          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
-            export PATH="${CLANG_BIN_PATH}:$PATH"
-          fi
-          
-          # Setup prebuilt tools (critical for GKI!)
-          RUSTC_PATH="$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc"
-          PAHOLE_PATH="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
-          
-          if [ -x "$RUSTC_PATH" ]; then
-            export RUSTC="$RUSTC_PATH"
-            echo "Using prebuilt rustc: $RUSTC"
-          fi
-          
-          if [ -x "$PAHOLE_PATH" ]; then
-            export PAHOLE="$PAHOLE_PATH"
-            echo "Using prebuilt pahole: $PAHOLE"
-          else
-            echo "ERROR: pahole not found at $PAHOLE_PATH"
-            exit 1
-          fi
-          
-          # LLVM toolchain setup
-          export LLVM=1
+          export LLVM=1 LLVM_IAS=1
           export ARCH=arm64 SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-android-
-          export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
-          export LD=ld.lld HOSTLD=ld.lld 
-          export AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip 
-          export HOSTCC=clang HOSTCXX=clang++
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
           export CC=clang
-          
-          # LLVM_IAS: Use LLVM integrated assembler
-          # Required for kernel 5.10 (has bugs with GNU as on ARM64)
-          # Kernel 5.15+ enables this automatically via LLVM=1
-          KERNEL_VERSION="${{ inputs.kernel_version }}"
-          if [[ "$KERNEL_VERSION" == "5.10" ]]; then
-            export LLVM_IAS=1
-            echo "Enabled LLVM_IAS for kernel 5.10"
-          fi
-          
           OUT=out
           mkdir -p "$OUT"
           make O="$OUT" gki_defconfig
-          
-          # LOCALVERSION branding
+
+           # LOCALVERSION branding
           if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
             scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
             scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
             sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
           fi
-          
-          # Optimize level config and flags
-          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
-          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          KCFLAGS_EXTRA="-O2 -flto=thin"
-          
+
+          # Optimize level config and flags (default O3)
+          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          KCFLAGS_EXTRA="-O3"
+
           # Consistent flags; include -pipe and disable stack protector
           KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
           KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
-          
+
           # Regenerate defaults after config edits
           make O="$OUT" olddefconfig
           
-          echo "Starting build with $(nproc --all) threads..."
-          echo "Build configuration:"
-          echo "  PAHOLE: $PAHOLE"
-          echo "  RUSTC: ${RUSTC:-system}"
-          echo "  LLVM_IAS: ${LLVM_IAS:-auto}"
-          echo "  KCFLAGS: $KCFLAGS"
-          
+          echo "Starting build with $(nproc --all) threads using ZyCromerZ Clang ${CLANG_VERSION}..."
           set -o pipefail
           make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
           
@@ -918,6 +875,7 @@ jobs:
             exit 1
           fi
           sha256sum "$IMG" | tee "$OUT/Image.sha256"
+          echo "Build completed successfully with ZyCromerZ Clang!"
           echo "::endgroup::"
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only)
