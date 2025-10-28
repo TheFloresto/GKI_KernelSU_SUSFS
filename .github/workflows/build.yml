@@ -51,6 +51,21 @@ jobs:
           curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
           chmod +x util_free_space.sh
           ./util_free_space.sh
+
+      - name: Setup SWAP
+        shell: bash
+        run: |
+         set -euo pipefail
+         sudo swapoff -a
+         sudo fallocate -l 15G /swapfile
+         sudo chmod 600 /swapfile
+         sudo mkswap /swapfile
+         sudo swapon -p 1 /swapfile
+         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
+         echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+         echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
+         sudo sysctl -p
+         free -h          
           
       - name: Check Disk Space After Cleanup
         shell: bash
