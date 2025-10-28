@@ -865,7 +865,7 @@ jobs:
           # Regenerate defaults after config edits
           make O="$OUT" olddefconfig
           
-          echo "Starting build with $(nproc --all) threads using ZyCromerZ Clang ${CLANG_VERSION}..."
+          echo "Starting build with $(nproc --all) threads using Clang..."
           set -o pipefail
           make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
           
@@ -875,7 +875,7 @@ jobs:
             exit 1
           fi
           sha256sum "$IMG" | tee "$OUT/Image.sha256"
-          echo "Build completed successfully with ZyCromerZ Clang!"
+          echo "Build completed successfully with Clang!"
           echo "::endgroup::"
 
       - name: Patch Image File for Android 12 and 13 (SukiSU only)
