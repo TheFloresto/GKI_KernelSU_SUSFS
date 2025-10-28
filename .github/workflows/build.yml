@@ -885,7 +885,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Copy Image from normal build locations
+          # Copy Image from normal build locations 
+          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
+            cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image       
           if [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
             cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image AnyKernel3/Image
           elif [ -f "./$CONFIG/bazel-bin/common/kernel_aarch64/Image" ]; then
