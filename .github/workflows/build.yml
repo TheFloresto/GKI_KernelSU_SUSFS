@@ -414,12 +414,12 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."           
               # Post-SUSFS sed safeguards for task_mmu.c 'goto show_pad' handling
               if ( ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL <= 75 )) ) ); then
-                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
-               fi
+               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 75 )) ) ); then
+               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+              fi
             
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
