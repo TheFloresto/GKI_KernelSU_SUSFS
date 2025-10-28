@@ -52,20 +52,32 @@ jobs:
           chmod +x util_free_space.sh
           ./util_free_space.sh
 
-      - name: Setup SWAP
+      - name: Setup Additional SWAP
         shell: bash
         run: |
-         set -euo pipefail
-         sudo swapoff -a
-         sudo fallocate -l 15G /swapfile
-         sudo chmod 600 /swapfile
-         sudo mkswap /swapfile
-         sudo swapon -p 1 /swapfile
-         echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
-         echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
-         sudo sysctl -p
-         free -h          
+          set -euo pipefail
+          echo "===== Current Memory Status ====="
+          free -h
+          echo "===== Current SWAP Status ====="
+          swapon --show || true
+          
+          echo "===== Setting up 15GB SWAP file ====="
+          sudo swapoff -a || true
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon -p 1 /swapfile
+          
+          echo "===== Configuring SWAP parameters ====="
+          echo 'vm.swappiness=1' | sudo tee -a /etc/sysctl.conf
+          echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+          echo 'vm.overcommit_memory=1' | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
+          
+          echo "===== New Memory Status ====="
+          free -h
+          echo "===== New SWAP Status ====="
+          swapon --show          
           
       - name: Check Disk Space After Cleanup
         shell: bash
