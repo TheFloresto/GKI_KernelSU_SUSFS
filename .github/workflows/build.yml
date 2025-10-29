@@ -914,8 +914,8 @@ jobs:
           set -euo pipefail
           # Copy Image from normal build locations 
           if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
-            cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image       
-          if [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
+            cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image
+          elif [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
             cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image AnyKernel3/Image
           elif [ -f "./$CONFIG/bazel-bin/common/kernel_aarch64/Image" ]; then
             cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image AnyKernel3/Image
@@ -994,10 +994,10 @@ jobs:
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
 
           if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
           fi
           
           # Create gzip of the Image file
@@ -1018,10 +1018,10 @@ jobs:
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
 
           if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./       
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
           fi
 
           # Create gzip of the Image file
