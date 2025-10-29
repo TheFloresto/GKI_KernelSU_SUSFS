@@ -597,18 +597,18 @@ jobs:
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"   
 
-      - name: Configure KSUNEXT
+      - name: Configure KSU NEXT
         if: ${{ inputs.kernelsu_variant == 'NEXT' || inputs.kernelsu_variant == 'WKSU' || inputs.kernelsu_variant == 'SukiSU' }}
         shell: bash
         run: |
           set -euo pipefail
           cd "$CONFIG"
-          # KSUNEXT Support
+          # KSU NEXT Support
           echo "# KSUNEXT Support" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure SukiSU
-        if: ${{ inputs.kernelsu_variant = 'SukiSU' }}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
         shell: bash
         run: |
           set -euo pipefail
