@@ -849,6 +849,7 @@ jobs:
           fi
 
       - name: Search for Kernel Modules
+        if: false
         shell: bash
         run: |
           set -euo pipefail
