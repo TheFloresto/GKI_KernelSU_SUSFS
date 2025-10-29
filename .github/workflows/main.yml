@@ -25,7 +25,6 @@ on:
           - Actions
           - Pre-Release
           - Release
-          - Release (No Artifacts)
         default: Actions
       build_selection:
         description: "Choose which kernels to build"
@@ -65,31 +64,32 @@ on:
         description: "If 'Other' is selected, specify your custom branch"
         required: false
         type: string
-        default: ""      
+        default: ""
 
 jobs:
 
   build-a12-5-10:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10') && inputs.release_type != 'Release (No Artifacts)'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10')
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
-     kernelsu_variant: ${{ inputs.kernelsu_variant }}
-     kernelsu_branch: ${{ inputs.kernelsu_branch }}
-     kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
 
   build-a13-5-10:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10') && inputs.release_type != 'Release (No Artifacts)'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10')
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
 
   build-a13-5-15:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15') && inputs.release_type != 'Release (No Artifacts)'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
@@ -99,7 +99,7 @@ jobs:
 
 
   build-a14-5-15:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15') && inputs.release_type != 'Release (No Artifacts)'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     with:
@@ -109,23 +109,23 @@ jobs:
 
 
   build-a14-6-1:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1') && inputs.release_type != 'Release (No Artifacts)'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }} 
-
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   build-a15-6-6:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6') && inputs.release_type != 'Release (No Artifacts)'
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6')
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
 
   build-test:
     if: inputs.build_selection == 'Build Test'
@@ -134,12 +134,12 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
 
   release:
     runs-on: ubuntu-latest
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Build Test') && (inputs.release_type == 'Release (No Artifacts)' || inputs.release_type != 'Actions')
+    if: inputs.release_type != 'Actions'
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -149,7 +149,7 @@ jobs:
       - build-a15-6-6
 
     env:
-      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
       RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
       RELEASE_BODY: ""
     steps:
@@ -234,11 +234,10 @@ jobs:
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
-        if: inputs.release_type != 'Release (No Artifacts)'
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-          pattern: '${{ inputs.kernelsu_variant }}-*-AK3'
+          pattern: '*-AK3'
 
       - name: Set release body
         run: |
@@ -261,7 +260,7 @@ jobs:
           - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
 
           Features:
-          -> ${{ inputs.kernelsu_variant }} KernelSU Variant
+          -> ${{ inputs.kernelsu_variant }} KSU
           -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
           -> SUSFS ඞ v1.5.12
           -> Scope-Minimized Manual hooks v1.4
@@ -322,38 +321,33 @@ jobs:
           body_path: release_body.md
 
       - name: Upload Release Assets
-        if: inputs.release_type != 'Release (No Artifacts)'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          for dir in ./downloaded-artifacts/*/; do
-            # Check if this is an AnyKernel3 artifact directory
-            if [[ "$(basename "$dir")" == *"-AK3" ]]; then
-              artifact_name=$(basename "$dir")
-              echo "Creating ZIP for $artifact_name..."
-              # The entire directory IS the AnyKernel3 content, so zip it directly
-              zip -r -9 "${artifact_name}.zip" "$dir"
-              echo "Uploading ${artifact_name}.zip..."
-              gh release upload NerestKernels/GKI_KernelSU_SUSFS ${{ env.NEW_TAG }} "${artifact_name}.zip"
-            fi
-          done
-
-      - name: Display Files Uploaded
-        if: inputs.release_type != 'Release (No Artifacts)'
-        run: |
-          echo "GitHub release created with the following files:"
-          ls ./downloaded-artifacts/**/*
+          shopt -s nullglob
+          anykernel_dirs=(./downloaded-artifacts/*/)
+          if [ ${#anykernel_dirs[@]} -eq 0 ]; then
+            echo "No artifact directories found under ./downloaded-artifacts; skipping upload."
+          else
+            for dir in "${anykernel_dirs[@]}"; do
+              # Check if this is an AnyKernel3 artifact directory
+              if [[ "$(basename "$dir")" == *"-AK3" ]]; then
+                artifact_name=$(basename "$dir")
+                echo "Creating ZIP for $artifact_name..."
+                # The entire directory IS the AnyKernel3 content, so zip it directly
+                zip -r -9 "${artifact_name}.zip" "$dir"
+                echo "Uploading ${artifact_name}.zip..."
+                gh release upload NerestKernels/GKI_KernelSU_SUSFS ${{ env.NEW_TAG }} "${artifact_name}.zip"
+              fi
+            done
+          fi
             
       - name: Send Telegram Notification
-        if: inputs.release_type != 'Build Test'
+        if: inputs.release_type != 'Actions'
         run: |
           RELEASE_TYPE_TEXT=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
             RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
-          elif [ "${{ inputs.build_selection }}" == "Build Test" ]; then
-            RELEASE_TYPE_TEXT="🔧 *Build Test*"
-          elif [ "${{ inputs.release_type }}" == "Release (No Artifacts)" ]; then
-            RELEASE_TYPE_TEXT="🚀 *Release*"
           else
             RELEASE_TYPE_TEXT="🚀 *Release*"
           fi
@@ -363,8 +357,8 @@ jobs:
             -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
             -F text="
             🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
-            📦 *Variant:* ${{ inputs.kernelsu_variant }}
+            🛑 *Variant:* ${{ inputs.kernelsu_variant }}
             📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
-            ✏️ *Source Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+            ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown"
+            -F parse_mode="Markdown
