@@ -598,7 +598,7 @@ jobs:
           echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"   
 
       - name: Configure KSU NEXT
-        if: ${{ inputs.kernelsu_variant == 'NEXT' || inputs.kernelsu_variant == 'WKSU' || inputs.kernelsu_variant == 'SukiSU' }}
+        if: ${{ inputs.kernelsu_variant = 'NEXT' || inputs.kernelsu_variant = 'WKSU' || inputs.kernelsu_variant = 'SukiSU' }}
         shell: bash
         run: |
           set -euo pipefail
