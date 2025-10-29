@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         apply_bypass: ["normal", "bypass"]
-        
+
     steps:
       - name: Check Initial Disk Space
         shell: bash
@@ -78,7 +78,7 @@ jobs:
           free -h
           echo "===== New SWAP Status ====="
           swapon --show          
-          
+    
       - name: Check Disk Space After Cleanup
         shell: bash
         run: |
@@ -95,19 +95,6 @@ jobs:
 
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
-
-      - name: Install Build Dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Installing build dependencies..."
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git curl ca-certificates build-essential clang lld llvm flex bison \
-            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-            libxml2-utils rsync unzip dwarves file python3 \
-            libdw-dev pahole
-          sudo apt-get clean
 
       - name: Setup Build Environment
         shell: bash
@@ -149,7 +136,7 @@ jobs:
           
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git -b main
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main       
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
           # Checkout specific commits for SUSFS v1.5.12
@@ -176,7 +163,6 @@ jobs:
           #esac
           #cd ..
           
-
       - name: Initialize and Sync Kernel Source
         shell: bash
         run: |
@@ -371,8 +357,8 @@ jobs:
           echo "Commits: $COMMIT_COUNT"
           KSU_VERSION=$(expr $COMMIT_COUNT "+" $BASE_VERSION)
           echo "KSUVER=$KSU_VERSION"
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV       
+            
       - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
@@ -414,47 +400,47 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."           
               # Post-SUSFS sed safeguards for task_mmu.c 'goto show_pad' handling
               if ( ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 75 )) ) ); then
-               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+                   || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
+                   || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
+                   || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
+                   || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 75 )) ) ); then
+                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               fi
-            
+
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
-               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
-               patch -p1 < fix_fdinfo.c.patch || true
-               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
-               patch -p1 < fix_namespace.c.patch || true
-               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
-               patch -p1 < fix_open.c.patch || true
-               sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
-             fi
+                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+                patch -p1 < fix_fdinfo.c.patch || true
+                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+                patch -p1 < fix_namespace.c.patch || true
+                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+                patch -p1 < fix_open.c.patch || true
+                sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
+              fi
 
               # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
               if ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL >= 145 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ); then
-               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
-               patch -p1 < 1_fix_base.c.patch || true
+                || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL >= 145 )) ) \
+                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ); then
+                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
+                patch -p1 < 1_fix_base.c.patch || true
               fi
 
               if [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )); then
-               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
-               patch -p1 < 2_fix_base.c.patch || true
+                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
+                patch -p1 < 2_fix_base.c.patch || true
               fi
 
               if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL <= 58 )) ); then
-               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
-               patch -p1 < fix_task_mmu.c.patch || true
+                cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
+                patch -p1 < fix_task_mmu.c.patch || true
               fi
 
               # Apply KSU integration patches
               cd ../KernelSU-Next
               cp -fv ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
-          
+              
               cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
               patch -p1 < fix_core_hook.c.patch
 
@@ -516,7 +502,7 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
           CONFIG_DIR="$CONFIG"
           REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
           mkdir -p "$REJECTS_DIR"
@@ -605,21 +591,27 @@ jobs:
           # KernelSU Configuration
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"   
 
-      - name: Configure SukiSU
+      - name: Configure KSU NEXT
+        if: ${{ inputs.kernelsu_variant == 'NEXT' || inputs.kernelsu_variant == 'WKSU' || inputs.kernelsu_variant == 'SukiSU' }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ inputs.kernelsu_variant }}" = "SukiSU" ]; then
-            exit 0
-          fi
-          
+          cd "$CONFIG"
+          # KSU NEXT Support
+          echo "# KSU NEXT Support" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
+
+      - name: Configure SukiSU
+        if: ${{ inputs.kernelsu_variant = 'SukiSU' }}
+        shell: bash
+        run: |
+          set -euo pipefail
           cd "$CONFIG"
           # SukiSU Support
           echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
@@ -685,6 +677,7 @@ jobs:
           echo "CONFIG_TCP_CONG_ADVANCED=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_BBR=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_NET_SCH_FQ=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_BIC=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_HTCP=n" >> "${{ env.DEFCONFIG }}"
@@ -715,7 +708,8 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
 
-      - name: Configure Sound
+
+      - name: Configure Sound 1
         if: false
         shell: bash
         run: |
@@ -731,16 +725,25 @@ jobs:
           echo "CONFIG_SND_PROC_FS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_SND_ALOOP=m" >> "${{ env.DEFCONFIG }}"
           
-          # Add snd-aloop.ko to modules list
-          if [ -f "build/build.sh" ]; then
-            echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
-          else
-            sed -i '/_COMMON_GKI_MODULES_LIST = \\[/,/\\]/ s/\\]/    "sound\/drivers\/snd-aloop.ko",\\n&/' common/modules.bzl
-          fi
+          ## Add snd-aloop.ko to modules list
+          #if [ -f "build/build.sh" ]; then
+          #  echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
+          #else
+          #  sed -i '/_COMMON_GKI_MODULES_LIST = \\[/,/\\]/ s/\\]/    "sound\/drivers\/snd-aloop.ko",\\n&/' common/modules.bzl
+          #fi
           
           # Add symbols to abi_gki_aarch64
-          SYMBOL_LIST=common/android/abi_gki_aarch64
-          cat Wild_KSU/kernel/export_symbol.txt | awk '{sub("[ \t]+","");print "  "$0}' >> $SYMBOL_LIST
+          #SYMBOL_LIST=common/android/abi_gki_aarch64
+          #cat Wild_KSU/kernel/export_symbol.txt | awk '{sub("[ \t]+","");print "  "$0}' >> $SYMBOL_LIST
+
+      - name: Configure Sound 2
+        if: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          cp ../kernel_patches/wild/bypass_patches/abi_bypass_gki.patch ./
+          patch -p1 < abi_bypass_gki.patch || true
 
       - name: Configure Build Optimization
         shell: bash
@@ -751,8 +754,8 @@ jobs:
           echo "# Build Optimization Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG_FULL=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CCACHE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
 
@@ -761,9 +764,11 @@ jobs:
         run: |
           set -euo pipefail
           cd "$CONFIG"
+          #Add @NoFloresto to Kernel Version
+          sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
-          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h                         
+          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
           #Set Kernel Timestamp
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
           if [ -f "build/build.sh" ]; then
@@ -792,115 +797,33 @@ jobs:
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
-      - name: Customize Kernel Branding
+      - name: Build
         shell: bash
         run: |
-          set -euo pipefail
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          cd "$KERNEL_PATH/common"
-          mkdir -p out
-          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
-          
-      - name: Detect Clang Toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          KP="$GITHUB_WORKSPACE/$CONFIG"
-          CLANG_FOUND=false
-          
-          # Search for prebuilt clang
-          for base in "$KP/prebuilts" "$KP/prebuilts-master"; do
-            [ -d "$base/clang/host/linux-x86" ] || continue
-            latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
-            if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
-              CLANG_BIN="$latest/bin"
-              CLANG_FOUND=true
-              break
-            fi
-          done
-          
-          # Fallback to system clang
-          if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
-            CLANG_BIN="$(dirname "$(command -v clang)")"
-            CLANG_FOUND=true
-            echo "Using system clang."
-          fi
-          
-          $CLANG_FOUND || { echo "No clang toolchain found"; exit 1; }
-          
-          echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
-          CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
-          echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-          echo "Detected Clang: $CLANG_VERSION"    
-          
-      - name: Build Kernel 
-        shell: bash
-        env:
-          PYTHONWARNINGS: "ignore:invalid escape sequence"
-        run: |
-          set -euo pipefail
-          echo "::group::Build kernel"
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          COMMON="$KERNEL_PATH/common"
-          cd "$COMMON"
-          : > "$COMMON/.scmversion"
-
-          # Ensure Python warnings are suppressed for scripts invoked by make
-          export PYTHONWARNINGS="${PYTHONWARNINGS}"
-          
-          export LLVM=1 LLVM_IAS=1
-          export ARCH=arm64 SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
-          export CC=clang
-          OUT=out
-          mkdir -p "$OUT"
-          make O="$OUT" gki_defconfig
-
-           # LOCALVERSION branding
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
+          set -euox pipefail
+          cd "$CONFIG"
+          echo "Building the kernel..."
+          if [ -f "build/build.sh" ]; then
+            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
+          else
+            tools/bazel build --config=fast --lto=full --sandbox_debug --verbose_failures //common:kernel_aarch64_dist || exit 1
           fi
 
-          # Optimize level config and flags (default O3)
-          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
-          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          KCFLAGS_EXTRA="-O3"
-
-          # Consistent flags; include -pipe and disable stack protector
-          KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
-          KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
-
-          # Regenerate defaults after config edits
-          make O="$OUT" olddefconfig
-          
-          echo "Starting build with $(nproc --all) threads using Clang..."
-          set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
-          
-          IMG="$OUT/arch/arm64/boot/Image"
-          if [ ! -f "$IMG" ]; then
-            echo "Kernel Image missing"
-            exit 1
-          fi
-          sha256sum "$IMG" | tee "$OUT/Image.sha256"
-          echo "Build completed successfully with Clang!"
-          echo "::endgroup::"
-          
       - name: Patch KPM for SukiSU-Ultra
-        if: ${{ inputs.kernel_variant == 'SukiSU'}}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU'}}
         shell: bash
         run: |
           set -euo pipefail
           echo "Patching Image file..."
-          if [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
+          if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
+            cd "$CONFIG/common/out/arch/arm64/boot"
+          elif [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
             cd "$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
-          else
+          elif [ -f "./$CONFIG/bazel-bin/common/kernel_aarch64/Image" ]; then
             cd "$CONFIG/bazel-bin/common/kernel_aarch64"
+          else
+            echo "Error: Image file not found in any expected location"
+            exit 1
           fi
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
           chmod +x patch
@@ -990,19 +913,19 @@ jobs:
           echo "Creating bootimgs folder and copying images..."
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./${{ env.FILE_NAME }}-Image
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
 
           if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
             cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
             cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
-            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./${{ env.FILE_NAME }}-Image
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
           fi
-          
+
           # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
+          gzip -n -k -f -9 ./${{ env.FILE_NAME }}-Image > ./${{ env.FILE_NAME }}-Image.gz
+          gzip -n -k -f -9 ./bootimgs/Image > ./bootimgs/Image.gz
 
       - name: Create Bootimgs Folder and Copy Images for Android 14/15
         if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
@@ -1014,19 +937,19 @@ jobs:
           echo "Creating bootimgs folder and copying images..."
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./bootimgs
           cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./${{ env.FILE_NAME }}-Image
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
 
           if [ -f "$CONFIG/common/out/arch/arm64/boot/Image" ]; then
             cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
             cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./
-            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image ./${{ env.FILE_NAME }}-Image
+            cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
           fi
 
           # Create gzip of the Image file
-          gzip -n -k -f -9 ./Image > ./Image.gz
-          gzip -n -k -f -9 ./Image > ./bootimgs/Image.gz
+          gzip -n -k -f -9 ./${{ env.FILE_NAME }}-Image > ./${{ env.FILE_NAME }}-Image.gz
+          gzip -n -k -f -9 ./bootimgs/Image > ./bootimgs/Image.gz
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
@@ -1100,6 +1023,7 @@ jobs:
           cp ./boot-lz4.img ../${{ env.FILE_NAME }}-boot-lz4.img
 
       - name: Upload AnyKernel3 Artifacts
+        id: upload_ak3
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.FILE_NAME }}-AK3
@@ -1107,92 +1031,43 @@ jobs:
             ./AnyKernel3/**
           compression-level: 9
 
-      - name: Upload Boot Image
-        if: hashFiles('*-boot.img') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.FILE_NAME }}-boot.img
-          path: |
-            *-boot.img
-          compression-level: 9
-          
-      - name: Upload Boot Image (GZ)
-        if: hashFiles('*-boot-gz.img') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.FILE_NAME }}-boot-gz.img
-          path: |
-            *-boot-gz.img
-          compression-level: 9
-          
-      - name: Upload Boot Image (LZ4)
-        if: hashFiles('*-boot-lz4.img') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.FILE_NAME }}-boot-lz4.img
-          path: |
-            *-boot-lz4.img
-          compression-level: 9
-          
-      - name: Upload Raw Image
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.FILE_NAME }}-Image
-          path: |
-            Image
-          compression-level: 9
-          
-      - name: Upload Raw Image (GZ)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.FILE_NAME }}-Image.gz
-          path: |
-            Image.gz
-          compression-level: 9
-          
-      - name: Upload Raw Image (LZ4)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.FILE_NAME }}-Image.lz4
-          path: |
-            Image.lz4
-          compression-level: 9
-
-      - name: Upload Build Diagnostics
+      - name: Extra Artifacts
         if: ${{ always() }}
+        id: upload_misc
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.FILE_NAME }}-Rejected-Patches
-          path: patch-rejects
+          name: ${{ env.FILE_NAME }}-Misc
+          path: |
+            ${{ env.FILE_NAME }}-Image
+            ${{ env.FILE_NAME }}-Image.gz
+            ${{ env.FILE_NAME }}-Image.lz4
+            ${{ env.FILE_NAME }}-boot.img
+            ${{ env.FILE_NAME }}-boot-gz.img
+            ${{ env.FILE_NAME }}-boot-lz4.img
+            patch-rejects/**
+            build_summary.md
+          if-no-files-found: ignore
           compression-level: 9
           
-      - name: Initialize Kernel Summary
+      - name: Generate Build Summary
         if: ${{ always() }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "# Kernel Build Summary" >> $GITHUB_STEP_SUMMARY
+          # Create build summary file for inclusion in Misc artifact
+          echo "# Kernel Build Summary" > build_summary.md
           
           # Add build variant header
-          echo "## ${{ env.FILE_NAME }}" >> $GITHUB_STEP_SUMMARY
-      
-      - name: Add Build Information
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          echo "## ${{ env.FILE_NAME }}" >> build_summary.md
+          
           # Add build info
-          echo "## Build Information" >> $GITHUB_STEP_SUMMARY
-          echo "- **Android Version**: ${{ inputs.android_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Kernel Version**: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **BBG**: Installed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Bypass Mode**: ${{ matrix.apply_bypass }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Information" >> build_summary.md
+          echo "- **Android Version**: ${{ inputs.android_version }}" >> build_summary.md
+          echo "- **Kernel Version**: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> build_summary.md
+          echo "- **BBG**: Installed" >> build_summary.md
+          echo "- **Bypass Mode**: ${{ matrix.apply_bypass }}" >> build_summary.md
+          echo "" >> build_summary.md
 
-      - name: Add KSU Version
-        shell: bash
-        run: |
-          set -euo pipefail
           # Get KSU directory name based on variant
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
@@ -1216,91 +1091,83 @@ jobs:
               KSU_REPO="https://github.com/5ec1cff/KernelSU"
               ;;
           esac
+
+          # Get KSU commit
+          if [ -d "$CONFIG/$KSU_DIR" ]; then
+            cd "$CONFIG/$KSU_DIR"
+            KSU_COMMIT=$(git rev-parse HEAD)
+            KSU_URL="$KSU_REPO/commit/$KSU_COMMIT"
+            echo "- **${{ inputs.kernelsu_variant }} (v${KSUVER})**: [$KSU_COMMIT]($KSU_URL)" >> "$GITHUB_WORKSPACE/build_summary.md"
+            cd "$GITHUB_WORKSPACE"
+          else
+            echo "- **${{ inputs.kernelsu_variant }} (v${KSUVER})**: not present" >> build_summary.md
+          fi
           
-          cd "$CONFIG/$KSU_DIR"
-          KSU_COMMIT=$(git rev-parse HEAD)
-          KSU_URL="$KSU_REPO/commit/$KSU_COMMIT"
-          echo "- **${{ inputs.kernelsu_variant }} (v${KSUVER})**: [$KSU_COMMIT]($KSU_URL)" >> $GITHUB_STEP_SUMMARY
-          
-      - name: Add BBG Version
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          # Get Baseband-guard commit
           if [ -d "$CONFIG/Baseband-guard" ]; then
             cd "$CONFIG/Baseband-guard"
             BBG_COMMIT=$(git rev-parse HEAD)
             BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_COMMIT"
-            echo "- **Baseband-guard**: [$BBG_COMMIT]($BBG_URL)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Baseband-guard**: [$BBG_COMMIT]($BBG_URL)" >> "$GITHUB_WORKSPACE/build_summary.md"
+            cd "$GITHUB_WORKSPACE"
           else
-            echo "- **Baseband-guard**: not present" >> $GITHUB_STEP_SUMMARY
+            echo "- **Baseband-guard**: not present" >> build_summary.md
           fi
           
-      - name: Add SUSFS Version
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -euo pipefail
           # Get SUSFS4KSU commit
           if [ -d "$GITHUB_WORKSPACE/susfs4ksu" ]; then
             cd "$GITHUB_WORKSPACE/susfs4ksu"
             SUSFS_COMMIT=$(git rev-parse HEAD)
             SUSFS_URL="https://gitlab.com/simonpunk/susfs4ksu/-/commit/$SUSFS_COMMIT"
-            echo "- **SUSFS4KSU (v1.5.12)**: [$SUSFS_COMMIT]($SUSFS_URL)" >> $GITHUB_STEP_SUMMARY
+            echo "- **SUSFS4KSU (v1.5.12)**: [$SUSFS_COMMIT]($SUSFS_URL)" >> "$GITHUB_WORKSPACE/build_summary.md"
+            cd "$GITHUB_WORKSPACE"
           else
-            echo "- **SUSFS4KSU (v1.5.12)**: not present" >> $GITHUB_STEP_SUMMARY
+            echo "- **SUSFS4KSU (v1.5.12)**: not present" >> build_summary.md
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-      
-      - name: Add Build Artifacts
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          echo "" >> build_summary.md
+          
           # Add artifact summary with presence verification
-          echo "## Build Artifacts" >> $GITHUB_STEP_SUMMARY
-      
+          echo "## Build Artifacts" >> build_summary.md
+
           # Verify AnyKernel3 contents - check if kernel Image was actually copied (indicates successful build)
           if [ -d "AnyKernel3" ] && [ -f "AnyKernel3/Image" ]; then
             AK3_STATUS="✅"
           else
             AK3_STATUS="❌"
           fi
-          echo "- **AnyKernel3**: $AK3_STATUS ${{ env.FILE_NAME }}-AnyKernel3" >> $GITHUB_STEP_SUMMARY
-      
-          echo "### Boot Images" >> $GITHUB_STEP_SUMMARY
-          for f in "${{ env.FILE_NAME }}-boot.img" "${{ env.FILE_NAME }}-boot-gz.img" "${{ env.FILE_NAME }}-boot-lz4.img"; do
-            if [ -f "$f" ]; then status="✅"; else status="❌"; fi
-            case "$f" in
-              *boot.img) name="Boot Image (RAW)";;
-              *boot-gz.img) name="Boot Image (GZ)";;
-              *boot-lz4.img) name="Boot Image (LZ4)";;
-            esac
-            echo "- **$name**: $status $f" >> $GITHUB_STEP_SUMMARY
+          echo "- **AnyKernel3**: $AK3_STATUS ${{ env.FILE_NAME }}-AnyKernel3" >> build_summary.md
+
+          echo "### Misc (uploaded files)" >> build_summary.md
+          FILES_PRESENT=0
+          for f in "${{ env.FILE_NAME }}-Image" "${{ env.FILE_NAME }}-Image.gz" "${{ env.FILE_NAME }}-Image.lz4" "${{ env.FILE_NAME }}-boot.img" "${{ env.FILE_NAME }}-boot-gz.img" "${{ env.FILE_NAME }}-boot-lz4.img"; do
+            if [ -f "$f" ]; then FILES_PRESENT=$((FILES_PRESENT+1)); fi
           done
-      
-          echo "### Kernel Images" >> $GITHUB_STEP_SUMMARY
-          for f in "Image" "Image.gz" "Image.lz4"; do
-            if [ -f "$f" ]; then status="✅"; else status="❌"; fi
-            case "$f" in
-              Image) name="Kernel Image (RAW)";;
-              Image.gz) name="Kernel Image (GZ)";;
-              Image.lz4) name="Kernel Image (LZ4)";;
-            esac
-            echo "- **$name**: $status $f" >> $GITHUB_STEP_SUMMARY
-          done
-      
-          echo "### Diagnostics" >> $GITHUB_STEP_SUMMARY
-          echo "- **Rejected Patches**: ${{ env.FILE_NAME }}-Rejected-Patches" >> $GITHUB_STEP_SUMMARY
+          if [ "$FILES_PRESENT" -gt 0 ]; then
+            MISC_STATUS="✅"
+          else
+            MISC_STATUS="❌"
+          fi
+          echo "- **Set**: $MISC_STATUS ${{ env.FILE_NAME }}-Misc" >> build_summary.md
+          if [ "$MISC_STATUS" = "✅" ]; then
+            echo "  Included:" >> build_summary.md
+            for f in "${{ env.FILE_NAME }}-Image" "${{ env.FILE_NAME }}-Image.gz" "${{ env.FILE_NAME }}-Image.lz4" "${{ env.FILE_NAME }}-boot.img" "${{ env.FILE_NAME }}-boot-gz.img" "${{ env.FILE_NAME }}-boot-lz4.img"; do
+              if [ -f "$f" ]; then
+                echo "  - $f" >> build_summary.md
+              fi
+            done
+          fi
+
+          echo "### Diagnostics" >> build_summary.md
+          echo "- **Rejected Patches**: ${{ env.FILE_NAME }}-Rejected-Patches" >> build_summary.md
           if [ -f patch-rejects/index.txt ]; then
             if [ -s patch-rejects/index.txt ]; then
-              echo "  Rejected files:" >> $GITHUB_STEP_SUMMARY
+              echo "  Rejected files:" >> build_summary.md
               while IFS= read -r line; do
-                echo "    - $line" >> $GITHUB_STEP_SUMMARY
+                echo "    - $line" >> build_summary.md
               done < patch-rejects/index.txt
             else
-              echo "  Rejected file list is empty." >> $GITHUB_STEP_SUMMARY
+              echo "  Rejected file list is empty." >> build_summary.md
             fi
           else
-            echo "  No rejected patches found." >> $GITHUB_STEP_SUMMARY
+            echo "  No rejected patches found." >> build_summary.md
           fi
