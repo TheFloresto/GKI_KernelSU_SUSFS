@@ -709,7 +709,7 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
 
-      - name: Configure Sound 1
+      - name: Configure SND
         if: false
         shell: bash
         run: |
@@ -736,12 +736,6 @@ jobs:
           #SYMBOL_LIST=common/android/abi_gki_aarch64
           #cat Wild_KSU/kernel/export_symbol.txt | awk '{sub("[ \t]+","");print "  "$0}' >> $SYMBOL_LIST
 
-      - name: Configure Sound 2
-        if: false
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$CONFIG"
           cp ../kernel_patches/wild/bypass_patches/abi_bypass_gki.patch ./
           patch -p1 < abi_bypass_gki.patch || true
 
