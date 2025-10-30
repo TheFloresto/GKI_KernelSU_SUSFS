@@ -152,6 +152,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
       RELEASE_BODY: ""
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -237,7 +238,6 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-          pattern: '*-AK3'
 
       - name: Set release body
         run: |
@@ -280,7 +280,6 @@ jobs:
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
-          -> **boot.img files**: Available as CI artifacts only (not included in releases) - download from the Actions tab 
           -> **Warning**: boot.img files may not boot on some devices
           -> **Note:** For detailed commit information and component versions, please check the [build summary](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) in the GitHub Actions workflow that generated this release.
 
@@ -308,7 +307,57 @@ jobs:
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
 
-      - name: Create GitHub Release
+      - name: Prepare Release Files
+        run: |
+          shopt -s nullglob
+          mkdir -p ./release-files
+          
+          echo "=== Processing artifacts ==="
+          
+          # Обработка AK3 директорий (запаковываем в ZIP)
+          anykernel_dirs=(./downloaded-artifacts/*-AK3/)
+          if [ ${#anykernel_dirs[@]} -gt 0 ]; then
+            echo "Found ${#anykernel_dirs[@]} AK3 artifact(s)"
+            for dir in "${anykernel_dirs[@]}"; do
+              artifact_name=$(basename "$dir")
+              echo "Creating ZIP for $artifact_name..."
+              cd "$dir"
+              zip -r -9 "../../release-files/${artifact_name}.zip" ./*
+              cd - > /dev/null
+            done
+          else
+            echo "No AK3 artifacts found."
+          fi
+          
+          # Обработка boot.img файлов
+          boot_artifacts=(./downloaded-artifacts/*/)
+          for artifact_dir in "${boot_artifacts[@]}"; do
+            # Пропускаем AK3 директории (они уже обработаны)
+            if [[ "$(basename "$artifact_dir")" == *"-AK3" ]]; then
+              continue
+            fi
+            
+            # Ищем boot*.img файлы в директории
+            boot_imgs=("${artifact_dir}"boot*.img)
+            for boot_img in "${boot_imgs[@]}"; do
+              if [ -f "$boot_img" ]; then
+                artifact_name=$(basename "$artifact_dir")
+                boot_name=$(basename "$boot_img")
+                
+                # Копируем с понятным именем
+                cp "$boot_img" "./release-files/${artifact_name}-${boot_name}"
+                echo "Prepared: ${artifact_name}-${boot_name}"
+              fi
+            done
+          done
+          
+          echo ""
+          echo "=== Files ready for release ==="
+          ls -lh ./release-files/
+          echo ""
+          echo "Total files: $(ls -1 ./release-files/ | wc -l)"
+
+      - name: Create GitHub Release and Upload Assets
         if: inputs.release_type != 'Actions'
         uses: softprops/action-gh-release@v2
         with:
@@ -316,33 +365,9 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: ${{ env.NEW_TAG }}
           prerelease: ${{ inputs.release_type == 'Pre-Release' }}
-          files: ""
+          files: './release-files/*'
           name: ${{ env.RELEASE_NAME }}
           body_path: release_body.md
-
-      - name: Upload Release Assets
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          shopt -s nullglob
-          anykernel_dirs=(./downloaded-artifacts/*/)
-          if [ ${#anykernel_dirs[@]} -eq 0 ]; then
-            echo "No artifact directories found under ./downloaded-artifacts; skipping upload."
-          else
-            for dir in "${anykernel_dirs[@]}"; do
-              # Check if this is an AnyKernel3 artifact directory
-              if [[ "$(basename "$dir")" == *"-AK3" ]]; then
-                artifact_name=$(basename "$dir")
-                echo "Creating ZIP for $artifact_name..."
-                # Navigate into the directory and zip its contents directly
-                cd "$dir"
-                zip -r -9 "../../${artifact_name}.zip" ./*
-                cd - > /dev/null
-                echo "Uploading ${artifact_name}.zip..."
-                gh release upload NerestKernels/GKI_KernelSU_SUSFS ${{ env.NEW_TAG }} "${artifact_name}.zip"
-              fi
-            done
-          fi
             
       - name: Send Telegram Notification
         if: inputs.release_type != 'Actions'
@@ -363,4 +388,4 @@ jobs:
             📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown
+            -F parse_mode="Markdown"
