@@ -147,6 +147,7 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
+      - Build Test
 
     env:
       GH_TOKEN: ${{ github.token }}
@@ -334,8 +335,10 @@ jobs:
               if [[ "$(basename "$dir")" == *"-AK3" ]]; then
                 artifact_name=$(basename "$dir")
                 echo "Creating ZIP for $artifact_name..."
-                # The entire directory IS the AnyKernel3 content, so zip it directly
-                zip -r -9 "${artifact_name}.zip" "$dir"
+                # Navigate into the directory and zip its contents directly
+                cd "$dir"
+                zip -r -9 "../../${artifact_name}.zip" ./*
+                cd - > /dev/null
                 echo "Uploading ${artifact_name}.zip..."
                 gh release upload NerestKernels/GKI_KernelSU_SUSFS ${{ env.NEW_TAG }} "${artifact_name}.zip"
               fi
