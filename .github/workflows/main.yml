@@ -329,33 +329,58 @@ jobs:
             echo "No AK3 artifacts found."
           fi
           
-          # Обработка boot.img файлов
-          boot_artifacts=(./downloaded-artifacts/*/)
-          for artifact_dir in "${boot_artifacts[@]}"; do
-            # Пропускаем AK3 директории (они уже обработаны)
-            if [[ "$(basename "$artifact_dir")" == *"-AK3" ]]; then
-              continue
-            fi
-            
-            # Ищем boot*.img файлы в директории
-            boot_imgs=("${artifact_dir}"boot*.img)
-            for boot_img in "${boot_imgs[@]}"; do
-              if [ -f "$boot_img" ]; then
-                artifact_name=$(basename "$artifact_dir")
-                boot_name=$(basename "$boot_img")
-                
-                # Копируем с понятным именем
-                cp "$boot_img" "./release-files/${artifact_name}-${boot_name}"
-                echo "Prepared: ${artifact_name}-${boot_name}"
-              fi
+          # Обработка Misc артефактов (извлекаем boot.img из ZIP)
+          misc_dirs=(./downloaded-artifacts/*-Misc/)
+          if [ ${#misc_dirs[@]} -gt 0 ]; then
+            echo ""
+            echo "Found ${#misc_dirs[@]} Misc artifact(s)"
+            for dir in "${misc_dirs[@]}"; do
+              artifact_name=$(basename "$dir")
+              echo "Processing $artifact_name..."
+              
+              # Ищем ZIP файлы в директории
+              zip_files=("${dir}"*.zip)
+              for zip_file in "${zip_files[@]}"; do
+                if [ -f "$zip_file" ]; then
+                  echo "  Found ZIP: $(basename "$zip_file")"
+                  
+                  # Создаем временную директорию для распаковки
+                  temp_extract="./temp_extract_$$"
+                  mkdir -p "$temp_extract"
+                  
+                  # Распаковываем ZIP
+                  unzip -q "$zip_file" -d "$temp_extract"
+                  
+                  # Ищем boot.img файлы
+                  boot_imgs=("${temp_extract}/"*boot*.img)
+                  for boot_img in "${boot_imgs[@]}"; do
+                    if [ -f "$boot_img" ]; then
+                      boot_name=$(basename "$boot_img")
+                      # Копируем с именем артефакта
+                      new_name="${artifact_name%-Misc}-${boot_name}"
+                      cp "$boot_img" "./release-files/${new_name}"
+                      echo "  Extracted: ${new_name}"
+                    fi
+                  done
+                  
+                  # Удаляем временную директорию
+                  rm -rf "$temp_extract"
+                fi
+              done
             done
-          done
+          else
+            echo "No Misc artifacts found."
+          fi
           
           echo ""
           echo "=== Files ready for release ==="
-          ls -lh ./release-files/
-          echo ""
-          echo "Total files: $(ls -1 ./release-files/ | wc -l)"
+          if [ -d "./release-files" ] && [ "$(ls -A ./release-files)" ]; then
+            ls -lh ./release-files/
+            echo ""
+            echo "Total files: $(ls -1 ./release-files/ | wc -l)"
+          else
+            echo "WARNING: No files prepared for release!"
+          fi
 
       - name: Create GitHub Release and Upload Assets
         if: inputs.release_type != 'Actions'
