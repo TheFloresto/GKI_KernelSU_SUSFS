@@ -488,8 +488,8 @@ jobs:
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."          
-              cp -fv ../../SukiSU_patch/hooks/syscall_hooks.patch ./
-              patch -p1 --forward -F 3 < syscall_hooks.patch
+              cp -fv ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
