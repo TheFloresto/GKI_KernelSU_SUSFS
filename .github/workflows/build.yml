@@ -236,7 +236,7 @@ jobs:
                 sed -i 's/for (int i = 0; subcommands\[i\]; i++)/for (i = 0; subcommands[i]; i++)/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
               fi
             fi
-          fi 
+          fi  
 
       - name: Fix Less Then 6.6.50 Builds
         if: inputs.android_version == 'android15' && inputs.kernel_version == '6.6'
@@ -725,19 +725,35 @@ jobs:
           echo "CONFIG_SND_PROC_FS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_SND_ALOOP=m" >> "${{ env.DEFCONFIG }}"
           
-          ## Add snd-aloop.ko to modules list
-          #if [ -f "build/build.sh" ]; then
-          #  echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
-          #else
-          #  sed -i '/_COMMON_GKI_MODULES_LIST = \\[/,/\\]/ s/\\]/    "sound\/drivers\/snd-aloop.ko",\\n&/' common/modules.bzl
-          #fi
+           # Add snd-aloop.ko to modules list
+          echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
+
+          if [[ -f common/modules.bzl ]]; then
+            # Insert before the closing bracket of _COMMON_GKI_MODULES_LIST
+            echo "snd-aloop injection: adding to module list"
+            sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "sound/drivers/snd-aloop.ko",
+            }' common/modules.bzl
+          fi
           
           # Add symbols to abi_gki_aarch64
           #SYMBOL_LIST=common/android/abi_gki_aarch64
           #cat Wild_KSU/kernel/export_symbol.txt | awk '{sub("[ \t]+","");print "  "$0}' >> $SYMBOL_LIST
 
-          cp ../kernel_patches/wild/bypass_patches/abi_bypass_gki.patch ./
-          patch -p1 < abi_bypass_gki.patch || true
+          # ABI compare bypass per kernel/android version
+          # Edit each block as needed per version
+          if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/abi/compare_to_symbol_list
+          elif [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/kernel/abi/compare_to_symbol_list
+          elif [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/kernel/abi/compare_to_symbol_list
+          elif [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            perl -i -pe 's/return 1$/    print("Who Cares? Bypassing Now!")\n    return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
+          elif [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            perl -i -pe 's/return 1$/    print("Who Cares? Bypassing Now!")\n    return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
+          elif [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            perl -i -pe 's/return 1$/    print("Who Cares? Bypassing Now!")\n    return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
+          fi
 
       - name: Configure Build Optimization
         shell: bash
