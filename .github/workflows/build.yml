@@ -590,7 +590,8 @@ jobs:
           set -euo pipefail
           cd "$CONFIG"
           # KernelSU Configuration
-          echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"       
+          echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
+          echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           # BBG Support
@@ -775,8 +776,6 @@ jobs:
         run: |
           set -euo pipefail
           cd "$CONFIG"
-          #Add @NoFloresto to Kernel Version
-          sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
           perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
