@@ -590,7 +590,9 @@ jobs:
           set -euo pipefail
           cd "$CONFIG"
           # KernelSU Configuration
-          echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"       
+          echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
+          echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
