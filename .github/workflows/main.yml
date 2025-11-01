@@ -136,223 +136,288 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
+release:
+  runs-on: ubuntu-latest
+  timeout-minutes: 120
+  if: inputs.release_type != 'Actions'
+  needs:
+    - build-a12-5-10
+    - build-a13-5-10
+    - build-a13-5-15
+    - build-a14-5-15
+    - build-a14-6-1
+    - build-a15-6-6
 
-  release:
-    runs-on: ubuntu-latest
-    if: inputs.release_type != 'Actions'
-    needs:
-      - build-a12-5-10
-      - build-a13-5-10
-      - build-a13-5-15
-      - build-a14-5-15
-      - build-a14-6-1
-      - build-a15-6-6
+  env:
+    GH_TOKEN: ${{ github.token }}
+    RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
+    RELEASE_BODY: ""
+    
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    env:
-      GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
-      RELEASE_BODY: ""
-      
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get commit hashes and generate commit URLs
-        run: |
-          GITLAB_OWNER="simonpunk"
-          GITLAB_REPO="susfs4ksu"
+    - name: Get commit hashes and generate commit URLs
+      run: |
+        GITLAB_OWNER="simonpunk"
+        GITLAB_REPO="susfs4ksu"
+        
+        declare -A BRANCH_MAP=(
+          ["gki_android12_5_10"]="gki-android12-5.10"
+          ["gki_android13_5_10"]="gki-android13-5.10"
+          ["gki_android13_5_15"]="gki-android13-5.15"
+          ["gki_android14_5_15"]="gki-android14-5.15"
+          ["gki_android14_6_1"]="gki-android14-6.1"
+          ["gki_android15_6_6"]="gki-android15-6.6"
+        )
+        
+        for var_name in "${!BRANCH_MAP[@]}"; do
+          branch_name="${BRANCH_MAP[$var_name]}"
+          COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
           
-          declare -A BRANCH_MAP=(
-            ["gki_android12_5_10"]="gki-android12-5.10"
-            ["gki_android13_5_10"]="gki-android13-5.10"
-            ["gki_android13_5_15"]="gki-android13-5.15"
-            ["gki_android14_5_15"]="gki-android14-5.15"
-            ["gki_android14_6_1"]="gki-android14-6.1"
-            ["gki_android15_6_6"]="gki-android15-6.6"
-          )
-          
-          for var_name in "${!BRANCH_MAP[@]}"; do
-            branch_name="${BRANCH_MAP[$var_name]}"
-            COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
+          if [[ -n "$COMMIT_HASH" ]]; then
+            COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
+            echo "$branch_name Commit: $COMMIT_HASH"
+            echo "$branch_name Commit URL: $COMMIT_URL"
             
-            if [[ -n "$COMMIT_HASH" ]]; then
-              COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
-              echo "$branch_name Commit: $COMMIT_HASH"
-              echo "$branch_name Commit URL: $COMMIT_URL"
-              
-              echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
-              echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
+            echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
+            echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
+          fi
+        done
+
+    - name: Get KernelSU variant refs and links
+      run: |
+        case "${{ inputs.kernelsu_variant }}" in
+          "WKSU")
+            KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
+            KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
+            ;;
+          "NEXT")
+            KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/next | awk '{print $1}')
+            KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
+            ;;
+          "MKSU")
+            KSU_REF=$(git ls-remote "https://github.com/5ec1cff/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/5ec1cff/KernelSU/commit/$KSU_REF"
+            ;;
+          "KSU")
+            KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
+            ;;
+          "SukiSU")
+            KSU_REF=$(git ls-remote "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/$KSU_REF"
+            ;;
+        esac
+        
+        echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
+        echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
+        
+        # Get Baseband-guard latest commit from main branch
+        BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
+        BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
+        echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
+        echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
+
+    - name: Generate New Tag
+      if: inputs.release_type != 'Actions'
+      env:
+       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      run: |
+        LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
+        if [ -z "$LATEST_TAG" ]; then
+          LATEST_TAG="v1.5.12-r0"
+        fi
+        
+        NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+
+        echo "New tag: $NEW_TAG"
+        echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+
+    - name: Download AK3 Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        pattern: '*-AK3'
+        path: ./downloaded-artifacts
+      continue-on-error: true
+      timeout-minutes: 30
+
+    - name: Download Misc Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        pattern: '*-Misc'
+        path: ./downloaded-artifacts
+      continue-on-error: true
+      timeout-minutes: 30
+
+    - name: Verify Downloaded Artifacts
+      run: |
+        set -euo pipefail
+        echo "=== Checking downloaded artifacts ==="
+        
+        if [ ! -d "./downloaded-artifacts" ]; then
+          echo "ERROR: downloaded-artifacts directory does not exist!"
+          exit 1
+        fi
+        
+        AK3_COUNT=$(find ./downloaded-artifacts -type d -name '*-AK3' 2>/dev/null | wc -l)
+        MISC_COUNT=$(find ./downloaded-artifacts -type d -name '*-Misc' 2>/dev/null | wc -l)
+        
+        echo "Found $AK3_COUNT AK3 artifact directories"
+        echo "Found $MISC_COUNT Misc artifact directories"
+        
+        if [ "$AK3_COUNT" -eq 0 ] && [ "$MISC_COUNT" -eq 0 ]; then
+          echo "ERROR: No artifacts downloaded!"
+          exit 1
+        fi
+        
+        if [ "$AK3_COUNT" -eq 0 ]; then
+          echo "WARNING: No AK3 artifacts found!"
+        fi
+        
+        if [ "$MISC_COUNT" -eq 0 ]; then
+          echo "WARNING: No Misc artifacts found!"
+        fi
+        
+        echo ""
+        echo "=== Downloaded artifact structure ==="
+        ls -la ./downloaded-artifacts/ || true
+        echo ""
+        echo "Total items: $(ls -1 ./downloaded-artifacts/ 2>/dev/null | wc -l)"
+
+    - name: Set release body
+      run: |
+        cat << 'EOF' > release_body.md
+    
+        **IMPORTANT DISCLAIMER**
+        This software is provided for testing and educational purposes only. Use at your own risk.
+        The developers are not responsible for any damage, data loss, or issues that may occur.
+        Please ensure you have proper backups before installation.
+
+        🔹 Normal 
+        - Default kernel configuration 
+        - Standard kernel module loading behavior 
+        - Recommended for most users 
+
+        🔹 Bypass 
+        - Includes module check bypass modifications 
+        - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
+        - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
+        - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
+
+        Features:
+        -> ${{ inputs.kernelsu_variant }} KSU
+        -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
+        -> SUSFS ඞ v1.5.12
+        -> Scope-Minimized Manual hooks v1.4
+        -> Ptrace Patch Support for Older Kernels (<5.16)
+        -> IPSet Support for Advanced Network Filtering
+        -> Wireguard Support
+        -> BBR v1 Support
+        -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
+
+        🔹 BBG (Baseband-guard)
+        - A lightweight LSM (Linux Security Module) for Android kernel
+        - Blocks unauthorized writes to critical partitions/device nodes
+        - Prevents malicious tampering with baseband and boot chain
+        - Kernel-level protection via LSM hooks
+        - Reduces risk of soft-brick/hard-brick issues
+
+        Notes:
+        -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
+        -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
+        -> **Warning**: boot.img files may not boot on some devices
+        -> **Note:** For detailed commit information and component versions, please check the [build summary](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) in the GitHub Actions workflow that generated this release.
+
+        Module: 
+        -> https://github.com/sidex15/ksu_module_susfs
+    
+        Managers:
+        -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
+        -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
+        -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
+        -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
+        -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
+
+        Commit Hashes (at the time of release):
+        -> ${{ inputs.kernelsu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
+
+        -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
+
+        -> SUSFS4KSU: 
+          -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
+          -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
+          -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})
+          -> gki-android14-5.15: [${{ env.COMMIT_HASH_gki_android14_5_15 }}](${{ env.COMMIT_URL_gki_android14_5_15 }})
+          -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
+          -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
+        EOF
+
+    - name: Prepare Release Files
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+        mkdir -p ./release-files
+        
+        echo "=== Processing artifacts ==="
+        
+        # Обработка AK3 директорий (запаковываем в ZIP)
+        anykernel_dirs=(./downloaded-artifacts/*-AK3/)
+        if [ ${#anykernel_dirs[@]} -gt 0 ]; then
+          echo "Found ${#anykernel_dirs[@]} AK3 artifact(s)"
+          for dir in "${anykernel_dirs[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "  Skipping $dir (not a directory)"
+              continue
             fi
-          done
-
-      - name: Get KernelSU variant refs and links
-        run: |
-          case "${{ inputs.kernelsu_variant }}" in
-            "WKSU")
-              KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
-              KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
-              ;;
-            "NEXT")
-              KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/next | awk '{print $1}')
-              KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
-              ;;
-            "MKSU")
-              KSU_REF=$(git ls-remote "https://github.com/5ec1cff/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/5ec1cff/KernelSU/commit/$KSU_REF"
-              ;;
-            "KSU")
-              KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
-              ;;
-            "SukiSU")
-              KSU_REF=$(git ls-remote "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/$KSU_REF"
-              ;;
-          esac
-          
-          echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
-          echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
-          
-          # Get Baseband-guard latest commit from main branch
-          BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
-          BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
-          echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
-          echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
-
-      - name: Generate New Tag
-        if: inputs.release_type != 'Actions'
-        env:
-         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.5.12-r0"
-          fi
-          
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./downloaded-artifacts
-
-      - name: Set release body
-        run: |
-          cat << 'EOF' > release_body.md
-      
-          **IMPORTANT DISCLAIMER**
-          This software is provided for testing and educational purposes only. Use at your own risk.
-          The developers are not responsible for any damage, data loss, or issues that may occur.
-          Please ensure you have proper backups before installation.
-
-          🔹 Normal 
-          - Default kernel configuration 
-          - Standard kernel module loading behavior 
-          - Recommended for most users 
-
-          🔹 Bypass 
-          - Includes module check bypass modifications 
-          - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
-          - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
-          - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
-
-          Features:
-          -> ${{ inputs.kernelsu_variant }} KSU
-          -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
-          -> SUSFS ඞ v1.5.12
-          -> Scope-Minimized Manual hooks v1.4
-          -> Ptrace Patch Support for Older Kernels (<5.16)
-          -> IPSet Support for Advanced Network Filtering
-          -> Wireguard Support
-          -> BBR v1 Support
-          -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
-
-          🔹 BBG (Baseband-guard)
-          - A lightweight LSM (Linux Security Module) for Android kernel
-          - Blocks unauthorized writes to critical partitions/device nodes
-          - Prevents malicious tampering with baseband and boot chain
-          - Kernel-level protection via LSM hooks
-          - Reduces risk of soft-brick/hard-brick issues
-
-          Notes:
-          -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
-          -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
-          -> **Warning**: boot.img files may not boot on some devices
-          -> **Note:** For detailed commit information and component versions, please check the [build summary](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) in the GitHub Actions workflow that generated this release.
-
-          Module: 
-          -> https://github.com/sidex15/ksu_module_susfs
-      
-          Managers:
-          -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
-          -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
-          -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
-          -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
-          -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
-
-          Commit Hashes (at the time of release):
-          -> ${{ inputs.kernelsu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
-
-          -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
-
-          -> SUSFS4KSU: 
-            -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
-            -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
-            -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})
-            -> gki-android14-5.15: [${{ env.COMMIT_HASH_gki_android14_5_15 }}](${{ env.COMMIT_URL_gki_android14_5_15 }})
-            -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
-            -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
-          EOF
-
-      - name: Prepare Release Files
-        run: |
-          shopt -s nullglob
-          mkdir -p ./release-files
-          
-          echo "=== Processing artifacts ==="
-          
-          # Обработка AK3 директорий (запаковываем в ZIP)
-          anykernel_dirs=(./downloaded-artifacts/*-AK3/)
-          if [ ${#anykernel_dirs[@]} -gt 0 ]; then
-            echo "Found ${#anykernel_dirs[@]} AK3 artifact(s)"
-            for dir in "${anykernel_dirs[@]}"; do
-              artifact_name=$(basename "$dir")
-              echo "Creating ZIP for $artifact_name..."
-              cd "$dir"
-              zip -r -9 "../../release-files/${artifact_name}.zip" ./*
+            
+            artifact_name=$(basename "$dir")
+            echo "Creating ZIP for $artifact_name..."
+            
+            cd "$dir"
+            if [ -z "$(ls -A)" ]; then
+              echo "  WARNING: $artifact_name is empty, skipping"
               cd - > /dev/null
-            done
-          else
-            echo "No AK3 artifacts found."
-          fi
-          
-          # Обработка Misc артефактов (извлекаем boot.img из ZIP)
-          misc_dirs=(./downloaded-artifacts/*-Misc/)
-          if [ ${#misc_dirs[@]} -gt 0 ]; then
-            echo ""
-            echo "Found ${#misc_dirs[@]} Misc artifact(s)"
-            for dir in "${misc_dirs[@]}"; do
-              artifact_name=$(basename "$dir")
-              echo "Processing $artifact_name..."
-              
-              # Ищем ZIP файлы в директории
-              zip_files=("${dir}"*.zip)
-              for zip_file in "${zip_files[@]}"; do
-                if [ -f "$zip_file" ]; then
-                  echo "  Found ZIP: $(basename "$zip_file")"
-                  
-                  # Создаем временную директорию для распаковки
-                  temp_extract="./temp_extract_$$"
-                  mkdir -p "$temp_extract"
-                  
-                  # Распаковываем ZIP
-                  unzip -q "$zip_file" -d "$temp_extract"
-                  
+              continue
+            fi
+            
+            zip -r -9 "../../release-files/${artifact_name}.zip" ./*
+            cd - > /dev/null
+          done
+        else
+          echo "No AK3 artifacts found."
+        fi
+        
+        # Обработка Misc артефактов (извлекаем boot.img из ZIP)
+        misc_dirs=(./downloaded-artifacts/*-Misc/)
+        if [ ${#misc_dirs[@]} -gt 0 ]; then
+          echo ""
+          echo "Found ${#misc_dirs[@]} Misc artifact(s)"
+          for dir in "${misc_dirs[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "  Skipping $dir (not a directory)"
+              continue
+            fi
+            
+            artifact_name=$(basename "$dir")
+            echo "Processing $artifact_name..."
+            
+            # Ищем ZIP файлы в директории
+            zip_files=("${dir}"*.zip)
+            for zip_file in "${zip_files[@]}"; do
+              if [ -f "$zip_file" ]; then
+                echo "  Found ZIP: $(basename "$zip_file")"
+                
+                # Создаем временную директорию для распаковки
+                temp_extract="./temp_extract_$$_$(date +%s)"
+                mkdir -p "$temp_extract"
+                
+                # Распаковываем ZIP
+                if unzip -q "$zip_file" -d "$temp_extract" 2>/dev/null; then
                   # Ищем boot.img файлы
                   boot_imgs=("${temp_extract}/"*boot*.img)
+                  found_boot=false
+                  
                   for boot_img in "${boot_imgs[@]}"; do
                     if [ -f "$boot_img" ]; then
                       boot_name=$(basename "$boot_img")
@@ -360,57 +425,72 @@ jobs:
                       new_name="${artifact_name%-Misc}-${boot_name}"
                       cp "$boot_img" "./release-files/${new_name}"
                       echo "  Extracted: ${new_name}"
+                      found_boot=true
                     fi
                   done
                   
-                  # Удаляем временную директорию
-                  rm -rf "$temp_extract"
+                  if [ "$found_boot" = false ]; then
+                    echo "  WARNING: No boot.img files found in $zip_file"
+                  fi
+                else
+                  echo "  ERROR: Failed to unzip $zip_file"
                 fi
-              done
+                
+                # Удаляем временную директорию
+                rm -rf "$temp_extract"
+              fi
             done
-          else
-            echo "No Misc artifacts found."
-          fi
-          
+          done
+        else
+          echo "No Misc artifacts found."
+        fi
+        
+        echo ""
+        echo "=== Files ready for release ==="
+        if [ -d "./release-files" ] && [ "$(ls -A ./release-files 2>/dev/null)" ]; then
+          ls -lh ./release-files/
           echo ""
-          echo "=== Files ready for release ==="
-          if [ -d "./release-files" ] && [ "$(ls -A ./release-files)" ]; then
-            ls -lh ./release-files/
-            echo ""
-            echo "Total files: $(ls -1 ./release-files/ | wc -l)"
-          else
-            echo "WARNING: No files prepared for release!"
-          fi
-
-      - name: Create GitHub Release and Upload Assets
-        if: inputs.release_type != 'Actions'
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: NerestKernels/GKI_KernelSU_SUSFS
-          token: ${{ secrets.RELEASE_TOKEN }}
-          tag_name: ${{ env.NEW_TAG }}
-          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
-          files: './release-files/*'
-          name: ${{ env.RELEASE_NAME }}
-          body_path: release_body.md
-            
-      - name: Send Telegram Notification
-        if: inputs.release_type != 'Actions'
-        run: |
-          RELEASE_TYPE_TEXT=""
-          if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
-            RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
-          else
-            RELEASE_TYPE_TEXT="🚀 *Release*"
-          fi
+          echo "Total files: $(ls -1 ./release-files/ | wc -l)"
           
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
-            -F text="
-            🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
-            🛑 *Variant:* ${{ inputs.kernelsu_variant }}
-            📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
-            ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown"
+          # Проверка минимального количества файлов
+          FILE_COUNT=$(ls -1 ./release-files/ | wc -l)
+          if [ "$FILE_COUNT" -lt 2 ]; then
+            echo "WARNING: Only $FILE_COUNT file(s) prepared. Expected more."
+          fi
+        else
+          echo "ERROR: No files prepared for release!"
+          exit 1
+        fi
+
+    - name: Create GitHub Release and Upload Assets
+      if: inputs.release_type != 'Actions'
+      uses: softprops/action-gh-release@v2
+      with:
+        repository: NerestKernels/GKI_KernelSU_SUSFS
+        token: ${{ secrets.RELEASE_TOKEN }}
+        tag_name: ${{ env.NEW_TAG }}
+        prerelease: ${{ inputs.release_type == 'Pre-Release' }}
+        files: './release-files/*'
+        name: ${{ env.RELEASE_NAME }}
+        body_path: release_body.md
+          
+    - name: Send Telegram Notification
+      if: inputs.release_type != 'Actions'
+      run: |
+        RELEASE_TYPE_TEXT=""
+        if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
+          RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
+        else
+          RELEASE_TYPE_TEXT="🚀 *Release*"
+        fi
+        
+        curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
+          -F text="
+          🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
+          🛑 *Variant:* ${{ inputs.kernelsu_variant }}
+          📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
+          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+          [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
+          -F parse_mode="Markdown"
