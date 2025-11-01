@@ -592,7 +592,6 @@ jobs:
           # KernelSU Configuration
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"       
           echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
-          echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
@@ -853,6 +852,22 @@ jobs:
             echo "Error: Image file not found in any expected location"
             exit 1
           fi
+
+      - name: Copy snd-aloop module for Android 12-13    
+        if: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p AnyKernel3/modules/data/adb/lkm
+          cp "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
+
+      - name: Copy snd-aloop module for Android 14-15
+        if: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p AnyKernel3/modules/data/adb/lkm
+          cp "./$CONFIG/bazel-bin/common/kernel_aarch64/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
 
       - name: Search for Kernel Modules
         if: false
