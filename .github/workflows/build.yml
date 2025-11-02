@@ -808,9 +808,11 @@ jobs:
           set -euox pipefail
           cd "$CONFIG"
           echo "Building the kernel..."
-          if [ -f "build/build.sh" ]; then
+          if [ -f "build/build.sh" ]; then        
+            unset LOCALVERSION
             LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
           else
+            unset LOCALVERSION
             tools/bazel build --config=fast --lto=full --sandbox_debug --verbose_failures //common:kernel_aarch64_dist || exit 1
           fi
 
