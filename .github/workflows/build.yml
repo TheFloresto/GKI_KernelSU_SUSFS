@@ -620,6 +620,8 @@ jobs:
           echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KALLSYMS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_MANUAL_SU" >> "${{ env.DEFCONFIG }}"          
 
       - name: Configure SUSFS
         shell: bash
