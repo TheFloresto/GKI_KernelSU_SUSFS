@@ -96,6 +96,19 @@ jobs:
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
 
+      - name: Install Minimal Dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Install deps"
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git curl ca-certificates build-essential clang lld flex bison \
+            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+            libxml2-utils rsync unzip dwarves file python3
+          sudo apt-get clean
+          echo "::endgroup::"
+
       - name: Setup Build Environment
         shell: bash
         run: |
@@ -591,8 +604,6 @@ jobs:
           cd "$CONFIG"
           # KernelSU Configuration
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
-          echo 'CONFIG_LOCALVERSION="-@NoFloresto"' >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
@@ -804,19 +815,123 @@ jobs:
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
-      - name: Build
+      - name: Detect Clang Toolchain
         shell: bash
         run: |
-          set -euox pipefail
+          set -euo pipefail
           cd "$CONFIG"
-          echo "Building the kernel..."
-          if [ -f "build/build.sh" ]; then        
-            unset LOCALVERSION
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
-          else
-            unset LOCALVERSION
-            tools/bazel build --config=fast --lto=full --sandbox_debug --verbose_failures //common:kernel_aarch64_dist || exit 1
+          
+          # Проверяем наличие Clang в prebuilts-master или prebuilts
+          CLANG_FOUND=false
+          for base in "prebuilts-master" "prebuilts"; do
+            if [ -d "$base/clang/host/linux-x86" ]; then
+              CLANG_PATH="$base/clang/host/linux-x86"
+              # Находим последнюю версию Clang
+              latest=$(ls -d $CLANG_PATH/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
+              if [ -n "$latest" ] && [ -d "$latest" ]; then
+                CLANG_DIR="$GITHUB_WORKSPACE/$CONFIG/$latest"
+                CLANG_BIN_PATH="$CLANG_DIR/bin"
+                CLANG_FOUND=true
+                break
+              fi
+            fi
+          done
+          
+          if ! $CLANG_FOUND; then
+            echo "Error: Clang toolchain not found in prebuilts directories"
+            exit 1
           fi
+          
+          # Сохраняем путь к Clang в переменных окружения
+          echo "CLANG_DIR=$CLANG_DIR" >> $GITHUB_ENV
+          echo "CLANG_BIN_PATH=$CLANG_BIN_PATH" >> $GITHUB_ENV
+          echo "PATH=$CLANG_BIN_PATH:$PATH" >> $GITHUB_ENV
+          
+          # Получаем версию Clang для отображения
+          if [ -x "${CLANG_BIN_PATH}/clang" ]; then
+            CLANG_VERSION=$("${CLANG_BIN_PATH}/clang" --version | head -n 1)
+            echo "Detected Clang: $CLANG_VERSION"
+            echo "CLANG_VERSION=$CLANG_VERSION" >> $GITHUB_ENV
+          else
+            echo "Warning: clang binary not found at $CLANG_BIN_PATH/clang"
+          fi
+
+      - name: Customize Kernel Branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          cd "$KERNEL_PATH/common"
+          mkdir -p out
+          CUSTOM_LOCALVERSION="-@NoFloresto"
+          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
+
+      - name: Build Kernel
+        shell: bash
+        env:
+          PYTHONWARNINGS: "ignore:invalid escape sequence"
+        run: |
+          set -euox pipefail
+          echo "::group::Build kernel"
+          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
+          COMMON="$KERNEL_PATH/common"
+          cd "$COMMON"
+          : > "$COMMON/.scmversion"
+          
+          # Ensure Python warnings are suppressed for scripts invoked by make
+          export PYTHONWARNINGS="${PYTHONWARNINGS}"
+          
+          # Используем сохраненный путь к Clang
+          if [ -n "${CLANG_BIN_PATH:-}" ] && [ -x "${CLANG_BIN_PATH}/clang" ]; then
+            export PATH="${CLANG_BIN_PATH}:$PATH"
+          else
+            # Fallback: если CLANG_BIN_PATH не установлен, используем CLANG_DIR
+            export PATH="${CLANG_DIR}/bin:${PATH}"
+          fi
+          
+          export LLVM=1 LLVM_IAS=1
+          export ARCH=arm64 SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-android-
+          export CROSS_COMPILE_COMPAT=arm-linux-androideabi-
+          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip HOSTCC=clang HOSTCXX=clang++
+          export CC=clang
+          
+          OUT=out
+          mkdir -p "$OUT"
+          make O="$OUT" gki_defconfig
+          
+          # LOCALVERSION branding
+          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
+            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
+            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
+          fi
+          
+          # Optimize level config and flags
+          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          KCFLAGS_EXTRA="-O2"
+          
+          # Consistent flags; include -pipe and disable stack protector
+          KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
+          KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
+          
+          # Regenerate defaults after config edits
+          make O="$OUT" olddefconfig
+          
+          echo "Starting build with $(nproc --all) threads..."
+          set -o pipefail
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" Image Image.gz Image.lz4 2>&1 | tee build.log
+          
+          IMG="$OUT/arch/arm64/boot/Image"
+          if [ ! -f "$IMG" ]; then
+            echo "Kernel Image missing"
+            exit 1
+          f        
+          sha256sum "$IMG" | tee "$OUT/Image.sha256"
+          echo "Build completed successfully!"
+          ls -la "$OUT/arch/arm64/boot/Image"*
+          echo "::endgroup::"
 
       - name: Patch KPM for SukiSU-Ultra
         if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
