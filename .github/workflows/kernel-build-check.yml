@@ -1,8 +1,8 @@
-name: Kernel Build Check
+name: Test Build
 
 permissions:
-  contents: write
-  actions: write
+  contents: write  # Allow writing to repository contents
+  actions: write   # Allows triggering actions
 
 on:
   workflow_call:
@@ -19,12 +19,13 @@ on:
         default: ""
 
 jobs:
-  build-check:
+  build-test-kernels:
+    name: "Test Build ${{ matrix.kernel_version }}.${{ matrix.sub_level }}-${{ matrix.android_version }}"
     strategy:
       fail-fast: false
       matrix:
-        kernel_config:
-          # Android 12 - Kernel 5.10.43 (Oldest)
+        include:
+          # Android 12 - 5.10 oldest (OLD)
           - android_version: "android12"
             kernel_version: "5.10"
             sub_level: "43"
@@ -36,59 +37,65 @@ jobs:
             sub_level: "209"
             os_patch_level: "2024-05"
           
-          # Android 12 - Kernel 5.10 LTS (Latest)
+          # Android 12 - 5.10 LTS (NEW)
           - android_version: "android12"
             kernel_version: "5.10"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 13 - Kernel 5.10.107 (Oldest)
+          # Android 13 - 5.10 oldest (OLD)
           - android_version: "android13"
             kernel_version: "5.10"
             sub_level: "107"
             os_patch_level: "2022-04"
           
-          # Android 13 - Kernel 5.10 LTS (Latest)
+          # Android 13 - 5.10 LTS (NEW)
           - android_version: "android13"
             kernel_version: "5.10"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 13 - Kernel 5.15.41 (Oldest)
+          # Android 13 - 5.15 oldest (OLD)
           - android_version: "android13"
             kernel_version: "5.15"
             sub_level: "41"
             os_patch_level: "2022-06"
           
-          # Android 13 - Kernel 5.15 LTS (Latest)
+          # Android 13 - 5.15 LTS (NEW)
           - android_version: "android13"
             kernel_version: "5.15"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 14 - Kernel 5.15.110 (Oldest)
+          # Android 14 - 5.15 oldest (OLD)
           - android_version: "android14"
             kernel_version: "5.15"
             sub_level: "110"
             os_patch_level: "2023-06"
           
-          # Android 14 - Kernel 5.15 LTS (Latest)
+          # Android 14 - 5.15 LTS (NEW)
           - android_version: "android14"
             kernel_version: "5.15"
             sub_level: "X"
             os_patch_level: "lts"
           
-          # Android 14 - Kernel 6.1.25 (Oldest)
+          # Android 14 - 6.1 oldest (OLD)
           - android_version: "android14"
             kernel_version: "6.1"
             sub_level: "25"
             os_patch_level: "2023-06"
-
-          # Android 14 - Kernel 6.1.124 (Test)
+          
+          # Android 14 - 6.1 LTS (NEW)
           - android_version: "android14"
             kernel_version: "6.1"
-            sub_level: "124"
-            os_patch_level: "2025-02"
+            sub_level: "X"
+            os_patch_level: "lts"
+          
+          # Android 14 - 6.1 specific sublevel (OLD)
+          - android_version: "android14"
+            kernel_version: "6.1"
+            sub_level: "134"
+            os_patch_level: "2025-05"
 
           # Android 14 - Kernel 6.1.138 (Test)
           - android_version: "android14"
@@ -96,32 +103,25 @@ jobs:
             sub_level: "138"
             os_patch_level: "2025-08"
           
-          # Android 14 - Kernel 6.1 LTS (Latest)
-          - android_version: "android14"
-            kernel_version: "6.1"
-            sub_level: "X"
-            os_patch_level: "lts"
-          
-          # Android 15 - Kernel 6.6.30 (Oldest)
+          # Android 15 - 6.6 oldest (NEW)
           - android_version: "android15"
             kernel_version: "6.6"
             sub_level: "30"
             os_patch_level: "2024-07"
           
-          # Android 15 - Kernel 6.6 LTS (Latest)
+          # Android 15 - 6.6 LTS (OLD)
           - android_version: "android15"
             kernel_version: "6.6"
             sub_level: "X"
             os_patch_level: "lts"
-
-    name: Build Check
+    
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
-      android_version: ${{ matrix.kernel_config.android_version }}
-      kernel_version: ${{ matrix.kernel_config.kernel_version }}
-      sub_level: ${{ matrix.kernel_config.sub_level }}
-      os_patch_level: ${{ matrix.kernel_config.os_patch_level }}
+      android_version: ${{ matrix.android_version }}
+      kernel_version: ${{ matrix.kernel_version }}
+      sub_level: ${{ matrix.sub_level }}
+      os_patch_level: ${{ matrix.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}   
