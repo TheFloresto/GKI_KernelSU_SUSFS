@@ -777,7 +777,7 @@ jobs:
           cd "$CONFIG"
           # Build Optimization Configuration
           echo "# Build Optimization Configuration" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_LTO_CLANG_FULL=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LTO_CLANG_THIN=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "${{ env.DEFCONFIG }}"
