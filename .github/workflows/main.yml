@@ -32,13 +32,13 @@ on:
         type: choice
         options:
           - All
+          - Test Build
           - Android12-5.10
           - Android13-5.10
           - Android13-5.15
           - Android14-5.15
           - Android14-6.1
           - Android15-6.6
-          - Build Test
         default: All
       kernelsu_variant:
         description: "Choose KernelSU Variant"
@@ -66,7 +66,18 @@ on:
         type: string
         default: ""
 
+
 jobs:
+
+  build-test:
+    if: inputs.build_selection == 'Test Build'
+    uses: ./.github/workflows/test-build.yml
+    secrets: inherit
+    with:
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
   build-a12-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10')
     uses: ./.github/workflows/kernel-a12-5-10.yml
@@ -75,6 +86,7 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
 
   build-a13-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10')
@@ -85,6 +97,7 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
+
   build-a13-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
     uses: ./.github/workflows/kernel-a13-5-15.yml
@@ -93,6 +106,7 @@ jobs:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
 
   build-a14-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
@@ -103,6 +117,7 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
+
   build-a14-6-1:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
     uses: ./.github/workflows/kernel-a14-6-1.yml
@@ -110,7 +125,8 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
 
   build-a15-6-6:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6')
@@ -119,20 +135,11 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
-  build-test:
-    if: inputs.build_selection == 'Build Test'
-    uses: ./.github/workflows/kernel-build-check.yml
-    secrets: inherit
-    with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+
 
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     if: inputs.release_type != 'Actions'
     needs:
       - build-a12-5-10
@@ -146,8 +153,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
       RELEASE_BODY: ""
-      
     steps:
+      - name: Download Apache Arrow's util_free_space.sh
+        run: |
+          curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
+          chmod +x util_free_space.sh
+          ./util_free_space.sh
+      
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -213,7 +225,6 @@ jobs:
           echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
           echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
 
-
       - name: Generate New Tag
         if: inputs.release_type != 'Actions'
         env:
@@ -229,56 +240,10 @@ jobs:
           echo "New tag: $NEW_TAG"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-      - name: Download AK3 Artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v5
         with:
-          pattern: '*-AK3'
           path: ./downloaded-artifacts
-        continue-on-error: true
-        timeout-minutes: 42
-
-      - name: Download Misc Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          pattern: '*-Misc'
-          path: ./downloaded-artifacts
-        continue-on-error: true
-        timeout-minutes: 42
-
-      - name: Verify Downloaded Artifacts
-        run: |
-          set -euo pipefail
-          echo "=== Checking downloaded artifacts ==="
-          
-          if [ ! -d "./downloaded-artifacts" ]; then
-            echo "ERROR: downloaded-artifacts directory does not exist!"
-            exit 1
-          fi
-          
-          AK3_COUNT=$(find ./downloaded-artifacts -type d -name '*-AK3' 2>/dev/null | wc -l)
-          MISC_COUNT=$(find ./downloaded-artifacts -type d -name '*-Misc' 2>/dev/null | wc -l)
-          
-          echo "Found $AK3_COUNT AK3 artifact directories"
-          echo "Found $MISC_COUNT Misc artifact directories"
-          
-          if [ "$AK3_COUNT" -eq 0 ] && [ "$MISC_COUNT" -eq 0 ]; then
-            echo "ERROR: No artifacts downloaded!"
-            exit 1
-          fi
-          
-          if [ "$AK3_COUNT" -eq 0 ]; then
-            echo "WARNING: No AK3 artifacts found!"
-          fi
-          
-          if [ "$MISC_COUNT" -eq 0 ]; then
-            echo "WARNING: No Misc artifacts found!"
-          fi
-          
-          echo ""
-          echo "=== Downloaded artifact structure ==="
-          ls -la ./downloaded-artifacts/ || true
-          echo ""
-          echo "Total items: $(ls -1 ./downloaded-artifacts/ 2>/dev/null | wc -l)"
 
       - name: Set release body
         run: |
@@ -309,6 +274,7 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
+          #-> Kernel Sound System: Basic audio support with PCM, timers, procfs info, dynamic devices, and loopback module (module found at /data/adb/lkm after install)
           -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
 
           🔹 BBG (Baseband-guard)
@@ -321,8 +287,9 @@ jobs:
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
+          -> **boot.img files**: Available as CI artifacts only - download from the Actions tab in the "Misc" Artifact
           -> **Warning**: boot.img files may not boot on some devices
-          -> **Note:** For detailed commit information and component versions, please check the [build summary](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) in the GitHub Actions workflow that generated this release.
+          -> **Note:** For detailed commit information and component versions, please check the build summary in the "Misc" Artifact
 
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
@@ -458,7 +425,6 @@ jobs:
           fi
 
       - name: Create GitHub Release and Upload Assets
-        if: inputs.release_type != 'Actions'
         uses: softprops/action-gh-release@v2
         with:
           repository: NerestKernels/GKI_KernelSU_SUSFS
