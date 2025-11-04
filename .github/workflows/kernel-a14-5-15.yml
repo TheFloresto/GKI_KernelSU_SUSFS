@@ -20,6 +20,7 @@ on:
 
 jobs:
   build-kernels-a14-5-15:
+    name: "5.15.${{ matrix.sub_level }}-${{ matrix.os_patch_level }}"
     strategy:
       fail-fast: false
       matrix:
@@ -70,7 +71,7 @@ jobs:
       android_version: "android14"
       kernel_version: "5.15"
       sub_level: ${{ matrix.sub_level }}
-      os_patch_level: ${{ matrix.os_patch_level }}
+      os_patch_level: ${{ matrix.os_patch_level }}              
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
