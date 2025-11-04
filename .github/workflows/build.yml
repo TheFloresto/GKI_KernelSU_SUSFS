@@ -1,4 +1,4 @@
-name: Kernel Build Process
+Name: Kernel Build Process
 permissions:
   contents: write
   actions: write 
@@ -100,7 +100,7 @@ jobs:
       - name: Install Minimal Dependencies
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           echo "::group::Install deps"
           sudo apt-get -o Acquire::Retries=3 update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -166,7 +166,7 @@ jobs:
           #    git checkout 700b9316b5a1cab174401b57f4198782a17154fb
           #    ;;
           #  "android14-5.15")
-          #    git checkout e1b1bba04b3cada700b8fd5bda4cfd4c59de07a2
+          #    git checkout e1b1bba06b3cada700b8fd5bda4cfd4c59de07a2
           #    ;;
           #  "android14-6.1")
           #    git checkout f16560ce8263fbfa9b2f259e9531f72d6fda4e3f
@@ -239,7 +239,7 @@ jobs:
               ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL <= 43 ))); then
             GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}') 
             if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then 
-              cd $CONFIG/common/
+              cd $CONFIG/common
               sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile 2>/dev/null || true
               if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 186 ))) || 
                   ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 119 ))) || 
@@ -433,9 +433,9 @@ jobs:
               fi
 
               # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
-              if ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )) ) \
+              if ( ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )) ) \
                 || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL >= 145 )) ) \
-                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ); then
+                || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ) ); then
                 cp -fv ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
                 patch -p1 < 1_fix_base.c.patch || true
               fi
@@ -542,6 +542,25 @@ jobs:
               echo "$REL" >> "$REJECTS_DIR/index.txt"
             done
           fi
+
+      # --- ШАГ ИСПРАВЛЕНИЯ ПРЕДУПРЕЖДЕНИЙ CLANG (С ИСПОЛЬЗОВАНИЕМ ФАЙЛА) ---
+      - name: Apply Clang Default Init Fix (Wno-default-const-init-var-unsafe)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG/common"
+          
+          PATCH_FILE="../../kernel_patches/0001-Wno-default-const-init-var-unsafe.patch"
+          
+          echo "Applying patch from ${PATCH_FILE} to disable noisy Clang default-const-init warnings..."
+          
+          if [ -f "$PATCH_FILE" ]; then
+            patch -p1 --forward < "$PATCH_FILE"
+          else
+            echo "Error: Clang warning disable patch not found at $PATCH_FILE" >&2
+            exit 1
+          fi
+      # --------------------------------------------------------------------
 
       - name: Add BBG
         shell: bash
@@ -785,6 +804,25 @@ jobs:
           echo "CONFIG_CCACHE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
 
+      - name: Configure DWARF/BTF Compatibility Fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          
+          echo "Applying DWARF4 compatibility flags for LTO/BTF to fix BTFIDS error."
+          
+          # Отключаем опции, которые могут генерировать неполную или сжатую DWARF, конфликтующую с BTFIDS
+          scripts/config --file "${{ env.DEFCONFIG }}" -d CONFIG_DEBUG_INFO_REDUCED || true
+          scripts/config --file "${{ env.DEFCONFIG }}" -d CONFIG_DEBUG_INFO_COMPRESSED || true
+          
+          # Принудительное использование DWARF4 для совместимости с pahole/BTFIDS (КЛЮЧЕВОЙ ФИКС)
+          echo "CONFIG_EXTRA_CFLAGS=\"-gdwarf-4\"" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_EXTRA_LDFLAGS=\"-gdwarf-4\"" >> "${{ env.DEFCONFIG }}"
+          
+          # Убедитесь, что KALLSYMS_ALL включен
+          scripts/config --file "${{ env.DEFCONFIG }}" -e CONFIG_KALLSYMS_ALL || true
+
       - name: Change Kernel Name
         shell: bash
         run: |
@@ -913,8 +951,11 @@ jobs:
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
           KCFLAGS_EXTRA="-O2"
           
-          # Consistent flags; include -pipe and disable stack protector
-          KCFLAGS="-Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
+          # Чтение LDFLAGS, добавленных в Configure DWARF/BTF Compatibility Fixes
+          EXTRA_LDFLAGS=$(grep '^CONFIG_EXTRA_LDFLAGS=' "$OUT/.config" | cut -d'"' -f2 || echo "")
+          
+          # Consistent flags; include -pipe and disable stack protector. Добавляем -gdwarf-4 в KCFLAGS для уверенности.
+          KCFLAGS="-Wno-error -pipe -fno-stack-protector -gdwarf-4 ${KCFLAGS_EXTRA}"
           KCPPFLAGS="-DCONFIG_OPTIMIZE_INLINING"
           
           # Regenerate defaults after config edits
@@ -922,7 +963,8 @@ jobs:
           
           echo "Starting build with $(nproc --all) threads..."
           set -o pipefail
-          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" Image Image.gz Image.lz4 2>&1 | tee build.log
+          # ПЕРЕДАЧА LDFLAGS для решения проблемы BTF/LTO
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" LDFLAGS="$EXTRA_LDFLAGS" Image Image.gz Image.lz4 2>&1 | tee build.log
           
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
