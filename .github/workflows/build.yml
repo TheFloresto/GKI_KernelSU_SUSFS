@@ -940,10 +940,15 @@ jobs:
         run: |
           set -euo pipefail
           echo "Patching Image file..."
-            cd "$CONFIG/common/out/arch/arm64/boot"
-            echo "Error: Image file not found in any expected location"
+          IMAGE_PATH="$CONFIG/common/out/arch/arm64/boot/Image"
+          
+          # ПРОВЕРКА: Если Image НЕ найден, то выходим
+          if [ ! -f "$IMAGE_PATH" ]; then
+            echo "Error: Image file not found in expected KPM location" >&2
             exit 1
           fi
+
+          cd "$CONFIG/common/out/arch/arm64/boot"
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
           chmod +x patch
           ./patch
@@ -954,19 +959,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Copy Image from normal build locations 
-            cp $CONFIG/common/out/arch/arm64/boot/Image AnyKernel3/Image
-            echo "Error: Image file not found in any expected location"
+          IMAGE_PATH="$CONFIG/common/out/arch/arm64/boot/Image"
+          
+          # Проверяем, что Image существует. Если НЕТ (! -f), то выводим ошибку и выходим.
+          if [ ! -f "$IMAGE_PATH" ]; then
+            echo "Error: Image file not found in any expected location: $IMAGE_PATH" >&2
             exit 1
           fi
-
+          
+          # Если Image найден, копируем его
+          echo "Copying Image to AnyKernel3..."
+          cp "$IMAGE_PATH" AnyKernel3/Image
+          
       - name: Copy snd-aloop module for Android 12-13    
         if: false
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p AnyKernel3/modules/data/adb/lkm
-          cp "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
+          cp "./$CONFIG/common/out/lib/modules/*/extra/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
 
       - name: Copy snd-aloop module for Android 14-15
         if: false
@@ -974,7 +985,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p AnyKernel3/modules/data/adb/lkm
-          cp "./$CONFIG/bazel-bin/common/kernel_aarch64/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
+          cp "./$CONFIG/common/out/lib/modules/*/extra/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
 
       - name: Search for Kernel Modules
         if: false
@@ -1039,12 +1050,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir bootimgs
+          MAKE_OUT_DIR="./$CONFIG/common/out/arch/arm64/boot"
 
-          echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./${{ env.FILE_NAME }}-Image
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
+          echo "Creating bootimgs folder and copying images from Make output path..."
+          cp ${MAKE_OUT_DIR}/Image ./bootimgs
+          cp ${MAKE_OUT_DIR}/Image.lz4 ./bootimgs
+          cp ${MAKE_OUT_DIR}/Image ./${{ env.FILE_NAME }}-Image
+          cp ${MAKE_OUT_DIR}/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
 
           # Create gzip of the Image file
           gzip -n -k -f -9 ./${{ env.FILE_NAME }}-Image > ./${{ env.FILE_NAME }}-Image.gz
@@ -1056,12 +1068,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir bootimgs
+          MAKE_OUT_DIR="./$CONFIG/common/out/arch/arm64/boot"
 
-          echo "Creating bootimgs folder and copying images..."
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./bootimgs
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image ./${{ env.FILE_NAME }}-Image
-          cp ./$CONFIG/common/out/arch/arm64/boot/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
+          echo "Creating bootimgs folder and copying images from Make output path..."
+          cp ${MAKE_OUT_DIR}/Image ./bootimgs
+          cp ${MAKE_OUT_DIR}/Image.lz4 ./bootimgs
+          cp ${MAKE_OUT_DIR}/Image ./${{ env.FILE_NAME }}-Image
+          cp ${MAKE_OUT_DIR}/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
 
           # Create gzip of the Image file
           gzip -n -k -f -9 ./${{ env.FILE_NAME }}-Image > ./${{ env.FILE_NAME }}-Image.gz
