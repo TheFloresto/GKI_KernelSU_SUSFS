@@ -31,6 +31,7 @@ on:
 jobs:
   build-gki:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -927,7 +928,7 @@ jobs:
           if [ ! -f "$IMG" ]; then
             echo "Kernel Image missing"
             exit 1
-          f        
+          fi
           sha256sum "$IMG" | tee "$OUT/Image.sha256"
           echo "Build completed successfully!"
           ls -la "$OUT/arch/arm64/boot/Image"*
@@ -1171,6 +1172,7 @@ jobs:
           path: |
             ./AnyKernel3/**
           compression-level: 9
+          retention-days: 7
 
       - name: Extra Artifacts
         if: ${{ always() }}
@@ -1189,6 +1191,7 @@ jobs:
             build_summary.md
           if-no-files-found: ignore
           compression-level: 9
+          retention-days: 7
           
       - name: Generate Build Summary
         if: ${{ always() }}
