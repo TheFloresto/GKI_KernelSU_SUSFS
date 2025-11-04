@@ -542,8 +542,7 @@ jobs:
               echo "$REL" >> "$REJECTS_DIR/index.txt"
             done
           fi
-
-      # --- ШАГ ИСПРАВЛЕНИЯ ПРЕДУПРЕЖДЕНИЙ CLANG (С ИСПОЛЬЗОВАНИЕМ ФАЙЛА) ---
+          
       - name: Apply Clang Default Init Fix (Wno-default-const-init-var-unsafe)
         shell: bash
         run: |
@@ -560,7 +559,6 @@ jobs:
             echo "Error: Clang warning disable patch not found at $PATCH_FILE" >&2
             exit 1
           fi
-      # --------------------------------------------------------------------
 
       - name: Add BBG
         shell: bash
