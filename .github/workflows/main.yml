@@ -150,6 +150,7 @@ jobs:
       inputs.release_type != 'Actions' &&
       !cancelled()
     needs:
+      - build-test
       - build-a12-5-10
       - build-a13-5-10
       - build-a13-5-15
