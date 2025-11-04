@@ -20,6 +20,7 @@ on:
 
 jobs:
   build-kernels-a13-5-10:
+    name: "5.10.${{ matrix.sub_level }}-${{ matrix.os_patch_level }}"
     strategy:
       fail-fast: false
       matrix:
@@ -108,4 +109,5 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}     
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      
