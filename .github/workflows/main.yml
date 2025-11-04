@@ -64,8 +64,7 @@ on:
         description: "If 'Other' is selected, specify your custom branch"
         required: false
         type: string
-        default: ""
-
+        default: ""       
 
 jobs:
 
@@ -274,7 +273,7 @@ jobs:
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-          #-> Kernel Sound System: Basic audio support with PCM, timers, procfs info, dynamic devices, and loopback module (module found at /data/adb/lkm after install)
+          -> Kernel Sound System: Basic audio support with PCM, timers, procfs info, dynamic devices, and loopback module (module found at /data/adb/lkm after install)
           -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
 
           🔹 BBG (Baseband-guard)
@@ -287,7 +286,6 @@ jobs:
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
-          -> **boot.img files**: Available as CI artifacts only - download from the Actions tab in the "Misc" Artifact
           -> **Warning**: boot.img files may not boot on some devices
           -> **Note:** For detailed commit information and component versions, please check the build summary in the "Misc" Artifact
 
@@ -455,3 +453,4 @@ jobs:
             ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
             [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
+            
