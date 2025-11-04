@@ -31,7 +31,8 @@ jobs:
             sub_level: "43"
             os_patch_level: "2021-08"
 
-          # Android 12 - Kernel 5.10.209 (Oldest)
+
+          # Android 12 - 5.10 oldest (OLD)
           - android_version: "android12"
             kernel_version: "5.10"
             sub_level: "209"
@@ -97,11 +98,11 @@ jobs:
             sub_level: "134"
             os_patch_level: "2025-05"
 
-          # Android 14 - Kernel 6.1.138 (Test)
+           # Android 14 - 6.1 specific sublevel (OLD)
           - android_version: "android14"
             kernel_version: "6.1"
-            sub_level: "138"
-            os_patch_level: "2025-08"
+            sub_level: "118"
+            os_patch_level: "2025-01"       
           
           # Android 15 - 6.6 oldest (NEW)
           - android_version: "android15"
@@ -124,4 +125,4 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}   
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}         
