@@ -30,7 +30,7 @@ on:
 
 jobs:
   build-gki:
-    name: "${{ inputs.kernelsu_variant }}${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ matrix.apply_bypass }})"
+    name: "${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ matrix.apply_bypass }})"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
