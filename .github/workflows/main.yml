@@ -66,11 +66,16 @@ on:
         type: string
         default: ""
 
+# Add concurrency control
+concurrency:
+  group: kernel-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
 
   build-test:
     if: inputs.build_selection == 'Test Build'
+    timeout-minutes: 120
     uses: ./.github/workflows/test-build.yml
     secrets: inherit
     with:
@@ -80,6 +85,7 @@ jobs:
 
   build-a12-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10')
+    timeout-minutes: 120
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
@@ -90,6 +96,7 @@ jobs:
 
   build-a13-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10')
+    timeout-minutes: 120
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     with:
@@ -100,6 +107,7 @@ jobs:
 
   build-a13-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
+    timeout-minutes: 120
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
@@ -110,6 +118,7 @@ jobs:
 
   build-a14-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
+    timeout-minutes: 120
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     with:
@@ -120,6 +129,7 @@ jobs:
 
   build-a14-6-1:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
+    timeout-minutes: 120
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
@@ -130,6 +140,7 @@ jobs:
 
   build-a15-6-6:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6')
+    timeout-minutes: 120
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
@@ -140,7 +151,11 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.release_type != 'Actions'
+    timeout-minutes: 30
+    if: |
+      always() && 
+      inputs.release_type != 'Actions' &&
+      !cancelled()
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -148,6 +163,7 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
+    continue-on-error: false
 
     env:
       GH_TOKEN: ${{ github.token }}
@@ -240,10 +256,70 @@ jobs:
           echo "New tag: $NEW_TAG"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-      - name: Download Artifacts
+      - name: Download Artifacts with Retry
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Retry Download if Failed
+        if: failure()
+        run: |
+          echo "Initial download failed, attempting retry with GitHub CLI..."
+          # Создаем директорию если не существует
+          mkdir -p ./downloaded-artifacts
+          
+          # Используем GitHub CLI для более надежного скачивания
+          echo "Downloading artifacts for run ${{ github.run_id }}..."
+          gh run download ${{ github.run_id }} --dir ./downloaded-artifacts || {
+            echo "GitHub CLI download also failed, attempting individual artifact download..."
+            
+            # Получаем список артефактов
+            ARTIFACTS=$(gh api -X GET repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[] | @base64')
+            
+            for artifact in $ARTIFACTS; do
+              _jq() {
+                echo ${artifact} | base64 --decode | jq -r ${1}
+              }
+              
+              ARTIFACT_NAME=$(_jq '.name')
+              ARTIFACT_ID=$(_jq '.id')
+              
+              echo "Downloading artifact: $ARTIFACT_NAME (ID: $ARTIFACT_ID)"
+              
+              # Создаем директорию для артефакта
+              mkdir -p "./downloaded-artifacts/$ARTIFACT_NAME"
+              
+              # Скачиваем артефакт
+              gh api \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" \
+                > "./downloaded-artifacts/${ARTIFACT_NAME}.zip" || continue
+                
+              # Распаковываем
+              unzip -q "./downloaded-artifacts/${ARTIFACT_NAME}.zip" -d "./downloaded-artifacts/$ARTIFACT_NAME/" || continue
+              rm -f "./downloaded-artifacts/${ARTIFACT_NAME}.zip"
+            done
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Downloaded Artifacts
+        run: |
+          echo "=== Verifying downloaded artifacts ==="
+          if [ ! -d "./downloaded-artifacts" ] || [ -z "$(ls -A ./downloaded-artifacts 2>/dev/null)" ]; then
+            echo "ERROR: No artifacts were downloaded!"
+            echo "Attempting to list available artifacts..."
+            gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[].name' || true
+            exit 1
+          fi
+          
+          echo "Downloaded artifacts:"
+          ls -la ./downloaded-artifacts/
+          
+          echo ""
+          echo "Total artifact count: $(find ./downloaded-artifacts -maxdepth 1 -type d | wc -l)"
 
       - name: Set release body
         run: |
@@ -418,9 +494,12 @@ jobs:
             FILE_COUNT=$(ls -1 ./release-files/ | wc -l)
             if [ "$FILE_COUNT" -lt 2 ]; then
               echo "WARNING: Only $FILE_COUNT file(s) prepared. Expected more."
+              # Don't fail, but log warning
             fi
           else
             echo "ERROR: No files prepared for release!"
+            echo "Checking what's in downloaded-artifacts..."
+            find ./downloaded-artifacts -type f -name "*.zip" -o -name "*.img" | head -20
             exit 1
           fi
 
@@ -434,9 +513,11 @@ jobs:
           files: './release-files/*'
           name: ${{ env.RELEASE_NAME }}
           body_path: release_body.md
+          fail_on_unmatched_files: false
             
       - name: Send Telegram Notification
         if: inputs.release_type != 'Actions'
+        continue-on-error: true
         run: |
           RELEASE_TYPE_TEXT=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
