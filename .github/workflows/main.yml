@@ -152,6 +152,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
       RELEASE_BODY: ""
+      
     steps:
       - name: Download Apache Arrow's util_free_space.sh
         run: |
@@ -243,6 +244,21 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
+          pattern: '${{ inputs.kernelsu_variant }}-*'
+          merge-multiple: false
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "=== Verifying downloaded artifacts ==="
+          if [ -d "./downloaded-artifacts" ]; then
+            echo "Artifact directories found:"
+            ls -la ./downloaded-artifacts/
+            echo ""
+            echo "Total artifact directories: $(ls -1 ./downloaded-artifacts/ | wc -l)"
+          else
+            echo "ERROR: No artifacts directory found!"
+            exit 1
+          fi
 
       - name: Set release body
         run: |
