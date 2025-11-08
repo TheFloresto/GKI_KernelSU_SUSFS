@@ -1,4 +1,4 @@
-name: Kernel Build Process
+name: Kernel Build Process (Make)
 permissions:
   contents: write
   actions: write 
@@ -118,6 +118,22 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
+
+      - name: Setup LLVM Toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Installing LLVM toolchain..."
+          
+          # Clone ZyCromerZ Clang toolchain
+          git clone --depth=1 https://github.com/ZyCromerZ/Clang.git -b 20 clang-toolchain
+          
+          CLANG_PATH="$GITHUB_WORKSPACE/clang-toolchain"
+          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
+          echo "$CLANG_PATH/bin" >> $GITHUB_PATH
+          
+          # Verify installation
+          $CLANG_PATH/bin/clang --version
 
       - name: Set boot sign key
         shell: bash
@@ -558,8 +574,7 @@ jobs:
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=./common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
           
-          # Remove check_defconfig
-          sed -i '2s/check_defconfig//' ./common/build.config.gki
+          # For make-based builds, we don't need to remove check_defconfig
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
       - name: Configure KernelSU Core
@@ -705,50 +720,6 @@ jobs:
           echo "CONFIG_SND_DYNAMIC_MINORS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_SND_PROC_FS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_SND_ALOOP=m" >> "${{ env.DEFCONFIG }}"
-          
-           # Add snd-aloop.ko to modules list
-          echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
-
-          if [[ -f common/modules.bzl ]]; then
-            # Insert before the closing bracket of COMMON_GKI_MODULES_LIST or _COMMON_GKI_MODULES_LIST
-            echo "snd-aloop injection: adding to module list"
-            if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 110 )) && [[ "${{ inputs.os_patch_level }}" != "2023-09" ]] ) \
-            || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL <= 25 )) && [[ "${{ inputs.os_patch_level }}" != "2023-09" ]] ); then
-              sed -i '/COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "sound/drivers/snd-aloop.ko",
-              }' common/modules.bzl
-            else
-              sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "sound/drivers/snd-aloop.ko",
-              }' common/modules.bzl
-            fi
-            
-            # Verify the injection was successful
-            if grep -q '"sound/drivers/snd-aloop.ko"' common/modules.bzl; then
-              echo "✓ snd-aloop injection: successfully added to module list"
-            else
-              echo "✗ snd-aloop injection: failed to add to module list"
-              exit 1
-            fi
-          fi
-          
-          # Add symbols to abi_gki_aarch64
-          #SYMBOL_LIST=common/android/abi_gki_aarch64
-          #cat Wild_KSU/kernel/export_symbol.txt | awk '{sub("[ \t]+","");print "  "$0}' >> $SYMBOL_LIST
-
-          # ABI compare bypass per kernel/android version
-          # Edit each block as needed per version
-          if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
-            sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/abi/compare_to_symbol_list
-          elif [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
-            sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/kernel/abi/compare_to_symbol_list
-          elif [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
-            sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/kernel/abi/compare_to_symbol_list
-          elif [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
-            perl -i -pe 's/^(\s*)return 1$/$1print("Who Cares? Bypassing Now!")\n$1return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
-          elif [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
-            perl -i -pe 's/^(\s*)return 1$/$1print("Who Cares? Bypassing Now!")\n$1return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
-          elif [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            perl -i -pe 's/^(\s*)return 1$/$1print("Who Cares? Bypassing Now!")\n$1return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
-          fi
 
       - name: Configure Build Optimization
         shell: bash
@@ -757,7 +728,7 @@ jobs:
           cd "$CONFIG"
           # Build Optimization Configuration
           echo "# Build Optimization Configuration" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_LTO_CLANG_FULL=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LTO_CLANG_THIN=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "${{ env.DEFCONFIG }}"
@@ -769,24 +740,19 @@ jobs:
         run: |
           set -euo pipefail
           cd "$CONFIG"
-          #Add Wild to Kernel Version
-          sed -i '$s|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
+          #Add to Kernel Version
+          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-@NoFloresto"/s' ./common/scripts/setlocalversion
+          else
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-@NoFloresto"/s' ./common/scripts/setlocalversion
           #Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
           perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
           #Set Kernel Timestamp
           perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
           perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
-          if [ -f "build/build.sh" ]; then
-            #Remove Dirty Flag
-            sed -i 's/-dirty//' ./common/scripts/setlocalversion
-          else
-            #Remove Dirty Flag
-            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-            #Remove Abi Exports and Error
-            rm -rf ./common/android/abi_gki_protected_exports_*
-            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
-          fi
+          #Remove Dirty Flag
+          sed -i 's/-dirty//' ./common/scripts/setlocalversion
 
       - name: Set file name
         shell: bash
@@ -796,17 +762,100 @@ jobs:
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
-      - name: Build
+      - name: Setup ccache
         shell: bash
         run: |
           set -euo pipefail
-          cd "$CONFIG"
-          echo "Building the kernel..."
-          if [ -f "build/build.sh" ]; then        
-            LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh || exit 1
-          else
-            tools/bazel build --config=fast --lto=full --sandbox_debug --verbose_failures //common:kernel_aarch64_dist || exit 1
-          fi
+          sudo apt-get update
+          sudo apt-get install -y ccache
+          
+          # Configure ccache
+          ccache --max-size=10G
+          ccache --set-config=compression=true
+          ccache --set-config=compression_level=6
+          
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+
+      - name: Build Kernel with Make
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG/common"
+          
+          # Set output directory
+          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
+          mkdir -p "$OUT_DIR"
+          
+          echo "Building the kernel with make..."
+          
+          # Clean previous builds
+          make ARCH=arm64 \
+               CC="ccache $CLANG_PATH/bin/clang" \
+               HOSTCC="ccache $CLANG_PATH/bin/clang" \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=$CLANG_PATH/bin/aarch64-linux-gnu- \
+               CROSS_COMPILE_ARM32=$CLANG_PATH/bin/arm-linux-gnueabi- \
+               LD="$CLANG_PATH/bin/ld.lld" \
+               AR="$CLANG_PATH/bin/llvm-ar" \
+               NM="$CLANG_PATH/bin/llvm-nm" \
+               OBJCOPY="$CLANG_PATH/bin/llvm-objcopy" \
+               OBJDUMP="$CLANG_PATH/bin/llvm-objdump" \
+               READELF="$CLANG_PATH/bin/llvm-readelf" \
+               OBJSIZE="$CLANG_PATH/bin/llvm-size" \
+               STRIP="$CLANG_PATH/bin/llvm-strip" \
+               HOSTLD="$CLANG_PATH/bin/ld.lld" \
+               HOSTLDFLAGS="-fuse-ld=lld" \
+               O="$OUT_DIR" \
+               mrproper
+          
+          # Configure kernel
+          make ARCH=arm64 \
+               CC="ccache $CLANG_PATH/bin/clang" \
+               HOSTCC="ccache $CLANG_PATH/bin/clang" \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=$CLANG_PATH/bin/aarch64-linux-gnu- \
+               CROSS_COMPILE_ARM32=$CLANG_PATH/bin/arm-linux-gnueabi- \
+               O="$OUT_DIR" \
+               gki_defconfig
+          
+          # Build kernel
+          make ARCH=arm64 \
+               CC="ccache $CLANG_PATH/bin/clang" \
+               HOSTCC="ccache $CLANG_PATH/bin/clang" \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=$CLANG_PATH/bin/aarch64-linux-gnu- \
+               CROSS_COMPILE_ARM32=$CLANG_PATH/bin/arm-linux-gnueabi- \
+               LD="$CLANG_PATH/bin/ld.lld" \
+               AR="$CLANG_PATH/bin/llvm-ar" \
+               NM="$CLANG_PATH/bin/llvm-nm" \
+               OBJCOPY="$CLANG_PATH/bin/llvm-objcopy" \
+               OBJDUMP="$CLANG_PATH/bin/llvm-objdump" \
+               READELF="$CLANG_PATH/bin/llvm-readelf" \
+               OBJSIZE="$CLANG_PATH/bin/llvm-size" \
+               STRIP="$CLANG_PATH/bin/llvm-strip" \
+               HOSTLD="$CLANG_PATH/bin/ld.lld" \
+               HOSTLDFLAGS="-fuse-ld=lld" \
+               O="$OUT_DIR" \
+               -j$(nproc --all)
+          
+          echo "Build completed successfully!"
+          
+          # Show ccache statistics
+          ccache -s
+
+      - name: Create compressed kernel images
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
+          
+          # Create Image.gz
+          gzip -n -k -f -9 "$OUT_DIR/arch/arm64/boot/Image" -c > "$OUT_DIR/arch/arm64/boot/Image.gz"
+          
+          # Create Image.lz4
+          lz4 -9 -f "$OUT_DIR/arch/arm64/boot/Image" "$OUT_DIR/arch/arm64/boot/Image.lz4"
+          
+          echo "Compressed images created successfully!"
 
       - name: Patch KPM for SukiSU-Ultra
         if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
@@ -814,132 +863,73 @@ jobs:
         run: |
           set -euo pipefail
           echo "Patching Image file..."
-          if [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
-            cd "$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
-          else
-            cd "$CONFIG/bazel-bin/common/kernel_aarch64"
-          fi
+          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
+          cd "$OUT_DIR/arch/arm64/boot"
+          
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
           chmod +x patch
           ./patch
           rm -f Image
           mv oImage Image
+          
+          # Recreate compressed images with patched kernel
+          gzip -n -k -f -9 Image -c > Image.gz
+          lz4 -9 -f Image Image.lz4
 
       - name: Prepare AnyKernel3
         shell: bash
         run: |
           set -euo pipefail
-          # Copy Image from normal build locations
-          if [ -f "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" ]; then
-            cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image AnyKernel3/Image
-          elif [ -f "./$CONFIG/bazel-bin/common/kernel_aarch64/Image" ]; then
-            cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image AnyKernel3/Image
+          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
+          
+          # Copy Image
+          if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
+            cp "$OUT_DIR/arch/arm64/boot/Image" AnyKernel3/Image
           else
-            echo "Error: Image file not found in any expected location"
+            echo "Error: Image file not found"
             exit 1
           fi
 
-      - name: Copy snd-aloop module for Android 12-13
-        if: inputs.android_version == 'android12' || inputs.android_version == 'android13'
+      - name: Copy snd-aloop module
         shell: bash
         run: |
           set -euo pipefail
+          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
           mkdir -p AnyKernel3/modules/data/adb/lkm
-          cp "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
-
-      - name: Copy snd-aloop module for Android 14-15
-        if: inputs.android_version == 'android14' || inputs.android_version == 'android15'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p AnyKernel3/modules/data/adb/lkm
-          cp "./$CONFIG/bazel-bin/common/kernel_aarch64/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
+          
+          # Find and copy snd-aloop.ko
+          if [ -f "$OUT_DIR/sound/drivers/snd-aloop.ko" ]; then
+            cp "$OUT_DIR/sound/drivers/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
+            echo "snd-aloop.ko copied successfully"
+          else
+            echo "Warning: snd-aloop.ko not found"
+          fi
 
       - name: Search for Kernel Modules
         shell: bash
         run: |
           set -euo pipefail
+          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
           echo "Searching for kernel modules (.ko files)..."
           
-          # Function to scan for modules (search only)
-          scan_modules() {
-            local search_dir="$1"
-            local module_count=0
-            
-            if [ -d "$search_dir" ]; then
-              echo "Scanning directory: $search_dir"
-              
-              # Find all .ko files and report their locations
-              while IFS= read -r -d '' module_file; do
-                if [ -f "$module_file" ]; then
-                  module_name=$(basename "$module_file")
-                  echo "Found module: $module_name in $(dirname "$module_file")"
-                  ((module_count++))
-                fi
-              done < <(find "$search_dir" -name "*.ko" -type f -print0 2>/dev/null)
-            fi
-            
-            return $module_count
-          }
-          
-          # Scan common build output directories
-          total_modules=0
-          
-          # Scan bazel-bin directory
-          if scan_modules "./$CONFIG/bazel-bin"; then
-            total_modules=$((total_modules + $?))
-          fi
-          
-          # Scan out directory
-          if scan_modules "./$CONFIG/out"; then
-            total_modules=$((total_modules + $?))
-          fi
-          
-          # Scan dist directory specifically
-          if scan_modules "./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"; then
-            total_modules=$((total_modules + $?))
-          fi
-          
-          # Look for snd-aloop.ko specifically
-          echo "Searching specifically for snd-aloop.ko..."
-          snd_aloop_found=$(find ./$CONFIG -name "snd-aloop.ko" -type f 2>/dev/null | head -1)
-          if [ -n "$snd_aloop_found" ]; then
-            echo "Found snd-aloop.ko at: $snd_aloop_found"
-          else
-            echo "snd-aloop.ko not found"
-          fi
-          
-          echo "Total kernel modules found: $total_modules"
+          find "$OUT_DIR" -name "*.ko" -type f 2>/dev/null | while read -r module_file; do
+            echo "Found module: $(basename "$module_file") in $(dirname "$module_file")"
+          done || true
 
-      - name: Create Bootimgs Folder and Copy Images for Android 12/13
-        if: ${{ inputs.android_version == 'android12' || inputs.android_version == 'android13' }}
+      - name: Create Bootimgs Folder and Copy Images
         shell: bash
         run: |
           set -euo pipefail
-          mkdir bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./${{ env.FILE_NAME }}-Image
-          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./${{ env.FILE_NAME }}-Image > ./${{ env.FILE_NAME }}-Image.gz
-          gzip -n -k -f -9 ./bootimgs/Image > ./bootimgs/Image.gz
-
-      - name: Create Bootimgs Folder and Copy Images for Android 14/15
-        if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./bootimgs
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./${{ env.FILE_NAME }}-Image
-          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./${{ env.FILE_NAME }}-Image.lz4
-
-          # Create gzip of the Image file
-          gzip -n -k -f -9 ./${{ env.FILE_NAME }}-Image > ./${{ env.FILE_NAME }}-Image.gz
-          gzip -n -k -f -9 ./bootimgs/Image > ./bootimgs/Image.gz
+          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
+          mkdir -p bootimgs
+          
+          cp "$OUT_DIR/arch/arm64/boot/Image" ./bootimgs/
+          cp "$OUT_DIR/arch/arm64/boot/Image.gz" ./bootimgs/
+          cp "$OUT_DIR/arch/arm64/boot/Image.lz4" ./bootimgs/
+          
+          cp "$OUT_DIR/arch/arm64/boot/Image" ./${{ env.FILE_NAME }}-Image
+          cp "$OUT_DIR/arch/arm64/boot/Image.gz" ./${{ env.FILE_NAME }}-Image.gz
+          cp "$OUT_DIR/arch/arm64/boot/Image.lz4" ./${{ env.FILE_NAME }}-Image.lz4
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
@@ -1042,6 +1032,7 @@ jobs:
           echo "## Build Information" >> build_summary.md
           echo "- **Android Version**: ${{ inputs.android_version }}" >> build_summary.md
           echo "- **Kernel Version**: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> build_summary.md
+          echo "- **Build Method**: make (Direct)" >> build_summary.md
           echo "- **BBG**: Installed" >> build_summary.md
           echo "- **Bypass Mode**: ${{ matrix.apply_bypass }}" >> build_summary.md
           echo "" >> build_summary.md
