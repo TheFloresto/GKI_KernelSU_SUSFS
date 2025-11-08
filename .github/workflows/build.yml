@@ -123,14 +123,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Installing LLVM toolchain..."
+          echo "Installing LLVM toolchain from AOSP..."
           
-          # Clone ZyCromerZ Clang toolchain
-          git clone --depth=1 https://github.com/ZyCromerZ/Clang.git -b 20 clang-toolchain
+          # Clone official AOSP prebuilt Clang
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main clang-prebuilt
           
-          CLANG_PATH="$GITHUB_WORKSPACE/clang-toolchain"
+          # Find the latest clang version directory (e.g., clang-r498229b, clang-r510928, etc.)
+          CLANG_VERSION=$(ls -d clang-prebuilt/clang-r* | sort -V | tail -n 1)
+          
+          if [ -z "$CLANG_VERSION" ]; then
+            echo "Error: No clang version found in prebuilts"
+            exit 1
+          fi
+          
+          CLANG_PATH="$GITHUB_WORKSPACE/$CLANG_VERSION"
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
           echo "$CLANG_PATH/bin" >> $GITHUB_PATH
+          
+          echo "Using Clang from: $CLANG_VERSION"
           
           # Verify installation
           $CLANG_PATH/bin/clang --version
