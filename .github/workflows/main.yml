@@ -159,6 +159,20 @@ jobs:
           curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
           chmod +x util_free_space.sh
           ./util_free_space.sh
+
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          android: 'true'          # Безопасно! SDK не нужен для сборки ядра
+          dotnet: 'true'           # .NET не нужен
+          haskell: 'true'          # Haskell не нужен
+          large-packages: 'true'   # Дополнительно ~4-5GB
+          docker-images: 'true'    # Если не используешь Docker
+          swap-storage: 'true'     # Удалит дефолтный 4GB swap (добавит места)
+          tool-cache: 'false'      # Сохранит Python и нужные инструменты
+
+      - name: Check Disk Space
+        run: df -h
       
       - name: Checkout code
         uses: actions/checkout@v4
