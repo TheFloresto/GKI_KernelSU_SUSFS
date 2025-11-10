@@ -1024,7 +1024,6 @@ jobs:
             ${{ env.FILE_NAME }}-boot-lz4.img
             patch-rejects/**
             build_summary.md
-          if-no-files-found: ignore
           compression-level: 9
           
       - name: Generate Build Summary
