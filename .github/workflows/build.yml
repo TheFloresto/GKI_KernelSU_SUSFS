@@ -1,4 +1,4 @@
-name: Kernel Build Process (Make)
+name: Kernel Build Process
 permissions:
   contents: write
   actions: write 
@@ -80,6 +80,21 @@ jobs:
           free -h
           echo "===== New SWAP Status ====="
           swapon --show
+
+      - name: Install Complete Dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Install dependencies"
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git curl ca-certificates build-essential clang lld flex bison \
+            libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+            libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix \
+            zip gzip bzip2 cpio tar
+          sudo apt-get clean
+          echo "✅ Dependencies installed"
+          echo "::endgroup::"
           
       - name: Check Disk Space After Cleanup
         shell: bash
@@ -118,32 +133,6 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
           chmod a+rx ./git-repo/repo
           echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
-
-      - name: Setup LLVM Toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Installing LLVM toolchain from AOSP..."
-          
-          # Clone official AOSP prebuilt Clang
-          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main clang-prebuilt
-          
-          # Find the latest clang version directory (e.g., clang-r498229b, clang-r510928, etc.)
-          CLANG_VERSION=$(ls -d clang-prebuilt/clang-r* | sort -V | tail -n 1)
-          
-          if [ -z "$CLANG_VERSION" ]; then
-            echo "Error: No clang version found in prebuilts"
-            exit 1
-          fi
-          
-          CLANG_PATH="$GITHUB_WORKSPACE/$CLANG_VERSION"
-          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH/bin" >> $GITHUB_PATH
-          
-          echo "Using Clang from: $CLANG_VERSION"
-          
-          # Verify installation
-          $CLANG_PATH/bin/clang --version
 
       - name: Set boot sign key
         shell: bash
@@ -217,23 +206,193 @@ jobs:
             fi
           fi
 
+      - name: Detect Clang Toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Detect Clang"
+          
+          # Try to find prebuilt clang in kernel source
+          CONFIG_DIR="$GITHUB_WORKSPACE/$CONFIG"
+          CLANG_FOUND=false
+          CLANG_BIN=""
+          
+          # Check for prebuilts in kernel source (GKI style)
+          for base in "$CONFIG_DIR/prebuilts" "$CONFIG_DIR/prebuilts-master" "$CONFIG_DIR"; do
+            if [ -d "$base/clang/host/linux-x86" ]; then
+              latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
+              if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
+                CLANG_BIN="$latest/bin"
+                CLANG_FOUND=true
+                echo "Found prebuilt clang in: $latest"
+                break
+              fi
+            fi
+          done
+          
+          # If not found, download AOSP prebuilt clang
+          if ! $CLANG_FOUND; then
+            echo "Downloading AOSP prebuilt clang..."
+            CLANG_VERSION="clang-r498229b"
+            git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main clang-prebuilts
+            
+            CLANG_DIR=$(ls -d clang-prebuilts/clang-r* | sort -V | tail -n1)
+            
+            if [ -n "$CLANG_DIR" ] && [ -x "$CLANG_DIR/bin/clang" ]; then
+              CLANG_BIN="$GITHUB_WORKSPACE/$CLANG_DIR/bin"
+              CLANG_FOUND=true
+              echo "Using downloaded AOSP clang: $CLANG_DIR"
+            fi
+          fi
+          
+          # Fallback to system clang
+          if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
+            CLANG_BIN="$(dirname "$(command -v clang)")"
+            CLANG_FOUND=true
+            echo "Using system clang"
+          fi
+          
+          $CLANG_FOUND || { echo "::error::No clang toolchain found"; exit 1; }
+          
+          echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
+          CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
+          echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
+          echo "✅ Detected Clang: $CLANG_VERSION"
+          echo "::endgroup::"
+
+      - name: Derive Clang Short Version
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Derive Clang fingerprint"
+          
+          short="$("${CLANG_BIN_PATH}/clang" --version | sed -n '1s/.*clang-r\([0-9.]\+\).*/\1/p')"
+          
+          if [ -z "$short" ]; then
+            short="$("${CLANG_BIN_PATH}/clang" --version | sha256sum | cut -c1-8)"
+            echo "⚠️ Could not extract clang-r version, using hash: $short"
+          else
+            echo "✅ Clang version fingerprint: $short"
+          fi
+          
+          echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
+          
+          CLANG_FULL_VERSION="$("${CLANG_BIN_PATH}/clang" --version | head -n1)"
+          echo "CLANG_FULL_VERSION=$CLANG_FULL_VERSION" >> "$GITHUB_ENV"
+          
+          echo "Full Clang version: $CLANG_FULL_VERSION"
+          echo "::endgroup::"
+
+      - name: Set Cache Environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Configure ccache environment"
+          
+          CACHE_DIR="$HOME/.ccache"
+          echo "CCACHE_DIR=$CACHE_DIR" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+          
+          mkdir -p "$CACHE_DIR"
+          
+          echo "Cache configuration:"
+          echo "  Directory: $CACHE_DIR"
+          echo "  Max size: 1G"
+          echo "  Android: ${{ inputs.android_version }}"
+          echo "  Kernel: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
+          echo "  KSU Variant: ${{ inputs.kernelsu_variant }}"
+          echo "  Clang: ${CLANG_VERSION_SHORT:-unknown}"
+          echo "  Bypass: ${{ matrix.apply_bypass }}"
+          echo "::endgroup::"
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-gki-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ env.CLANG_VERSION_SHORT }}-${{ matrix.apply_bypass }}
+          restore-keys: |
+            ccache-gki-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ env.CLANG_VERSION_SHORT }}-
+            ccache-gki-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-
+            ccache-gki-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
+
+      - name: Configure ccache
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Configure ccache for maximum performance"
+          
+          export CCACHE_DIR="$HOME/.ccache"
+          export CCACHE_MAXSIZE="1G"
+          
+          ccache -M "$CCACHE_MAXSIZE"
+          
+          export CCACHE_COMPILERCHECK="content"
+          export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
+          export CCACHE_NOHASHDIR="true"
+          
+          ccache -o compression=true
+          ccache -o compression_level=3
+          ccache -o direct_mode=true
+          ccache -o hash_dir=false
+          ccache -o file_clone=true
+          ccache -o inode_cache=true
+          ccache -o umask=002
+          
+          if ccache --help 2>&1 | grep -q 'depend_mode'; then
+            ccache -o depend_mode=true
+          fi
+          
+          ccache -o sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale
+          
+          export CCACHE_IGNOREOPTIONS="--sysroot*"
+          
+          {
+            echo "CCACHE_COMPILERCHECK=content"
+            echo "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
+            echo "CCACHE_NOHASHDIR=true"
+            echo "CCACHE_IGNOREOPTIONS=$CCACHE_IGNOREOPTIONS"
+          } >> "$GITHUB_ENV"
+          
+          echo "✅ ccache configured for production"
+          echo ""
+          echo "Configuration applied:"
+          echo "  Max size: 1G"
+          echo "  Base dir: ${GITHUB_WORKSPACE}"
+          echo "  Compression: zstd level 3"
+          echo "  Direct mode: enabled"
+          echo "  File cloning: enabled"
+          echo "  Inode cache: enabled"
+          echo ""
+          
+          if [ -d "$CCACHE_DIR" ] && find "$CCACHE_DIR" -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "✅ Restored cache found"
+            echo ""
+            echo "Pre-build cache statistics:"
+            ccache -s | head -n 20
+          else
+            echo "⚠️ No existing cache - building from scratch"
+            echo "Cache will be populated for future builds"
+          fi
+          
+          echo "::endgroup::"
+
       - name: Apply glibc 2.38 Compatibility Fix
         shell: bash
         run: |
           set -euo pipefail
           # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
           
-          if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 186 ))) || 
-              ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 119 ))) || 
-              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 110 ))) || 
-              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL <= 43 ))); then
+          if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 186 ))) || 
+              ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 119 ))) || 
+              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 110 ))) || 
+              ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 43 ))); then
             GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}') 
             if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then 
               cd $CONFIG/common/
               sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile 2>/dev/null || true
-              if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 186 ))) || 
-                  ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 119 ))) || 
-                  ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 110 ))); then
+              if ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 186 ))) || 
+                  ([[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 119 ))) || 
+                  ([[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 110 ))); then
                 sed -i '/char \*buf = NULL;/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i 's/for (int i = 0; subcommands\[i\]; i++) {/for (i = 0; subcommands[i]; i++) {/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i '/if (subcommands) {/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
@@ -259,6 +418,26 @@ jobs:
           set -euo pipefail
           cd "$CONFIG/common"
           patch -p1 -F 3 < "../../kernel_patches/gki_ptrace.patch"
+
+      - name: Clean Up ABI Protected Exports
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Clean up ABI protected exports"
+          cd "$CONFIG"
+          
+          # Remove ABI protected export files
+          echo "Removing ABI protected export files..."
+          rm -f common/android/abi_gki_protected_exports_* || true
+          
+          # Also remove from BUILD.bazel if it exists
+          if [ -f common/BUILD.bazel ]; then
+            echo "Cleaning BUILD.bazel..."
+            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' common/BUILD.bazel 2>/dev/null || true
+          fi
+          
+          echo "✅ ABI protected exports cleaned"
+          echo "::endgroup::"
 
       - name: Determine the branch for KernelSU
         shell: bash
@@ -379,8 +558,6 @@ jobs:
           cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
           cd common
 
-          # Pre-SUSFS sed safeguards removed; moved below core patch
-
           # Apply SUSFS core patch
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
@@ -403,11 +580,11 @@ jobs:
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."           
               # Post-SUSFS sed safeguards for task_mmu.c 'goto show_pad' handling
-              if ( ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 75 )) ) ); then
+              if ( ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 209 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 209 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 148 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 148 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 75 )) ) ); then
               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
              fi
 
@@ -423,19 +600,19 @@ jobs:
               fi
 
               # Use ACTUAL_SUBLEVEL for LTS or actual kernel sublevel if available
-              if ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL >= 145 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ); then
+              if ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 43 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( ${ACTUAL_SUBLEVEL:-999} >= 145 )) ) \
+               || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( ${ACTUAL_SUBLEVEL:-999} >= 98 )) ); then
                cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
                patch -p1 < 1_fix_base.c.patch || true
               fi
 
-              if [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )); then
+              if [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 43 )); then
                 cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
                 patch -p1 < 2_fix_base.c.patch || true
               fi
 
-             if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL <= 58 )) ); then
+             if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( ${ACTUAL_SUBLEVEL:-999} <= 58 )) ); then
                 cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
                 patch -p1 < fix_task_mmu.c.patch || true
              fi
@@ -492,8 +669,8 @@ jobs:
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."          
-              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+              cp -v ../../kernel_patches/suki/scope_min_manual_hooks_v1.6.patch ./
+              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
@@ -584,7 +761,8 @@ jobs:
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=./common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
           
-          # For make-based builds, we don't need to remove check_defconfig
+          # Remove check_defconfig
+          sed -i '2s/check_defconfig//' ./common/build.config.gki
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
 
       - name: Configure KernelSU Core
@@ -730,39 +908,56 @@ jobs:
           echo "CONFIG_SND_DYNAMIC_MINORS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_SND_PROC_FS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_SND_ALOOP=m" >> "${{ env.DEFCONFIG }}"
+          
+           # Add snd-aloop.ko to modules list
+          echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
 
       - name: Configure Build Optimization
         shell: bash
         run: |
           set -euo pipefail
           cd "$CONFIG"
-          # Build Optimization Configuration
+          # Build Optimization Configuration - Always O3
           echo "# Build Optimization Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG_THIN=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CCACHE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
 
-      - name: Change Kernel Name
+      - name: Customize Kernel Branding (OnePlus Style)
         shell: bash
         run: |
           set -euo pipefail
+          echo "::group::Customize kernel branding (OnePlus style)"
+          
           cd "$CONFIG"
-          #Add to Kernel Version
-          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-${{ inputs.android_version }}-@NoFloresto"/s' ./common/scripts/setlocalversion
-          else
-            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-${{ inputs.android_version }}-@NoFloresto"/s' ./common/scripts/setlocalversion
-          #Set Custom Hostname and Username
+          
+          # Set custom LOCALVERSION
+          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}"
+          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
+          
+          # One-time fix for setlocalversion — remove -dirty and scm, add @NoFloresto
+          sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          sed -i 's|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' ./common/scripts/setlocalversion
+          
+          # One-time fix for mkcompile_h — set static UTS_VERSION and compile info
+          STATIC_DATE="Sun Jun 15 14:56:02 UTC 2025"
+          perl -pi -e "s{UTS_VERSION=\"\\\$\\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $STATIC_DATE\"}" ./common/scripts/mkcompile_h
+          perl -pi -e "s/build-timestamp = \\\$\\(or \\\$\\(KBUILD_BUILD_TIMESTAMP\\), \\\$\\(build-timestamp-auto\\)\\)/build-timestamp = \"$STATIC_DATE\"/" ./common/init/Makefile
+          
+          # Set Custom Hostname and Username
           perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
           perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
-          #Set Kernel Timestamp
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Mon Apr 20 08:09:31 UTC 2025"}' ./common/scripts/mkcompile_h
-          perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Mon Apr 20 08:09:31 UTC 2025"/' ./common/init/Makefile
-          #Remove Dirty Flag
-          sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          
+          echo "Branding applied:"
+          echo "   LOCALVERSION: $CUSTOM_LOCALVERSION"
+          echo "   UTS_VERSION: #1 SMP PREEMPT $STATIC_DATE"
+          echo "   Compile by: thefloresto"
+          echo "   Compile host: thefloresto-labs"
+          echo "::endgroup::"
 
       - name: Set file name
         shell: bash
@@ -772,100 +967,201 @@ jobs:
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
-      - name: Setup ccache
+      - name: Build Kernel with ccache
         shell: bash
+        env:
+          PYTHONWARNINGS: "ignore:invalid escape sequence"
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y ccache
+          echo "::group::Build kernel with ccache optimization"
           
-          # Configure ccache
-          ccache --max-size=10G
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          
-          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
-
-      - name: Build Kernel with Make
-        shell: bash
-        run: |
-          set -euo pipefail
           cd "$CONFIG/common"
           
-          # Set output directory
-          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
-          mkdir -p "$OUT_DIR"
+          # Clear .scmversion to prevent dirty flag
+          : > "$CONFIG/common/.scmversion"
           
-          echo "Building the kernel with make..."
+          export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
-          # Clean previous builds
-          make ARCH=arm64 \
-               CC="ccache $CLANG_PATH/bin/clang" \
-               HOSTCC="ccache $CLANG_PATH/bin/clang" \
-               CLANG_TRIPLE=aarch64-linux-gnu- \
-               CROSS_COMPILE=$CLANG_PATH/bin/aarch64-linux-gnu- \
-               CROSS_COMPILE_ARM32=$CLANG_PATH/bin/arm-linux-gnueabi- \
-               LD="$CLANG_PATH/bin/ld.lld" \
-               AR="$CLANG_PATH/bin/llvm-ar" \
-               NM="$CLANG_PATH/bin/llvm-nm" \
-               OBJCOPY="$CLANG_PATH/bin/llvm-objcopy" \
-               OBJDUMP="$CLANG_PATH/bin/llvm-objdump" \
-               READELF="$CLANG_PATH/bin/llvm-readelf" \
-               OBJSIZE="$CLANG_PATH/bin/llvm-size" \
-               STRIP="$CLANG_PATH/bin/llvm-strip" \
-               HOSTLD="$CLANG_PATH/bin/ld.lld" \
-               HOSTLDFLAGS="-fuse-ld=lld" \
-               O="$OUT_DIR" \
-               mrproper
+          # Build timestamp setup (static as per branding)
+          STATIC_DATE="Sun Jun 15 14:56:02 UTC 2025"
+          export SOURCE_DATE_EPOCH=$(date -d "$STATIC_DATE" +%s 2>/dev/null || date +%s)
+          export KBUILD_BUILD_TIMESTAMP="$STATIC_DATE"
+          export KBUILD_BUILD_USER="thefloresto"
+          export KBUILD_BUILD_HOST="thefloresto-labs"
+          export KBUILD_BUILD_VERSION=1
+          
+          echo "📅 Build timestamp: $KBUILD_BUILD_TIMESTAMP"
+          echo "👤 Build user: $KBUILD_BUILD_USER"
+          echo "🖥️  Build host: $KBUILD_BUILD_HOST"
+          
+          # Setup ccache in PATH
+          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${PATH}"
+          
+          # Setup build environment variables
+          export CC="ccache clang"
+          export CXX="ccache clang++"
+          export HOSTCC="ccache clang"
+          export HOSTCXX="ccache clang++"
+          export LD=ld.lld
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+          export READELF=llvm-readelf
+          export CROSS_COMPILE="aarch64-linux-gnu-"
+          export CROSS_COMPILE_ARM32="arm-linux-gnueabi-"
+          export CLANG_TRIPLE="aarch64-linux-gnu-"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          
+          # Create output directory
+          mkdir -p out
+          
+          echo "============================================"
+          echo "🔍 Compiler & ccache Verification"
+          echo "============================================"
+          echo "CC: $CC"
+          echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+          echo ""
+          echo "ccache pre-build status:"
+          ccache -s | head -n 20
+          echo "============================================"
           
           # Configure kernel
-          make ARCH=arm64 \
-               CC="ccache $CLANG_PATH/bin/clang" \
-               HOSTCC="ccache $CLANG_PATH/bin/clang" \
-               CLANG_TRIPLE=aarch64-linux-gnu- \
-               CROSS_COMPILE=$CLANG_PATH/bin/aarch64-linux-gnu- \
-               CROSS_COMPILE_ARM32=$CLANG_PATH/bin/arm-linux-gnueabi- \
-               O="$OUT_DIR" \
-               gki_defconfig
+          make O=out gki_defconfig
+          
+          # Set LOCALVERSION
+          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
+            scripts/config --file out/.config --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
+            scripts/config --file out/.config -d LOCALVERSION_AUTO || true
+          fi
+          
+          # Force O3 optimization
+          scripts/config --file out/.config -d CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file out/.config -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          
+          # Enable LTO Thin
+          scripts/config --file out/.config -e LTO_CLANG
+          scripts/config --file out/.config -e LTO_CLANG_THIN
+          scripts/config --file out/.config -e OPTIMIZE_INLINING
+          
+          # Update config
+          make O=out olddefconfig
+          
+          # Set compiler flags with O3
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          MAP="-fdebug-prefix-map=${WORKSPACE}=."
+          MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
+          FPMAP="-ffile-prefix-map=${WORKSPACE}=."
+          
+          export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -O3 -Wno-error -pipe -fno-stack-protector"
+          export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP -DCONFIG_OPTIMIZE_INLINING"
+          
+          echo "============================================"
+          echo "🔧 Build Configuration"
+          echo "============================================"
+          echo "Kernel: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
+          echo "KSU Variant: ${{ inputs.kernelsu_variant }}"
+          echo "Threads: $(nproc --all)"
+          echo "Optimization: O3 (forced)"
+          echo "LTO: Thin"
+          echo "ccache: ENABLED"
+          echo "  Dir: $CCACHE_DIR"
+          echo "  Base: $CCACHE_BASEDIR"
+          echo "  Max size: $CCACHE_MAXSIZE"
+          echo "============================================"
+          
+          # Prime cache if empty
+          if [ ! -d "$CCACHE_DIR" ] || [ -z "$(find "$CCACHE_DIR" -type f 2>/dev/null | head -n1)" ]; then
+            echo "🔥 Priming cache with header preprocessing..."
+            make O=out headers_install prepare 2>&1 | head -n 20 || true
+            echo ""
+          fi
+          
+          BUILD_START=$(date +%s)
           
           # Build kernel
-          make ARCH=arm64 \
-               CC="ccache $CLANG_PATH/bin/clang" \
-               HOSTCC="ccache $CLANG_PATH/bin/clang" \
-               CLANG_TRIPLE=aarch64-linux-gnu- \
-               CROSS_COMPILE=$CLANG_PATH/bin/aarch64-linux-gnu- \
-               CROSS_COMPILE_ARM32=$CLANG_PATH/bin/arm-linux-gnueabi- \
-               LD="$CLANG_PATH/bin/ld.lld" \
-               AR="$CLANG_PATH/bin/llvm-ar" \
-               NM="$CLANG_PATH/bin/llvm-nm" \
-               OBJCOPY="$CLANG_PATH/bin/llvm-objcopy" \
-               OBJDUMP="$CLANG_PATH/bin/llvm-objdump" \
-               READELF="$CLANG_PATH/bin/llvm-readelf" \
-               OBJSIZE="$CLANG_PATH/bin/llvm-size" \
-               STRIP="$CLANG_PATH/bin/llvm-strip" \
-               HOSTLD="$CLANG_PATH/bin/ld.lld" \
-               HOSTLDFLAGS="-fuse-ld=lld" \
-               O="$OUT_DIR" \
-               -j$(nproc --all)
+          make -j$(nproc --all) O=out \
+            KCFLAGS="$KCFLAGS" \
+            KCPPFLAGS="$KCPPFLAGS" \
+            Image \
+            modules \
+            2>&1 | tee build.log || {
+              echo "Build failed! Last 50 lines of build log:"
+              tail -n 50 build.log
+              exit 1
+            }
           
-          echo "Build completed successfully!"
+          BUILD_END=$(date +%s)
+          BUILD_TIME=$((BUILD_END - BUILD_START))
           
-          # Show ccache statistics
+          echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+          
+          # Check if Image was built successfully
+          if [ ! -f "out/arch/arm64/boot/Image" ]; then
+            echo "Error: Kernel Image not found!"
+            exit 1
+          fi
+          
+          IMG_SIZE=$(stat -c%s "out/arch/arm64/boot/Image")
+          
+          echo "============================================"
+          echo "✅ Build Completed Successfully"
+          echo "============================================"
+          echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
+          echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
+          echo ""
+          echo "📊 ccache Post-Build Statistics"
+          echo "============================================"
           ccache -s
+          echo "============================================"
+          echo "::endgroup::"
 
-      - name: Create compressed kernel images
+      - name: 📊 ccache Post-Build Statistics
+        id: ccache_stats
+        if: ${{ always() }}
         shell: bash
         run: |
           set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
+          echo "::group::ccache final statistics"
           
-          # Create Image.gz
-          gzip -n -k -f -9 "$OUT_DIR/arch/arm64/boot/Image" -c > "$OUT_DIR/arch/arm64/boot/Image.gz"
+          export CCACHE_DIR="${{ env.CCACHE_DIR }}"
           
-          # Create Image.lz4
-          lz4 -9 -f "$OUT_DIR/arch/arm64/boot/Image" "$OUT_DIR/arch/arm64/boot/Image.lz4"
+          echo "ccache Statistics"
+          ccache -s
           
-          echo "Compressed images created successfully!"
+          STATS="$(ccache -s)"
+          
+          CACHEABLE=$(echo "$STATS" | awk '/Cacheable calls:/ {
+            match($0, /[0-9]+/); 
+            print substr($0, RSTART, RLENGTH)
+          }' | head -n1)
+          
+          HITS=$(echo "$STATS" | awk '/^[[:space:]]*Hits:/ {
+            match($0, /[0-9]+/); 
+            print substr($0, RSTART, RLENGTH)
+          }' | head -n1)
+          
+          DIRECT=$(echo "$STATS" | awk '/Direct:/ {
+            match($0, /[0-9]+/); 
+            print substr($0, RSTART, RLENGTH)
+          }' | head -n1)
+          
+          if [ "${CACHEABLE:-0}" -gt 0 ]; then
+            HIT_RATE=$(awk -v h="${HITS:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (h/c)*100}')
+            DIRECT_RATE=$(awk -v d="${DIRECT:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (d/c)*100}')
+          else
+            HIT_RATE="0.0"
+            DIRECT_RATE="0.0"
+          fi
+          
+          echo "hit_rate=${HIT_RATE}%" >> "$GITHUB_OUTPUT"
+          echo "direct_rate=${DIRECT_RATE}%" >> "$GITHUB_OUTPUT"
+          
+          echo "::endgroup::"
 
       - name: Patch KPM for SukiSU-Ultra
         if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
@@ -873,43 +1169,32 @@ jobs:
         run: |
           set -euo pipefail
           echo "Patching Image file..."
-          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
-          cd "$OUT_DIR/arch/arm64/boot"
-          
+          cd "$CONFIG/common/out/arch/arm64/boot"
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
           chmod +x patch
           ./patch
           rm -f Image
           mv oImage Image
-          
-          # Recreate compressed images with patched kernel
-          gzip -n -k -f -9 Image -c > Image.gz
-          lz4 -9 -f Image Image.lz4
 
       - name: Prepare AnyKernel3
         shell: bash
         run: |
           set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
+          # Copy Image from build location
+          cp "$CONFIG/common/out/arch/arm64/boot/Image" AnyKernel3/Image
           
-          # Copy Image
-          if [ -f "$OUT_DIR/arch/arm64/boot/Image" ]; then
-            cp "$OUT_DIR/arch/arm64/boot/Image" AnyKernel3/Image
-          else
-            echo "Error: Image file not found"
-            exit 1
-          fi
+          # Enable modules in AnyKernel3
+          sed -i 's|^do\.modules=.*|do.modules=1|' ./AnyKernel3/anykernel.sh
 
       - name: Copy snd-aloop module
         shell: bash
         run: |
           set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
           mkdir -p AnyKernel3/modules/data/adb/lkm
           
-          # Find and copy snd-aloop.ko
-          if [ -f "$OUT_DIR/sound/drivers/snd-aloop.ko" ]; then
-            cp "$OUT_DIR/sound/drivers/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
+          # Find and copy snd-aloop module if it exists
+          if [ -f "$CONFIG/common/out/sound/drivers/snd-aloop.ko" ]; then
+            cp "$CONFIG/common/out/sound/drivers/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
             echo "snd-aloop.ko copied successfully"
           else
             echo "Warning: snd-aloop.ko not found"
@@ -919,27 +1204,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
           echo "Searching for kernel modules (.ko files)..."
           
-          find "$OUT_DIR" -name "*.ko" -type f 2>/dev/null | while read -r module_file; do
-            echo "Found module: $(basename "$module_file") in $(dirname "$module_file")"
-          done || true
+          # Search for all .ko files in the output directory
+          find "$CONFIG/common/out" -name "*.ko" -type f | while read -r module; do
+            module_name=$(basename "$module")
+            module_dir=$(dirname "$module")
+            echo "Found module: $module_name in $module_dir"
+          done
+          
+          # Count total modules
+          total_modules=$(find "$CONFIG/common/out" -name "*.ko" -type f | wc -l)
+          echo "Total kernel modules found: $total_modules"
 
       - name: Create Bootimgs Folder and Copy Images
         shell: bash
         run: |
           set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/$CONFIG/out"
-          mkdir -p bootimgs
+          mkdir bootimgs
           
-          cp "$OUT_DIR/arch/arm64/boot/Image" ./bootimgs/
-          cp "$OUT_DIR/arch/arm64/boot/Image.gz" ./bootimgs/
-          cp "$OUT_DIR/arch/arm64/boot/Image.lz4" ./bootimgs/
+          # Copy kernel images
+          cp "$CONFIG/common/out/arch/arm64/boot/Image" ./bootimgs/
+          cp "$CONFIG/common/out/arch/arm64/boot/Image" "./${{ env.FILE_NAME }}-Image"
           
-          cp "$OUT_DIR/arch/arm64/boot/Image" ./${{ env.FILE_NAME }}-Image
-          cp "$OUT_DIR/arch/arm64/boot/Image.gz" ./${{ env.FILE_NAME }}-Image.gz
-          cp "$OUT_DIR/arch/arm64/boot/Image.lz4" ./${{ env.FILE_NAME }}-Image.lz4
+          # Create compressed versions
+          gzip -n -k -f -9 ./bootimgs/Image
+          cp ./bootimgs/Image.gz "./${{ env.FILE_NAME }}-Image.gz"
+          
+          # Create lz4 compressed version
+          lz4 -f -12 --favor-decSpeed ./bootimgs/Image ./bootimgs/Image.lz4
+          cp ./bootimgs/Image.lz4 "./${{ env.FILE_NAME }}-Image.lz4"
 
       - name: Android 12 boot image build script
         if: ${{ inputs.android_version == 'android12' }}
@@ -1024,7 +1318,6 @@ jobs:
             ${{ env.FILE_NAME }}-boot-lz4.img
             patch-rejects/**
             build_summary.md
-          if-no-files-found: ignore
           compression-level: 9
           
       - name: Generate Build Summary
@@ -1042,9 +1335,13 @@ jobs:
           echo "## Build Information" >> build_summary.md
           echo "- **Android Version**: ${{ inputs.android_version }}" >> build_summary.md
           echo "- **Kernel Version**: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}" >> build_summary.md
-          echo "- **Build Method**: make (Direct)" >> build_summary.md
+          echo "- **Actual Sublevel**: ${ACTUAL_SUBLEVEL:-${{ inputs.sub_level }}}" >> build_summary.md
           echo "- **BBG**: Installed" >> build_summary.md
           echo "- **Bypass Mode**: ${{ matrix.apply_bypass }}" >> build_summary.md
+          echo "- **Optimization**: O3 (forced)" >> build_summary.md
+          echo "- **Build Time**: ${BUILD_TIME:-0}s" >> build_summary.md
+          echo "- **ccache Hit Rate**: ${{ steps.ccache_stats.outputs.hit_rate }}" >> build_summary.md
+          echo "- **ccache Direct Rate**: ${{ steps.ccache_stats.outputs.direct_rate }}" >> build_summary.md
           echo "" >> build_summary.md
 
           # Get KSU directory name based on variant
@@ -1108,7 +1405,7 @@ jobs:
           # Add artifact summary with presence verification
           echo "## Build Artifacts" >> build_summary.md
 
-          # Verify AnyKernel3 contents - check if kernel Image was actually copied (indicates successful build)
+          # Verify AnyKernel3 contents
           if [ -d "AnyKernel3" ] && [ -f "AnyKernel3/Image" ]; then
             AK3_STATUS="✅"
           else
@@ -1150,3 +1447,4 @@ jobs:
           else
             echo "  No rejected patches found." >> build_summary.md
           fi
+          
