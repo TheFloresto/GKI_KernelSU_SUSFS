@@ -669,7 +669,7 @@ jobs:
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."          
-              cp -v ../../kernel_patches/suki/scope_min_manual_hooks_v1.6.patch ./
+              cp -v ../../SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./
               patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "MKSU")
