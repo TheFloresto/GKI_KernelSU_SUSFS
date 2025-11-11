@@ -838,6 +838,7 @@ jobs:
             echo "Error: Image file not found in any expected location"
             exit 1
           fi
+          sed -i 's|^do\.modules=.*|do.modules=1|' ./AnyKernel3/anykernel.sh
 
       - name: Copy snd-aloop module for Android 12-13
         if: inputs.android_version == 'android12' || inputs.android_version == 'android13'
