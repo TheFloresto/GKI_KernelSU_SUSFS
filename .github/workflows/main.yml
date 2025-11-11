@@ -337,7 +337,7 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           shopt -s nullglob
-          anykernel_dirs=(./downloaded-artifacts/*/)
+          anykernel_dirs=(./downloaded-artifacts/*-AK3/)
           
           if [ ${#anykernel_dirs[@]} -eq 0 ]; then
             echo "No artifact directories found under ./downloaded-artifacts; skipping upload."
