@@ -466,8 +466,8 @@ jobs:
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."          
-              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+              cp -v ../../kernel_patches/suki/scope_min_manual_hooks_v1.6.patch ./
+              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
