@@ -940,17 +940,7 @@ jobs:
           
           # One-time fix for setlocalversion — remove -dirty and scm, add @NoFloresto
           sed -i 's/-dirty//' ./common/scripts/setlocalversion
-          sed -i 's|echo "\$res"|echo "\$res-@NoFloresto"|' ./common/scripts/setlocalversion
           sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' ./common/scripts/setlocalversion
-          
-          # One-time fix for mkcompile_h — set static UTS_VERSION and compile info
-          STATIC_DATE="Sun Jun 15 14:56:02 UTC 2025"
-          perl -pi -e "s{UTS_VERSION=\"\\\$\\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $STATIC_DATE\"}" ./common/scripts/mkcompile_h
-          perl -pi -e "s/build-timestamp = \\\$\\(or \\\$\\(KBUILD_BUILD_TIMESTAMP\\), \\\$\\(build-timestamp-auto\\)\\)/build-timestamp = \"$STATIC_DATE\"/" ./common/init/Makefile
-          
-          # Set Custom Hostname and Username
-          perl -pi -e 's/LINUX_COMPILE_BY=.*/LINUX_COMPILE_BY="thefloresto"/' ./common/scripts/mkcompile_h
-          perl -pi -e 's/LINUX_COMPILE_HOST=.*/LINUX_COMPILE_HOST="thefloresto-labs"/' ./common/scripts/mkcompile_h        
           
           echo "Branding applied:"
           echo "   LOCALVERSION: $CUSTOM_LOCALVERSION"
