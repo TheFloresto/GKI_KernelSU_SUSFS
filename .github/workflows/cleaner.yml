@@ -1,0 +1,100 @@
+name: Clean GKI Kernel ccache caches
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DELETE to confirm cleaning all caches"
+        required: true
+        default: ""
+      kernel_version:
+        description: "Kernel version to clean (6.1, 6.6, all)"
+        required: true
+        default: "all"
+        type: choice
+        options:
+        - "all"
+        - "6.1"
+        - "6.6"
+
+jobs:
+  clean-caches:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    
+    steps:
+      - name: Validate confirmation input
+        if: ${{ github.event.inputs.confirm != 'DELETE' }}
+        run: |
+          echo "::error::Must type DELETE to confirm cleaning operation!"
+          exit 1
+      
+      - name: Get and delete all caches
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let totalDeleted = 0;
+            const kernelVersion = '${{ github.event.inputs.kernel_version }}';
+            
+            // Get all caches
+            const caches = await github.rest.actions.getActionsCacheList({
+              owner,
+              repo,
+              per_page: 100
+            });
+            
+            console.log(`Found ${caches.data.actions_caches.length} total caches`);
+            
+            // Delete matching caches
+            for (const cache of caches.data.actions_caches) {
+              let shouldDelete = false;
+              
+              if (kernelVersion === 'all') {
+                // Delete all ccache-related caches
+                if (cache.key.startsWith('ccache-')) {
+                  shouldDelete = true;
+                }
+              } else {
+                // Delete only specific kernel version caches
+                if (cache.key.startsWith(`ccache-${kernelVersion}.`)) {
+                  shouldDelete = true;
+                }
+              }
+              
+              if (shouldDelete) {
+                console.log(`Deleting cache: ${cache.key} (${cache.size_in_bytes} bytes)`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner,
+                  repo,
+                  cache_id: cache.id
+                });
+                totalDeleted++;
+              }
+            }
+            
+            console.log(`Successfully deleted ${totalDeleted} cache(s) for kernel version: ${kernelVersion}`);
+            return `Successfully deleted ${totalDeleted} cache(s)`;
+
+      - name: Reset environment and cleanup
+        run: |
+          echo "Cleaning up local ccache directories..."
+          rm -rf $HOME/.ccache* || true
+          
+          # Clean up system caches
+          sudo apt clean || true
+          sudo journalctl --vacuum-time=1s || true
+          sudo rm -rf /var/log/* || true
+          
+          # Docker cleanup
+          docker system prune -af || true
+          
+          # Clear temporary files
+          sudo rm -rf /tmp/* || true
+          
+          echo "Container environment has been reset!"
+          echo "Space after cleanup:"
+          df -h
+          
+          echo "Cache cleanup completed for kernel version: ${{ github.event.inputs.kernel_version }}"
