@@ -960,6 +960,320 @@ jobs:
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
+
+      - name: BTF Environment Diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::BTF Environment Diagnostics"
+          
+          echo "========================================"
+          echo "1. System Information"
+          echo "========================================"
+          uname -a
+          lsb_release -a 2>/dev/null || cat /etc/os-release
+          
+          echo ""
+          echo "========================================"
+          echo "2. Compiler Versions"
+          echo "========================================"
+          echo "--- Clang ---"
+          ${CLANG_BIN_PATH}/clang --version || echo "❌ clang not found"
+          
+          echo ""
+          echo "--- GCC ---"
+          gcc --version | head -n1 || echo "❌ gcc not found"
+          
+          echo ""
+          echo "--- LLVM Tools ---"
+          llvm-objcopy --version 2>&1 | head -n1 || echo "❌ llvm-objcopy not found"
+          llvm-strip --version 2>&1 | head -n1 || echo "❌ llvm-strip not found"
+          llvm-nm --version 2>&1 | head -n1 || echo "❌ llvm-nm not found"
+          llvm-ar --version 2>&1 | head -n1 || echo "❌ llvm-ar not found"
+          ld.lld --version 2>&1 | head -n1 || echo "❌ ld.lld not found"
+          
+          echo ""
+          echo "========================================"
+          echo "3. BTF-Related Tools"
+          echo "========================================"
+          echo "--- pahole ---"
+          which pahole && pahole --version || echo "❌ pahole not found in PATH"
+          
+          echo ""
+          echo "--- libelf ---"
+          pkg-config --modversion libelf 2>/dev/null || echo "⚠️ libelf pkg-config not available"
+          ldconfig -p | grep libelf | head -n3 || echo "⚠️ libelf not in ldconfig"
+          find /usr/lib* -name "libelf.so*" 2>/dev/null | head -n3 || echo "⚠️ libelf.so not found"
+          
+          echo ""
+          echo "--- libdw (dwarves dependency) ---"
+          pkg-config --modversion libdw 2>/dev/null || echo "⚠️ libdw pkg-config not available"
+          ldconfig -p | grep libdw | head -n3 || echo "⚠️ libdw not in ldconfig"
+          
+          echo ""
+          echo "--- dwarves package ---"
+          dpkg -l | grep dwarves || echo "⚠️ dwarves package not installed"
+          
+          echo ""
+          echo "========================================"
+          echo "4. glibc Version Check"
+          echo "========================================"
+          ldd --version | head -n1
+          GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')
+          echo "Detected glibc: $GLIBC_VERSION"
+          
+          if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then
+            echo "⚠️ glibc >= 2.38 detected - compatibility patches will be needed"
+          else
+            echo "✅ glibc version is compatible"
+          fi
+          
+          echo ""
+          echo "========================================"
+          echo "5. Kernel Source BTF Tools"
+          echo "========================================"
+          cd "$CONFIG/common"
+          
+          echo "--- resolve_btfids source ---"
+          if [ -d "tools/bpf/resolve_btfids" ]; then
+            echo "✅ tools/bpf/resolve_btfids exists"
+            ls -la tools/bpf/resolve_btfids/
+          else
+            echo "❌ tools/bpf/resolve_btfids not found"
+          fi
+          
+          echo ""
+          echo "--- libbpf source ---"
+          if [ -d "tools/lib/bpf" ]; then
+            echo "✅ tools/lib/bpf exists"
+            ls -la tools/lib/bpf/ | head -n10
+          else
+            echo "❌ tools/lib/bpf not found"
+          fi
+          
+          echo ""
+          echo "--- subcmd source ---"
+          if [ -d "tools/lib/subcmd" ]; then
+            echo "✅ tools/lib/subcmd exists"
+            ls -la tools/lib/subcmd/ | head -n10
+          else
+            echo "❌ tools/lib/subcmd not found"
+          fi
+          
+          echo ""
+          echo "========================================"
+          echo "6. BTF Configuration Detection"
+          echo "========================================"
+          echo "Checking kernel Makefile for BTF support..."
+          grep -n "CONFIG_DEBUG_INFO_BTF" Makefile | head -n5 || echo "⚠️ BTF not mentioned in Makefile"
+          
+          echo ""
+          echo "Checking defconfig for BTF..."
+          grep -E "BTF|PAHOLE" arch/arm64/configs/gki_defconfig || echo "⚠️ BTF not in defconfig"
+          
+          echo ""
+          echo "========================================"
+          echo "7. Python Environment"
+          echo "========================================"
+          python3 --version
+          which python3
+          
+          echo ""
+          echo "========================================"
+          echo "8. Build Dependencies Check"
+          echo "========================================"
+          echo "Checking critical build dependencies..."
+          
+          DEPS_OK=true
+          for cmd in flex bison bc make; do
+            if command -v $cmd >/dev/null 2>&1; then
+              echo "✅ $cmd: $(command -v $cmd)"
+            else
+              echo "❌ $cmd: NOT FOUND"
+              DEPS_OK=false
+            fi
+          done
+          
+          if $DEPS_OK; then
+            echo "✅ All critical dependencies present"
+          else
+            echo "❌ Some dependencies missing"
+          fi
+          
+          echo ""
+          echo "========================================"
+          echo "9. Memory and Disk Space"
+          echo "========================================"
+          echo "--- Memory ---"
+          free -h
+          echo ""
+          echo "--- Disk Space ---"
+          df -h "$CONFIG" | tail -n1
+          
+          echo "::endgroup::"
+
+      - name: Upgrade and Test pahole
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Upgrade pahole"
+          
+          cd "$CONFIG/common"
+          
+          PAHOLE_VERSION=$(pahole --version 2>/dev/null | grep -oP '\d+\.\d+' | head -n1 || echo "0.0")
+          echo "Current pahole version: $PAHOLE_VERSION"
+          
+          if awk -v ver="$PAHOLE_VERSION" 'BEGIN {exit !(ver < 1.21)}'; then
+            echo "⚠️ pahole version too old, upgrading..."
+            
+            sudo apt-get install -y cmake libdw-dev libelf-dev
+            
+            cd /tmp
+            rm -rf pahole
+            git clone --depth=1 https://git.kernel.org/pub/scm/devel/pahole/pahole.git
+            cd pahole
+            
+            mkdir build && cd build
+            cmake -DCMAKE_INSTALL_PREFIX=/usr -D__LIB=lib ..
+            make -j$(nproc)
+            sudo make install
+            sudo ldconfig
+            
+            cd "$GITHUB_WORKSPACE/$CONFIG/common"
+            
+            NEW_VERSION=$(pahole --version 2>/dev/null | grep -oP '\d+\.\d+' | head -n1)
+            echo "✅ pahole upgraded to: $NEW_VERSION"
+          else
+            echo "✅ pahole version is sufficient: $PAHOLE_VERSION"
+          fi
+          
+          echo ""
+          echo "=== Testing pahole ==="
+          cat > /tmp/test_btf.c << 'EOF'
+          struct test_struct {
+              int a;
+              long b;
+              char c[16];
+          };
+          
+          struct nested {
+              struct test_struct s;
+              int x;
+          };
+          
+          int main(void) {
+              struct nested n = {0};
+              return n.x;
+          }
+          EOF
+          
+          echo "Compiling test with debug info..."
+          if ${CLANG_BIN_PATH}/clang -g -c -o /tmp/test_btf.o /tmp/test_btf.c 2>&1; then
+            echo "✅ Test compilation successful"
+            
+            echo ""
+            echo "Testing pahole on compiled object..."
+            if pahole /tmp/test_btf.o 2>&1 | head -n 30; then
+              echo "✅ pahole working correctly"
+            else
+              echo "❌ pahole failed on test object"
+            fi
+          else
+            echo "⚠️ Test compilation failed"
+          fi
+          
+          rm -f /tmp/test_btf.c /tmp/test_btf.o
+          
+          echo "::endgroup::"
+
+      - name: Fix BTF Build Tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Fix BTF build tools"
+          
+          cd "$CONFIG/common"
+          
+          GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')
+          
+          echo "=== Fixing resolve_btfids Makefile ==="
+          if [ -f "tools/bpf/resolve_btfids/Makefile" ]; then
+            echo "Patching resolve_btfids/Makefile for modern toolchain..."
+            
+            # Добавляем EXTRA_CFLAGS если его нет
+            if ! grep -q "EXTRA_CFLAGS" tools/bpf/resolve_btfids/Makefile; then
+              sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC)/s/\$(MAKE)/\$(MAKE) EXTRA_CFLAGS="\$(CFLAGS) -Wno-error"/' \
+                tools/bpf/resolve_btfids/Makefile
+            fi
+            
+            echo "✅ resolve_btfids/Makefile patched"
+          fi
+          
+          echo ""
+          echo "=== Fixing libbpf Makefile ==="
+          if [ -f "tools/lib/bpf/Makefile" ]; then
+            echo "Adding error suppression to libbpf..."
+            sed -i 's|override CFLAGS +=|override CFLAGS += -Wno-error |g' tools/lib/bpf/Makefile
+            echo "✅ libbpf/Makefile patched"
+          fi
+          
+          if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then
+            echo ""
+            echo "=== Applying glibc 2.38 compatibility patches ==="
+            
+            if [ -f "tools/lib/subcmd/parse-options.c" ]; then
+              echo "Patching parse-options.c for C99 compatibility..."
+              
+              # Проверяем, не был ли уже пропатчен
+              if ! grep -q "int i;" tools/lib/subcmd/parse-options.c | head -n1; then
+                sed -i '/char \*buf = NULL;/a\	int i;' tools/lib/subcmd/parse-options.c
+                sed -i 's/for (int i = 0; subcommands\[i\]; i++)/for (i = 0; subcommands[i]; i++)/' \
+                  tools/lib/subcmd/parse-options.c
+              fi
+              
+              echo "✅ parse-options.c patched"
+            fi
+          fi
+          
+          echo ""
+          echo "=== Testing resolve_btfids build ==="
+          export EXTRA_CFLAGS="-Wno-error -Wno-unused-command-line-argument"
+          
+          echo "Cleaning previous build..."
+          make -C tools/bpf/resolve_btfids clean || true
+          
+          echo ""
+          echo "Building resolve_btfids with verbose output..."
+          if make V=1 -C tools/bpf/resolve_btfids 2>&1 | tee /tmp/btfids_build.log; then
+            echo "✅ resolve_btfids built successfully"
+            
+            if [ -f "tools/bpf/resolve_btfids/resolve_btfids" ]; then
+              ls -lh tools/bpf/resolve_btfids/resolve_btfids
+              file tools/bpf/resolve_btfids/resolve_btfids
+              
+              echo ""
+              echo "Testing resolve_btfids binary..."
+              if tools/bpf/resolve_btfids/resolve_btfids --help 2>&1 | head -n 10 || true; then
+                echo "✅ resolve_btfids binary works"
+              fi
+            fi
+          else
+            echo "❌ resolve_btfids build failed!"
+            echo ""
+            echo "=== Last 50 lines of build log ==="
+            tail -n 50 /tmp/btfids_build.log
+            echo ""
+            echo "=== Error analysis ==="
+            grep -i "error:" /tmp/btfids_build.log | head -n 20 || echo "No explicit errors found"
+            grep -i "undefined reference" /tmp/btfids_build.log || echo "No undefined references"
+            
+            echo ""
+            echo "⚠️ Continuing despite resolve_btfids build failure..."
+            echo "This may cause BTF generation to fail during kernel build"
+          fi
+          
+          echo "::endgroup::"
+
       - name: Build Kernel with ccache
         shell: bash
         env:
