@@ -934,11 +934,15 @@ jobs:
           
           cd "$CONFIG"
           
+          # Set static build date for reproducible builds
+          STATIC_DATE="Sun Jun 15 14:56:02 UTC 2025"
+          echo "STATIC_DATE=$STATIC_DATE" >> "$GITHUB_ENV"
+          
           # Set custom LOCALVERSION
           CUSTOM_LOCALVERSION="-${{ inputs.android_version }}"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
           
-          # One-time fix for setlocalversion — remove -dirty and scm, add @NoFloresto
+          # One-time fix for setlocalversion — remove -dirty and scm
           sed -i 's/-dirty//' ./common/scripts/setlocalversion
           sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' ./common/scripts/setlocalversion
           
