@@ -994,7 +994,7 @@ jobs:
             # Клонируем конкретную версию 1.24
             git clone https://git.kernel.org/pub/scm/devel/pahole/pahole.git
             cd pahole
-            git checkout v1.24
+            git checkout v1.22
             
             mkdir build && cd build
             cmake -DCMAKE_INSTALL_PREFIX=/usr -D__LIB=lib ..
