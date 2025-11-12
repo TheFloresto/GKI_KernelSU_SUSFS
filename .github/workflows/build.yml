@@ -772,7 +772,6 @@ jobs:
           cd "$CONFIG"
           # KernelSU Configuration
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
@@ -939,7 +938,7 @@ jobs:
           echo "STATIC_DATE=$STATIC_DATE" >> "$GITHUB_ENV"
           
           # Set custom LOCALVERSION
-          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}"
+          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
           
           # One-time fix for setlocalversion — remove -dirty and scm
@@ -972,12 +971,11 @@ jobs:
           cd "$CONFIG/common"
           
           # Clear .scmversion to prevent dirty flag
-          : > "$CONFIG/common/.scmversion"
+          : > .scmversion
           
           export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
           # Build timestamp setup (static as per branding)
-          STATIC_DATE="Sun Jun 15 14:56:02 UTC 2025"
           export SOURCE_DATE_EPOCH=$(date -d "$STATIC_DATE" +%s 2>/dev/null || date +%s)
           export KBUILD_BUILD_TIMESTAMP="$STATIC_DATE"
           export KBUILD_BUILD_USER="thefloresto"
