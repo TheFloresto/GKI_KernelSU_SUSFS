@@ -982,6 +982,10 @@ jobs:
             echo "⚠️ pahole $PAHOLE_VERSION is too new for kernel ${{ inputs.kernel_version }}"
             echo "Installing pahole 1.24 (last compatible version)..."
             
+            # Устанавливаем зависимости для сборки pahole ПЕРЕД удалением
+            echo "Installing build dependencies..."
+            sudo apt-get install -y cmake libdw-dev libelf-dev zlib1g-dev libbz2-dev
+            
             sudo apt-get remove -y dwarves pahole 2>/dev/null || true
             
             cd /tmp
