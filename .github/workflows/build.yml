@@ -1055,6 +1055,37 @@ jobs:
           rm -f /tmp/test_btf.c /tmp/test_btf.o
           
           echo "::endgroup::"
+
+      - name: Build and Setup resolve_btfids
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::Build resolve_btfids"
+          
+          cd "$CONFIG/common"
+          
+          # Ensure llvm-objcopy is available
+          export PATH="${CLANG_BIN_PATH}:${PATH}"
+          
+          # Build resolve_btfids first
+          echo "Building resolve_btfids..."
+          make -C tools/bpf/resolve_btfids \
+            CC="${CLANG_BIN_PATH}/clang" \
+            LD="${CLANG_BIN_PATH}/ld.lld" \
+            AR="${CLANG_BIN_PATH}/llvm-ar" \
+            OBJCOPY="${CLANG_BIN_PATH}/llvm-objcopy" \
+            -j$(nproc)
+          
+          # Verify it was built
+          if [ -f "tools/bpf/resolve_btfids/resolve_btfids" ]; then
+            echo "✅ resolve_btfids built successfully"
+            ls -lh tools/bpf/resolve_btfids/resolve_btfids
+          else
+            echo "❌ resolve_btfids build failed"
+            exit 1
+          fi
+          
+          echo "::endgroup::"
           
       - name: Build Kernel with ccache
         shell: bash
