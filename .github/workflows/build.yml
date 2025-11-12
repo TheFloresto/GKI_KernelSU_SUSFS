@@ -959,130 +959,6 @@ jobs:
           ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.apply_bypass == 'bypass' && 'Bypass' || 'Normal' }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
-          
-      - name: Apply BTF Fixes for Old Kernels
-        if: |
-          (inputs.android_version == 'android13' && inputs.kernel_version == '5.10') ||
-          (inputs.android_version == 'android13' && inputs.kernel_version == '5.15')
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::group::Apply BTF fixes for kernel ${{ inputs.kernel_version }}"
-          
-          cd "$CONFIG/common"
-          
-          echo "=== Detected old kernel requiring BTF compatibility fixes ==="
-          echo "Kernel: ${{ inputs.kernel_version }}"
-          echo "Android: ${{ inputs.android_version }}"
-          
-          echo ""
-          echo "=== Fix 1: Patch BTF generation in main Makefile ==="
-          
-          # Находим строку с pahole и добавляем флаг --skip_encoding_btf_vars
-          if grep -q "RESOLVE_BTFIDS" Makefile; then
-            echo "Patching Makefile for BTF generation..."
-            
-            # Добавляем флаги для pahole в старых ядрах
-            sed -i 's/pahole -J/pahole --skip_encoding_btf_vars --btf_gen_floats -J/g' Makefile 2>/dev/null || true
-            
-            echo "✅ Makefile patched"
-          fi
-          
-          echo ""
-          echo "=== Fix 2: Patch resolve_btfids for compatibility ==="
-          
-          if [ -f "tools/bpf/resolve_btfids/main.c" ]; then
-            echo "Patching resolve_btfids main.c..."
-            
-            # Добавляем более мягкую обработку ошибок BTF
-            cat > /tmp/btf_patch.c << 'BTFPATCH'
-          --- a/tools/bpf/resolve_btfids/main.c
-          +++ b/tools/bpf/resolve_btfids/main.c
-          @@ -1,0 +1,5 @@
-          +/* Workaround for old kernel BTF compatibility */
-          +#ifndef BTF_KIND_FLOAT
-          +#define BTF_KIND_FLOAT 16
-          +#endif
-          +
-          BTFPATCH
-            
-            # Применяем патч если возможно
-            patch -p1 --forward < /tmp/btf_patch.c 2>/dev/null || echo "Patch already applied or not needed"
-            rm -f /tmp/btf_patch.c
-            
-            echo "✅ resolve_btfids patched"
-          fi
-          
-          echo ""
-          echo "=== Fix 3: Update BTF generation script ==="
-          
-          if [ -f "scripts/link-vmlinux.sh" ]; then
-            echo "Patching link-vmlinux.sh for better error handling..."
-            
-            # Делаем BTF generation более устойчивым к ошибкам
-            sed -i 's/LLVM_OBJCOPY="${OBJCOPY}" ${RESOLVE_BTFIDS}/LLVM_OBJCOPY="${OBJCOPY}" ${RESOLVE_BTFIDS} || { echo "BTF generation warning"; }/g' \
-              scripts/link-vmlinux.sh 2>/dev/null || true
-            
-            echo "✅ link-vmlinux.sh patched"
-          fi
-          
-          echo ""
-          echo "=== Fix 4: Ensure pahole has correct flags ==="
-          
-          # Создаём wrapper для pahole с правильными флагами
-          cat > /tmp/pahole_wrapper.sh << 'PAHOLEWRAP'
-          #!/bin/bash
-          # Wrapper for pahole with compatibility flags for old kernels
-          
-          PAHOLE_BIN=/usr/bin/pahole
-          
-          # Добавляем флаги совместимости
-          EXTRA_FLAGS=""
-          
-          # Проверяем поддержку флагов
-          if $PAHOLE_BIN --help 2>&1 | grep -q "skip_encoding_btf_vars"; then
-            EXTRA_FLAGS="$EXTRA_FLAGS --skip_encoding_btf_vars"
-          fi
-          
-          if $PAHOLE_BIN --help 2>&1 | grep -q "btf_gen_floats"; then
-            EXTRA_FLAGS="$EXTRA_FLAGS --btf_gen_floats"
-          fi
-          
-          # Запускаем с дополнительными флагами
-          exec $PAHOLE_BIN $EXTRA_FLAGS "$@"
-          PAHOLEWRAP
-          
-          chmod +x /tmp/pahole_wrapper.sh
-          sudo cp /tmp/pahole_wrapper.sh /usr/local/bin/pahole
-          
-          echo "✅ pahole wrapper installed"
-          
-          echo ""
-          echo "=== Fix 5: Test BTF tools with old kernel ==="
-          
-          # Пересобираем resolve_btfids с новыми патчами
-          make -C tools/bpf/resolve_btfids clean || true
-          
-          if make V=1 -C tools/bpf/resolve_btfids EXTRA_CFLAGS="-Wno-error -DBTF_KIND_FLOAT=16" 2>&1 | tee /tmp/btfids_rebuild.log; then
-            echo "✅ resolve_btfids rebuilt successfully with compatibility flags"
-          else
-            echo "⚠️ resolve_btfids rebuild failed, but continuing..."
-            tail -n 30 /tmp/btfids_rebuild.log
-          fi
-          
-          echo ""
-          echo "=== Verification ==="
-          echo "Checking pahole flags support..."
-          /usr/bin/pahole --help 2>&1 | grep -E "skip_encoding|btf_gen_floats" || echo "Legacy pahole"
-          
-          echo ""
-          echo "Checking resolve_btfids binary..."
-          if [ -f "tools/bpf/resolve_btfids/resolve_btfids" ]; then
-            file tools/bpf/resolve_btfids/resolve_btfids
-            ls -lh tools/bpf/resolve_btfids/resolve_btfids
-          fi
-          
-          echo "::endgroup::"
 
       - name: Build Kernel with ccache
         shell: bash
@@ -1132,6 +1008,17 @@ jobs:
           export SUBARCH=arm64
           export LLVM=1
           export LLVM_IAS=1
+
+          # ========== ДОБАВЬТЕ ЭТИ СТРОКИ ==========
+          # Правильные пути для BTF
+          export RESOLVE_BTFIDS="${PWD}/tools/bpf/resolve_btfids/resolve_btfids"
+          export PAHOLE=/usr/bin/pahole
+          
+          # Для старых ядер - абсолютный путь к vmlinux
+          if [[ "${{ inputs.kernel_version }}" == "5.10" ]] || [[ "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            export BTF_VMLINUX="${PWD}/out/vmlinux"
+          fi
+          # =========================================         
           
           # Create output directory
           mkdir -p out
