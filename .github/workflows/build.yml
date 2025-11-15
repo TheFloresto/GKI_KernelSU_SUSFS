@@ -960,7 +960,7 @@ jobs:
           CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
           echo "::endgroup::"
-          
+
       - name: Build kernel with ccache optimization
         shell: bash
         id: build_kernel
@@ -974,9 +974,9 @@ jobs:
 
           # Clear .scmversion to prevent dirty flag
           : > .scmversion
-          
+
           export PYTHONWARNINGS="${PYTHONWARNINGS}"
-          
+
           echo "Getting last commit timestamp from kernel source..."
           COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
           COMMIT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S')
@@ -1016,7 +1016,6 @@ jobs:
           export LLVM=1
           export LLVM_IAS=1
 
-          # ========== ОБНОВИТЕ ЭТОТ БЛОК ==========
           # Правильные пути для BTF
           export RESOLVE_BTFIDS="${PWD}/tools/bpf/resolve_btfids/resolve_btfids"
           export PAHOLE=/usr/bin/pahole
@@ -1030,12 +1029,11 @@ jobs:
               echo "Using PAHOLE_FLAGS: $PAHOLE_FLAGS"
             fi
           fi
-          # =========================================
 
           # Create output directory
           OUT=out
           mkdir -p "$OUT"
-          
+
           echo "============================================"
           echo "🔍 Compiler & ccache Verification"
           echo "============================================"
@@ -1045,7 +1043,7 @@ jobs:
           echo "CXX: $CXX"
           echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
           echo ""
-          
+
           echo "ccache wrapper test:"
           clang --version 2>&1 | head -n1 || true
           echo ""
@@ -1055,13 +1053,13 @@ jobs:
           echo "ccache pre-build status:"
           ccache -s | head -n 20
           echo "============================================"
-          
+
           make O="$OUT" gki_defconfig
-          
+
           # Force O3 optimization (adjusted from original)
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          
+
           # Enable LTO Thin
           scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
           scripts/config --file "$OUT/.config" -e LTO_CLANG
@@ -1073,12 +1071,15 @@ jobs:
             scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
             sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
           fi
-          
+
+          # ИСПРАВЛЕНИЕ: Инициализируем переменные перед использованием
+          KCFLAGS="${KCFLAGS:-}"
+          KCPPFLAGS="${KCPPFLAGS:-}"
           KCFLAGS_EXTRA="-O3"
-          
+
           KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
           KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
-          
+
           echo "============================================"
           echo "🔧 Build Configuration"
           echo "============================================"
@@ -1095,25 +1096,25 @@ jobs:
           echo "  Base: $CCACHE_BASEDIR"
           echo "  Max size: $CCACHE_MAXSIZE"
           echo "============================================"
-          
+
           if [ ! -d "$CCACHE_DIR" ] || [ -z "$(find "$CCACHE_DIR" -type f 2>/dev/null | head -n1)" ]; then
             echo "🔥 Priming cache with header preprocessing..."
             make -C "$CONFIG/common" O="$OUT" headers_install prepare 2>&1 | head -n 20 || true
             echo ""
           fi
-          
+
           BUILD_START=$(date +%s)
           set -o pipefail
-          
+
           make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
-          
+
           BUILD_END=$(date +%s)
           BUILD_TIME=$((BUILD_END - BUILD_START))
-          
+
           echo "BUILD_START=$BUILD_START" >> "$GITHUB_ENV"
           echo "BUILD_END=$BUILD_END" >> "$GITHUB_ENV"
           echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
-          
+
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
             echo "::error::Kernel Image missing"
@@ -1122,24 +1123,24 @@ jobs:
             echo "::endgroup::"
             exit 1
           fi
-          
+
           # Create Image.lz4
           lz4 -f -12 --favor-decSpeed "$IMG" "$OUT/arch/arm64/boot/Image.lz4"
-          
+
           # Copy snd-aloop module if it exists
           if [ -f "$OUT/sound/drivers/snd-aloop.ko" ]; then
             echo "Found snd-aloop.ko module"
             cp "$OUT/sound/drivers/snd-aloop.ko" "$OUT/"
           fi
-          
+
           IMG_SIZE=$(stat -c%s "$IMG")
-          
+
           echo "============================================"
           echo "✅ Build Completed Successfully"
           echo "============================================"
           echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
           echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
-          
+
           echo ""
           echo "📊 ccache Post-Build Statistics"
           echo "============================================"
