@@ -961,7 +961,7 @@ jobs:
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
           echo "::endgroup::"
 
-- name: Build kernel with ccache optimization
+      - name: Build kernel with ccache optimization
         shell: bash
         id: build_kernel
         env:
