@@ -950,17 +950,17 @@ jobs:
           echo "   User: $BUILD_USER"
           echo "   Host: $BUILD_HOST"
           echo "::endgroup::"
-
+          
       - name: Customize Kernel Branding
         shell: bash
         run: |
-           set -euo pipefail
-           cd "$GITHUB_WORKSPACE/$CONFIG/common"
-           mkdir -p out
-           CUSTOM_LOCALVERSION="-${inputs.android_version}-@NoFloresto"
-           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
-           echo "::endgroup::"
-
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/$CONFIG/common"
+          mkdir -p out
+          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-@NoFloresto"
+          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
+          echo "::endgroup::"
+          
       - name: Build kernel with ccache optimization
         shell: bash
         id: build_kernel
