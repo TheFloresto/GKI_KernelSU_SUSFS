@@ -387,7 +387,7 @@ jobs:
                 sed -i 's/for (int i = 0; subcommands\[i\]; i++)/for (i = 0; subcommands[i]; i++)/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
               fi
               # Полный патч для resolve_btfids
-              cat > tools/bpf/resolve_btfids/resolve_btfids_glibc_fix.patch << 'EOF'
+              cat > tools/bpf/resolve_btfids/resolve_btfids_glibc_fix.patch <<'EOF'
 --- a/tools/bpf/resolve_btfids/resolve_btfids.c
 +++ b/tools/bpf/resolve_btfids/resolve_btfids.c
 @@ -123,6 +123,7 @@ static int parse_syms_cb(void *data, const char *name, Elf64_Sym *sym)
@@ -409,11 +409,11 @@ jobs:
  	return add_symbol(data, name, sym->st_value, sym->st_size);
  }
 EOF
-              patch -p1 < tools/bpf/resolve_btfids/resolve_btfids_glibc_fix.patch || true  # Fallback если не применяется
+              patch -p1 < tools/bpf/resolve_btfids/resolve_btfids_glibc_fix.patch || true
            
               echo "PAHOLE_FLAGS=--skip_encoding_btf_vars --skip_encoding_btf_type_tag --skip_encoding_btf_decl_tag --btf_dump_no_prefix --btf_vars" >> $GITHUB_ENV
             fi
-          fi 
+          fi
 
       - name: Fix Less Then 6.6.50 Builds
         if: inputs.android_version == 'android15' && inputs.kernel_version == '6.6'
