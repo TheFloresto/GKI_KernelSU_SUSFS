@@ -247,6 +247,7 @@ jobs:
               CLANG_BIN="$latest/bin"
               CLANG_FOUND=true
               break
+            fi
           done
           
           # Fallback to system clang if not found
