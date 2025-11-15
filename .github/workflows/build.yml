@@ -231,39 +231,28 @@ jobs:
             fi
           fi
 
-      - name: Detect Clang Toolchain
+      - name: Derive Clang Short Version
         shell: bash
         run: |
-          set -euo pipefail
-          echo "::group::Detect Clang"
-          cd "$CONFIG"
-          
-          # Check for prebuilt clang in kernel source
-          CLANG_FOUND=false
-          for base in prebuilts prebuilts-master; do
-            [ -d "$base/clang/host/linux-x86" ] || continue
-            latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
-            if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
-              CLANG_BIN="$latest/bin"
-              CLANG_FOUND=true
-              break
+            set -euo pipefail
+            echo "::group::Derive Clang fingerprint"
+            
+            short="$("$GITHUB_WORKSPACE/$CONFIG/${CLANG_BIN_PATH}/clang" --version | sed -n '1s/.*clang-r\([0-9.]\+\).*/\1/p')"
+            
+            if [ -z "$short" ]; then
+              short="$("$GITHUB_WORKSPACE/$CONFIG/${CLANG_BIN_PATH}/clang" --version | sha256sum | cut -c1-8)"
+              echo "⚠️ Could not extract clang-r version, using hash: $short"
+            else
+              echo "✅ Clang version fingerprint: $short"
             fi
-          done
-          
-          # Fallback to system clang if not found
-          if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
-            CLANG_BIN="$(dirname "$(command -v clang)")"
-            CLANG_FOUND=true
-            echo "Using system clang."
-          fi
-          
-          $CLANG_FOUND || { echo "::error::No clang toolchain found"; exit 1; }
-          echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
-          
-          CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
-          echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-          echo "✅ Detected Clang: $CLANG_VERSION"
-          echo "::endgroup::"
+            
+            echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
+            
+            CLANG_FULL_VERSION="$("$GITHUB_WORKSPACE/$CONFIG/${CLANG_BIN_PATH}/clang" --version | head -n1)"
+            echo "CLANG_FULL_VERSION=$CLANG_FULL_VERSION" >> "$GITHUB_ENV"
+            
+            echo "Full Clang version: $CLANG_FULL_VERSION"
+            echo "::endgroup::"
 
       - name: Derive Clang Short Version
         shell: bash
