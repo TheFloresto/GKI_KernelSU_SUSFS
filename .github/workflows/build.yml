@@ -1090,7 +1090,7 @@ jobs:
           echo "KCFLAGS: ${KCFLAGS:0:150}..."
           echo "KCPPFLAGS: ${KCPPFLAGS:0:150}..."
           echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
-          echo "Workspace: $WORKSPACE"
+          echo "Workspace: $GITHUB_WORKSPACE"
           echo "ccache: ENABLED"
           echo "  Dir: $CCACHE_DIR"
           echo "  Base: $CCACHE_BASEDIR"
