@@ -961,7 +961,7 @@ jobs:
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
           echo "::endgroup::"
 
-      - name: Build kernel with ccache optimization
+- name: Build kernel with ccache optimization
         shell: bash
         id: build_kernel
         env:
@@ -1106,7 +1106,14 @@ jobs:
           BUILD_START=$(date +%s)
           set -o pipefail
 
-          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+          # ДОБАВЛЕНО: Более подробное логирование ошибок
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log || {
+            echo "::error::Build failed with exit code $?"
+            echo "::group::Last 200 lines of build log"
+            tail -n 200 build.log
+            echo "::endgroup::"
+            exit 1
+          }
 
           BUILD_END=$(date +%s)
           BUILD_TIME=$((BUILD_END - BUILD_START))
@@ -1123,9 +1130,6 @@ jobs:
             echo "::endgroup::"
             exit 1
           fi
-
-          # Create Image.lz4
-          lz4 -f -12 --favor-decSpeed "$IMG" "$OUT/arch/arm64/boot/Image.lz4"
 
           # Copy snd-aloop module if it exists
           if [ -f "$OUT/sound/drivers/snd-aloop.ko" ]; then
@@ -1293,6 +1297,14 @@ jobs:
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ env.FILE_NAME }}-boot-lz4.img
+          
+     - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-build-log
+          path: ${{ env.CONFIG }}/common/build.log
+          retention-days: 2
 
       - name: Upload AnyKernel3 Artifacts
         id: upload_ak3
