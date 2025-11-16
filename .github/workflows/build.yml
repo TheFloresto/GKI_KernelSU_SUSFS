@@ -1203,8 +1203,8 @@ jobs:
             echo ""
             echo "❌ Build failed! Showing error context..."
             echo "============================================"
-            echo "Last 100 lines of build log:"
-            tail -n 100 build.log
+            echo "Last 222 lines of build log:"
+            tail -n 222 build.log
             echo "============================================"
             echo ""
             echo "Checking for specific errors..."
@@ -1450,6 +1450,14 @@ jobs:
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ env.FILE_NAME }}-boot-lz4.img
 
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-build-log
+          path: ${{ env.CONFIG }}/common/build.log
+          retention-days: 2
+          
       - name: Upload AnyKernel3 Artifacts
         id: upload_ak3
         uses: actions/upload-artifact@v4
