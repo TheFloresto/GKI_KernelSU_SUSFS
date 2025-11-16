@@ -591,6 +591,7 @@ jobs:
           echo "KSUVER=$KSU_VERSION"
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
+      - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
           set -eo pipefail
