@@ -1014,7 +1014,7 @@ jobs:
           echo "👤 Build user: $KBUILD_BUILD_USER"
           echo "🖥️  Build host: $KBUILD_BUILD_HOST"
           
-          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${PATH}"
+          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_PATH}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_PATH}/prebuilts/rust/linux-x86/1.73.0b/bin/:${PATH}"
           
           echo "🚀 ccache-accelerated build - ALWAYS ON"
           
