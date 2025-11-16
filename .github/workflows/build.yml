@@ -635,17 +635,8 @@ jobs:
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
 
-              cp -v ../../kernel_patches/next/susfs_fix_patches/$SUSFS_VERSION/fix_apk_sign.c.patch ./
-              patch -p1 < fix_apk_sign.c.patch
-              
-              cp -v ../../kernel_patches/next/susfs_fix_patches/$SUSFS_VERSION/fix_core_hook.c.patch ./
-              patch -p1 --fuzz=3 < fix_core_hook.c.patch
-
-              cp -v ../../kernel_patches/next/susfs_fix_patches/$SUSFS_VERSION/fix_sucompat.c.patch ./
-              patch -p1 < fix_sucompat.c.patch
-
-              cp -v ../../kernel_patches/next/susfs_fix_patches/$SUSFS_VERSION/fix_kernel_compat.c.patch ./
-              patch -p1 < fix_kernel_compat.c.patch
+              cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./
+              patch -p1 < 0001-KSU-kernel-side.patch
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
               patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
@@ -680,8 +671,8 @@ jobs:
               ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
-              cp -v ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
+              cp -v ../../SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./
+              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."          
@@ -788,6 +779,8 @@ jobs:
           cd "$CONFIG"
           # KernelSU Configuration
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LOCALVERSION=\"-@NoFloresto\"" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
