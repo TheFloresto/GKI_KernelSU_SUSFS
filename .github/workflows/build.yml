@@ -993,8 +993,8 @@ jobs:
           echo "👤 Build user: $KBUILD_BUILD_USER"
           echo "🖥️  Build host: $KBUILD_BUILD_HOST"
 
-          # Setup ccache in PATH
-          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${PATH}"
+          # Setup ccache in PATH (BEFORE system PATH)
+          export PATH="/usr/lib/ccache:$GITHUB_WORKSPACE/$CONFIG/${CLANG_BIN_PATH}:${PATH}"
 
           # Setup build environment variables
           export CC="ccache clang"
@@ -1039,13 +1039,18 @@ jobs:
           echo "============================================"
           echo "PATH: ${PATH:0:200}..."
           echo "which clang: $(which clang)"
+          echo "which llvm-ar: $(which llvm-ar)"
           echo "CC: $CC"
           echo "CXX: $CXX"
+          echo "AR: $AR"
           echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
           echo ""
 
           echo "ccache wrapper test:"
           clang --version 2>&1 | head -n1 || true
+          echo ""
+          echo "llvm-ar version:"
+          llvm-ar --version 2>&1 | head -n1 || true
           echo ""
           echo "ccache configuration:"
           ccache -p | grep -E "(compression|direct_mode|readonly_direct|depend|sloppiness)" || true
@@ -1130,6 +1135,9 @@ jobs:
             echo "::endgroup::"
             exit 1
           fi
+
+          # Create Image.lz4
+          lz4 -f -12 --favor-decSpeed "$IMG" "$OUT/arch/arm64/boot/Image.lz4"
 
           # Copy snd-aloop module if it exists
           if [ -f "$OUT/sound/drivers/snd-aloop.ko" ]; then
