@@ -525,9 +525,8 @@ jobs:
               ;;
             "SukiSU")
               echo "Getting SukiSU version... "
-              git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
-              cd SukiSU-Ultra/kernel
-              BASE_VERSION=10700  
+              cd ./KernelSU
+              BASE_VERSION=37185  
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
