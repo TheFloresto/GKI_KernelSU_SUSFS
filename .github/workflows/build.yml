@@ -638,7 +638,7 @@ jobs:
               patch -p1 < 0001-KSU-kernel-side.patch
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
-              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
+              patch -p1 < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
               ;;
               "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
@@ -661,27 +661,27 @@ jobs:
             "WKSU")
               echo "Applying hooks for WKSU..."
               cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
-              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
+              patch -p1 -F 3 < 60_scope-minimized_manual_hooks.patch
               ;;
             "KSU")
               echo "Applying hooks for Official KernelSU..."
               cp -v ../../kernel_patches/sultan/ksu_hooks.patch ./
-              patch -p1 --forward -F 3 < ksu_hooks.patch
+              patch -p1 -F 3 < ksu_hooks.patch
               ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
               cp -v ../../SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."          
               cp -v ../../SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
               cp -v ../../kernel_patches/sultan/ksu_hooks.patch ./
-              patch -p1 --forward -F 3 < ksu_hooks.patch             
+              patch -p1 -F 3 < ksu_hooks.patch             
               ;;
           esac 
 
