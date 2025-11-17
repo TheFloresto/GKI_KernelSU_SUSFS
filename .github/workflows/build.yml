@@ -531,7 +531,7 @@ jobs:
             "MKSU")
               echo "Getting MKSU version..."   
               cd ./KernelSU
-              BASE_VERSION=10200           
+              BASE_VERSION=20000         
               ;;
           esac
           COMMIT_COUNT=$(/usr/bin/git rev-list --count HEAD)
