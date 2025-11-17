@@ -1029,6 +1029,8 @@ jobs:
           
           make O="$OUT" gki_defconfig
           
+          make O="$OUT" olddefconfig
+          
           if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
             scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
             scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
@@ -1038,10 +1040,6 @@ jobs:
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
           KCFLAGS_EXTRA="-O3"
-          
-          scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
-          scripts/config --file "$OUT/.config" -e LTO_CLANG
-          make O="$OUT" olddefconfig
           
           KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
           KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
