@@ -1029,13 +1029,11 @@ jobs:
           
           make O="$OUT" gki_defconfig
           
-          make O="$OUT" olddefconfig
-          
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
             scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
             scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
             sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-          fi
+
+          make O="$OUT" olddefconfig
           
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
