@@ -618,22 +618,12 @@ jobs:
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
 
-              cp -v ../../kernel_patches/sultan/rm_devpt.patch ./
-              patch -p1 < rm_devpt.patch
-              
-              cd ../common
-              cp -v ../kernel_patches/sultan/fix_inode.c.patch ./
-              patch -p1 < fix_inode.c.patch || true
-
-              cp -v ../kernel_patches/sultan/fix_core_hook.c.patch ./
-              patch -p1 < fix_core_hook.c.patch || true
+              cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./
+              patch -p1 < 0001-KSU-kernel-side.patch 
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ../KernelSU-Next
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
-
               cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./
               patch -p1 < 0001-KSU-kernel-side.patch
 
@@ -665,13 +655,9 @@ jobs:
               ;;
             "KSU")
               echo "Applying hooks for Official KernelSU..."
-              cp -v ../../kernel_patches/sultan/ksu_hooks.patch ./
-              patch -p1 -F 3 < ksu_hooks.patch
               ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
-              cp -v ../../SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./
-              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "SukiSU")
               echo "Applying hooks for SukiSU..."
