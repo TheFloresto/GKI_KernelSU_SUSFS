@@ -674,9 +674,7 @@ jobs:
               patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
             "SukiSU")
-              echo "Applying hooks for SukiSU..."          
-              cp -v ../../SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./
-              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch
+              echo "Applying hooks for SukiSU..."
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
@@ -805,7 +803,6 @@ jobs:
           cd "$CONFIG"
           # SukiSU Support
           echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KALLSYMS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_MANUAL_SU=n" >> "${{ env.DEFCONFIG }}"          
