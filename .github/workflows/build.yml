@@ -516,7 +516,7 @@ jobs:
             "KSU")
               echo "Getting Official KernelSU version..."
               cd ./KernelSU
-              BASE_VERSION=10200
+              BASE_VERSION=20000
               ;;
             "NEXT")
               echo "Getting NEXT version..."
