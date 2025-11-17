@@ -1028,10 +1028,10 @@ jobs:
           echo "============================================"
           
           make O="$OUT" gki_defconfig
-          
-            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
+
+          # ← ЭТО САМОЕ ГЛАВНОЕ: ставим ДО olddefconfig
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
+          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO
 
           make O="$OUT" olddefconfig
           
