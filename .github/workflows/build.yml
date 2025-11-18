@@ -935,6 +935,8 @@ jobs:
           echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CCACHE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LOCALVERSION="-@NoFloresto"" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure Universal Kernel Optimizations
         shell: bash
@@ -1086,17 +1088,13 @@ jobs:
           echo "   Host: $BUILD_HOST"
           echo "::endgroup::"
 
-      - name: Customize Kernel Branding
-        shell: bash
+      - name: Change Kernel Uname
         run: |
-          set -euo pipefail
-          echo "::group::Customize Kernel Branding"
-          cd "$CONFIG/common"
-          mkdir -p out
-          CUSTOM_LOCALVERSION="-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
-          echo "✅ Branding: $CUSTOM_LOCALVERSION"
-          echo "::endgroup::"
+          cd "$CONFIG"
+           #Remove Dirty Flag
+           sed -i 's/-dirty//' ./common/scripts/setlocalversion
+           #Remove Dirty Flag
+           sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl      
 
       - name: Set file name
         shell: bash
@@ -1186,12 +1184,6 @@ jobs:
           echo "============================================"
           
           make O="$OUT" gki_defconfig
-          
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-          fi
           
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
