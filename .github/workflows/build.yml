@@ -1256,8 +1256,8 @@ jobs:
           IMG="$OUT/arch/arm64/boot/Image"
           if [ ! -f "$IMG" ]; then
             echo "::error::Kernel Image missing"
-            echo "::group::Last 100 lines of build log"
-            tail -n 100 build.log || echo "Build log not available"
+            echo "::group::Last 444 lines of build log"
+            tail -n 444 build.log || echo "Build log not available"
             echo "::endgroup::"
             exit 1
           fi
@@ -1515,6 +1515,14 @@ jobs:
           $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ env.FILE_NAME }}-boot-lz4.img
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}-build-log
+          path: ${{ env.CONFIG }}/common/build.log
+          retention-days: 2
 
       - name: Upload AnyKernel3 Artifacts
         id: upload_ak3
