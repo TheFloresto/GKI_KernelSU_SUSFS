@@ -296,6 +296,7 @@ jobs:
           set -euo pipefail
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
+          
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Getting WKSU version..."
@@ -323,18 +324,21 @@ jobs:
               BASE_VERSION=20000         
               ;;
           esac
+          
           COMMIT_COUNT=$(/usr/bin/git rev-list --count HEAD)
           echo "Commits: $COMMIT_COUNT"
           KSU_VERSION=$(expr $COMMIT_COUNT "+" $BASE_VERSION)
           echo "KSUVER=$KSU_VERSION"
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           
-          # Save KSU commit SHA
-          cd ..
+          # Save KSU commit SHA BEFORE leaving the directory
           KSU_COMMIT_SHA=$(git rev-parse HEAD)
           echo "KSU_COMMIT_SHA=$KSU_COMMIT_SHA" >> $GITHUB_ENV
           echo "KSU commit: ${KSU_COMMIT_SHA:0:8}"
-
+          
+          # Now go back
+          cd ..
+          
       - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
