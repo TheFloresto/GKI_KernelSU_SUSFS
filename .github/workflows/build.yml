@@ -1069,7 +1069,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "::group::Customize Kernel Branding"
-          cd "$CONFIG/common"
+          cd "$CONFIG"
           mkdir -p out
           CUSTOM_LOCALVERSION="-@NoFloresto"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
