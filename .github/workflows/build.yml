@@ -400,12 +400,14 @@ jobs:
             patch -p1 < fix_task_mmu.c.patch || true
           fi
           
-          # Apply KSU integration patches
+          # Return to CONFIG directory before applying KSU patches
           cd ..
+          
+          # Apply KSU integration patches
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Applying SUSFS patches for Wild KSU..."
-              cd ../Wild_KSU
+              cd ./Wild_KSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
               
@@ -420,7 +422,7 @@ jobs:
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
-              cd ../KernelSU
+              cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
 
@@ -432,20 +434,23 @@ jobs:
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
-              cd ../KernelSU-Next
+              cd ./KernelSU-Next
               cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./
               patch -p1 < 0001-KSU-kernel-side.patch
+
+              cp -v ../../kernel_patches/next/0001-add-SuSFS-v2.0.0.patch ./
+              patch -p1 < 0001-add-SuSFS-v2.0.0.patch         
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
               patch -p1 < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
               ;;
             "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
-              cd ../KernelSU
+              cd ./KernelSU
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
-              cd ../KernelSU
+              cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
               
