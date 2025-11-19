@@ -1069,6 +1069,13 @@ jobs:
         run: |
           set -euo pipefail
           cd "$CONFIG"
+
+          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+            perl -0777 -pi -e 's/(echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}")/echo "\$\{KERNELVERSION\}-@NoFloresto"/s' ./common/scripts/setlocalversion
+          else
+            perl -0777 -pi -e 's/(echo "\$res")(?!.*echo "\$res")/echo "\-@NoFloresto"/s' ./common/scripts/setlocalversion
+          fi
+          
           if [ -f "build/build.sh" ]; then
             # Remove Dirty Flag
             sed -i 's/-dirty//g' ./common/scripts/setlocalversion
@@ -1079,7 +1086,7 @@ jobs:
             rm -rf ./common/android/abi_gki_protected_exports_*
             perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
-
+          
       - name: Customize Kernel Branding
         shell: bash
         run: |
