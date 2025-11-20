@@ -119,20 +119,7 @@ jobs:
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git     
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-
-          cd susfs4ksu
-          TARGET="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-          COMMIT=""
-          case "$TARGET" in
-            android12-5.10) COMMIT="8a76ba240d1f7315352b49d97d854a4b166e5b47" ;;
-            android13-5.10) COMMIT="e5c9eabfc6dcfc677d11f46ce1d5ff786de60a92" ;;
-            android13-5.15) COMMIT="babf6be195576f09aae79650d47abf6a76e8a21b" ;;
-            android14-5.15) COMMIT="19f339e804ba9aebd9c6d735b965e2b9396c73ae" ;;
-            android14-6.1) COMMIT="a162e2469d0b472545e5e46457eee171c0975fb0" ;;
-            android15-6.6) COMMIT="f450ec00bf592d080f59b01ff6f9242456c9a427" ;;
-          esac
-          git checkout "$COMMIT"
+          git clone https://gitlab.com/ShirkNeko/susfs4ksu.git -b "$SUSFS_BRANCH"
 
       - name: Initialize and Sync Kernel Source
         shell: bash
@@ -362,47 +349,6 @@ jobs:
           
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
           
-          # Post-SUSFS sed safeguards for task_mmu.c 'goto show_pad' handling
-          if ( ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 209 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 148 )) ) \
-               || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && [[ "${{ inputs.os_patch_level }}" != "2024-05" ]] && (( $ACTUAL_SUBLEVEL <= 75 )) ) ); then
-            sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
-          fi
-
-          # Apply additional SUSFS patches for Android 13 5.15 compatibility
-          if [[ "${{ inputs.android_version }}" == "android13" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( ${{ inputs.sub_level }} <= 41 )); then
-            cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
-            patch -p1 < fix_fdinfo.c.patch || true
-            cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
-            patch -p1 < fix_namespace.c.patch || true
-            cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
-            patch -p1 < fix_open.c.patch || true
-            sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
-          fi
-
-          # Additional fixes based on kernel version
-          if ( [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )) ) \
-            || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL >= 145 )) ) \
-            || ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL >= 98 )) ); then
-            cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
-            patch -p1 < 1_fix_base.c.patch || true
-          fi
-
-          if [[ "${{ inputs.android_version }}" == "android12" ]] && [[ "${{ inputs.kernel_version }}" == "5.10" ]] && (( $ACTUAL_SUBLEVEL <= 43 )); then
-            cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
-            patch -p1 < 2_fix_base.c.patch || true
-          fi
-
-          if ( [[ "${{ inputs.android_version }}" == "android15" ]] && [[ "${{ inputs.kernel_version }}" == "6.6" ]] && (( $ACTUAL_SUBLEVEL <= 58 )) ); then
-            cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
-            patch -p1 < fix_task_mmu.c.patch || true
-          fi
-          
-          # Return to CONFIG directory before applying KSU patches
-          cd ..
-          
           # Apply KSU integration patches
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
@@ -453,12 +399,6 @@ jobs:
               cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
-              
-              cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./            
-              patch -p1 < 0001-KSU-kernel-side.patch             
-
-              cp -v ../../kernel_patches/next/0001-add-SuSFS-v2.0.0.patch ./
-              patch -p1 < 0001-add-SuSFS-v2.0.0.patch       
               ;;
           esac
 
@@ -528,23 +468,6 @@ jobs:
           echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' common/security/Kconfig
 
-      - name: Apply LZ4KD & ZSTDN patches
-        if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
-        run: |
-          cd "$CONFIG/common"
-          cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
-          cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
-          cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
-          cp -r ../../SukiSU_patch/other/zram/lz4k_oplus ./lib/
-
-          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
-          echo "Applying lz4kd patch"
-          patch -p1 -F 3 < lz4kd.patch || true
-
-          cp ../../SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
-          echo "Applying lz4k_oplus patch"
-          patch -p1 -F 3 < lz4k_oplus.patch || true
-
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
         if: ${{ ( inputs.kernel_version == '6.6' ) }}
         run: |
@@ -598,50 +521,6 @@ jobs:
           echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KALLSYMS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_MANUAL_SU=n" >> "${{ env.DEFCONFIG }}"
-          
-          # SukiSU ZRAM and KPM Configuration
-          echo "# SukiSU ZRAM Configuration" >> "${{ env.DEFCONFIG }}"
-          
-          # Для kernel 5.10
-          if [[ "${{ inputs.kernel_version }}" == "5.10" ]]; then
-            echo "CONFIG_ZSMALLOC=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ZRAM=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_MODULE_SIG=n" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_CRYPTO_LZO=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          # Для kernel 5.15, 6.1 (не 5.10 и не 6.6)
-          if [[ "${{ inputs.kernel_version }}" != "6.6" ]] && [[ "${{ inputs.kernel_version }}" != "5.10" ]]; then
-            if grep -q "CONFIG_ZSMALLOC" "${{ env.DEFCONFIG }}"; then
-              sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "${{ env.DEFCONFIG }}"
-            else
-              echo "CONFIG_ZSMALLOC=y" >> "${{ env.DEFCONFIG }}"
-            fi
-            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "${{ env.DEFCONFIG }}"
-          fi
-          
-          # Для kernel 6.6
-          if [[ "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            echo "CONFIG_ZSMALLOC=y" >> "${{ env.DEFCONFIG }}"
-            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "${{ env.DEFCONFIG }}"
-          fi
-          
-          # Для Android 14/15 - отключаем принудительную подпись модулей
-          if [[ "${{ inputs.android_version }}" == "android14" ]] || [[ "${{ inputs.android_version }}" == "android15" ]]; then
-            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' ./common/modules.bzl
-            echo "CONFIG_MODULE_SIG_FORCE=n" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          # Добавляем дополнительные компрессоры если ZRAM включен
-          if grep -q "CONFIG_ZSMALLOC=y" "${{ env.DEFCONFIG }}" && grep -q "CONFIG_ZRAM=y" "${{ env.DEFCONFIG }}"; then
-            echo "CONFIG_CRYPTO_LZ4HC=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_CRYPTO_LZ4K=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_CRYPTO_LZ4KD=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_CRYPTO_842=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ZRAM_WRITEBACK=y" >> "${{ env.DEFCONFIG }}"
-          fi
 
       - name: Configure SUSFS
         shell: bash
