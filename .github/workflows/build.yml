@@ -119,7 +119,7 @@ jobs:
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git     
-          git clone https://gitlab.com/ShirkNeko/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://github.com/ShirkNeko/susfs4ksu.git -b "$SUSFS_BRANCH"
 
       - name: Initialize and Sync Kernel Source
         shell: bash
