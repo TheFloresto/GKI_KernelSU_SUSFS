@@ -527,7 +527,7 @@ jobs:
           cd "$CONFIG"
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_LOCALVERSION=\"-GKI-@NoFloresto\"" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LOCALVERSION=\"-@NoFloresto\"" >> "${{ env.DEFCONFIG }}"
           
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
@@ -1050,7 +1050,7 @@ jobs:
           KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
           cd "$KERNEL_PATH/common"
           mkdir -p out
-          CUSTOM_LOCALVERSION="-${{ inputs.android_version }}-GKI-@NoFloresto"
+          CUSTOM_LOCALVERSION="-@NoFloresto"
           echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
           echo "✅ Custom localversion set: $CUSTOM_LOCALVERSION"
           echo "::endgroup::"
