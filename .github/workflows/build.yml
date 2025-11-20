@@ -119,7 +119,7 @@ jobs:
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git     
-          git clone https://github.com/ShirkNeko/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
       - name: Initialize and Sync Kernel Source
         shell: bash
@@ -373,13 +373,7 @@ jobs:
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
-
-              cp -v ../../kernel_patches/next/0001-add-SuSFS-v2.0.0.patch ./
-              patch -p1 < 0001-add-SuSFS-v2.0.0.patch
-
-              cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./
-              patch -p1 < 0001-KSU-kernel-side.patch 
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true 
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
