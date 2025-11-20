@@ -1517,18 +1517,22 @@ jobs:
           cp ./boot-lz4.img ../${{ env.FILE_NAME }}-boot-lz4.img
 
       - name: Upload build log on failure
-        if: failure()
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.FILE_NAME }}-build-log
-          path: ${{ env.CONFIG }}/common/build.log
-          retention-days: 2
+          path: |
+            ${{ env.CONFIG }}/common/build.log
+            ${{ env.CONFIG }}/common/out/.config
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 9
 
       - name: Upload AnyKernel3 Artifacts
         id: upload_ak3
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.FILE_NAME }}-AnyKernel3
+          name: ${{ env.FILE_NAME }}-AK3
           path: |
             ./AnyKernel3/**
           compression-level: 9
