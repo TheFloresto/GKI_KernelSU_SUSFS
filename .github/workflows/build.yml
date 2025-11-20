@@ -499,7 +499,7 @@ jobs:
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
-          sed -i '/^CONFIG_KSU_SUSFS/d' "arch/arm64/configs/gki_defconfig" 2>/dev/null || true          
+          sed -i '/^CONFIG_KSU_SUSFS/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true          
           
           # ========================================
           # CLEAN UP LOCALVERSION - ВАЖНО!
@@ -507,17 +507,17 @@ jobs:
           echo "🧹 Cleaning up existing LOCALVERSION entries..."
           
           # Remove ALL existing LOCALVERSION entries
-          sed -i '/^CONFIG_LOCALVERSION=/d' "arch/arm64/configs/gki_defconfig" 2>/dev/null || true
-          sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+          sed -i '/^CONFIG_LOCALVERSION=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+          sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
           
           # Verify cleanup
-          REMAINING_ENTRIES=$(grep -c '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
+          REMAINING_ENTRIES=$(grep -c '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
           
           if [ "$REMAINING_ENTRIES" -eq 0 ]; then
             echo "✅ All LOCALVERSION entries removed successfully"
           else
             echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
-            grep '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" || true
+            grep '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" || true
           fi
 
       - name: Configure KernelSU Core
@@ -841,9 +841,10 @@ jobs:
           echo "🔍 Verifying kernel version configuration..."
           
           # Check current LOCALVERSION settings
-          VERSION_COUNT=$(grep -c '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
-          AUTO_VERSION=$(grep '^CONFIG_LOCALVERSION_AUTO' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "not set")
-          LOCAL_VERSION=$(grep '^CONFIG_LOCALVERSION=' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "not set")
+          DEFCONFIG_PATH="common/arch/arm64/configs/gki_defconfig"
+          VERSION_COUNT=$(grep -c '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" 2>/dev/null || echo "0")
+          AUTO_VERSION=$(grep '^CONFIG_LOCALVERSION_AUTO' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
+          LOCAL_VERSION=$(grep '^CONFIG_LOCALVERSION=' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
           
           echo "📊 Current configuration:"
           echo "  LOCALVERSION entries found: $VERSION_COUNT"
@@ -854,17 +855,17 @@ jobs:
           if [ "$VERSION_COUNT" -ne 2 ]; then
             echo "⚠️ Warning: Expected 2 LOCALVERSION entries, found $VERSION_COUNT"
             echo "Current entries:"
-            grep '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" || echo "  (none)"
+            grep '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" || echo "  (none)"
           fi
           
           # Check that LOCALVERSION_AUTO is disabled
-          if ! grep -q '^CONFIG_LOCALVERSION_AUTO=n' "arch/arm64/configs/gki_defconfig" 2>/dev/null; then
+          if ! grep -q '^CONFIG_LOCALVERSION_AUTO=n' "$DEFCONFIG_PATH" 2>/dev/null; then
             echo "❌ Error: LOCALVERSION_AUTO is not properly disabled"
             exit 1
           fi
           
           # Check that our custom LOCALVERSION is set
-          if ! grep -q '^CONFIG_LOCALVERSION="-@NoFloresto"' "arch/arm64/configs/gki_defconfig" 2>/dev/null; then
+          if ! grep -q '^CONFIG_LOCALVERSION="-GKI-@NoFloresto"' "$DEFCONFIG_PATH" 2>/dev/null; then
             echo "❌ Error: Custom LOCALVERSION not found or incorrect"
             exit 1
           fi
@@ -1548,7 +1549,8 @@ jobs:
               if [ "$KSU_SHA" != "unknown" ]; then
                 echo "- **KernelSU-Next Commit**: [\`${KSU_SHA:0:8}\`](https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_SHA)" >> build_summary.md
               fi
-             "KowXU")
+              ;;
+            "KowXU")
               if [ "$KSU_SHA" != "unknown" ]; then
                 echo "- **KowXU Commit**: [\`${KSU_SHA:0:8}\`](https://github.com/KOWX712/KernelSU/commit/$KSU_SHA)" >> build_summary.md
               fi           
