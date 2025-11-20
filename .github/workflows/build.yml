@@ -405,9 +405,7 @@ jobs:
               
               cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./            
               patch -p1 < 0001-KSU-kernel-side.patch             
-
-              cp -v ../../kernel_patches/next/0001-add-SuSFS-v2.0.0.patch ./
-              patch -p1 < 0001-add-SuSFS-v2.0.0.patch       
+       
               ;;
           esac
 
