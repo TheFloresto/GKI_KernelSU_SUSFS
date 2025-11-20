@@ -50,6 +50,7 @@ on:
           - MKSU
           - KSU
           - SukiSU
+          - KowXU
         default: NEXT
       kernelsu_branch:
         description: "Choose ksu branch"
@@ -64,27 +65,19 @@ on:
         description: "If 'Other' is selected, specify your custom branch"
         required: false
         type: string
-        default: ""
+        default: ""      
 
 jobs:
-  build-test:
-    if: inputs.build_selection == 'Test Build'
-    uses: ./.github/workflows/test-build.yml
-    secrets: inherit
-    with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   build-a12-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10')
     uses: ./.github/workflows/kernel-a12-5-10.yml
-    secrets: inherit
+    secrets: inherit    
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-
+      
   build-a13-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10')
     uses: ./.github/workflows/kernel-a13-5-10.yml
@@ -92,7 +85,8 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
 
   build-a13-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
@@ -103,6 +97,7 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
+
   build-a14-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
     uses: ./.github/workflows/kernel-a14-5-15.yml
@@ -112,6 +107,7 @@ jobs:
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
+
   build-a14-6-1:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
     uses: ./.github/workflows/kernel-a14-6-1.yml
@@ -119,7 +115,8 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
 
   build-a15-6-6:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6')
@@ -128,7 +125,17 @@ jobs:
     with:
       kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+
+
+  test-build:
+    if: inputs.build_selection == 'Test Build'
+    uses: ./.github/workflows/test-build.yml
+    secrets: inherit
+    with:
+      kernelsu_variant: ${{ inputs.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
 
   release:
     runs-on: ubuntu-latest
@@ -140,33 +147,19 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
+      - test-build
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v1.5.12"
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v2.0.0"
       RELEASE_BODY: ""
-
     steps:
       - name: Download Apache Arrow's util_free_space.sh
         run: |
           curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
           chmod +x util_free_space.sh
           ./util_free_space.sh
-
-      - name: Free Disk Space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          android: 'true'
-          dotnet: 'true'
-          haskell: 'true'
-          large-packages: 'true'
-          docker-images: 'true'
-          swap-storage: 'true'
-          tool-cache: 'false'
-
-      - name: Check Disk Space
-        run: df -h
-
+      
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -221,6 +214,10 @@ jobs:
               KSU_REF=$(git ls-remote "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" refs/heads/main | awk '{print $1}')
               KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/$KSU_REF"
               ;;
+            "KowXU")
+              KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/main | awk '{print $1}')
+              KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"             
+              ;;
           esac
           
           echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
@@ -234,78 +231,79 @@ jobs:
       - name: Generate New Tag
         if: inputs.release_type != 'Actions'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}        
         run: |
-          LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.5.12-r0"
-          fi
-          
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-          
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+            LATEST_TAG=$(gh api repos/repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
+            if [ -z "$LATEST_TAG" ]; then
+              LATEST_TAG="v2.0.0-r0"
+            fi
+            
+            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+    
+            echo "New tag: $NEW_TAG"
+            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
         uses: actions/download-artifact@v5
         with:
           path: ./downloaded-artifacts
-          pattern: '*-AnyKernel3'
+          pattern: '*-AK3'
 
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
-          
+      
           **IMPORTANT DISCLAIMER**
           This software is provided for testing and educational purposes only. Use at your own risk.
           The developers are not responsible for any damage, data loss, or issues that may occur.
           Please ensure you have proper backups before installation.
-          
+
           🔹 Normal 
           - Default kernel configuration 
           - Standard kernel module loading behavior 
           - Recommended for most users 
-          
+
           🔹 Bypass 
           - Includes module check bypass modifications 
           - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
           - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
           - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
-          
+
           Features:
-          -> ${{ inputs.kernelsu_variant }} KSU
+          -> Wild KSU
           -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
-          -> SUSFS ඞ v1.5.12
-          -> Scope-Minimized Manual hooks v1.4
+          -> SUSFS ඞ v2.0.0
+          -> Scope-Minimized Manual hooks susfs v2
           -> Ptrace Patch Support for Older Kernels (<5.16)
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
           -> BBR v1 Support
-          -> Kernel Sound System: Basic audio support with PCM, timers, procfs info, dynamic devices, and loopback module (module found at /data/adb/lkm after install)
           -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
-          
+
           🔹 BBG (Baseband-guard)
           - A lightweight LSM (Linux Security Module) for Android kernel
           - Blocks unauthorized writes to critical partitions/device nodes
           - Prevents malicious tampering with baseband and boot chain
           - Kernel-level protection via LSM hooks
           - Reduces risk of soft-brick/hard-brick issues
-          
+
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
           -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
+          -> **boot.img files**: Available as CI artifacts only - download from the Actions tab in the "Misc" Artifact
           -> **Warning**: boot.img files may not boot on some devices
           -> **Note:** For detailed commit information and component versions, please check the build summary in the "Misc" Artifact
-          
+
           Module: 
           -> https://github.com/sidex15/ksu_module_susfs
-          
+      
           Managers:
           -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
           -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
           -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
           -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
           -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
+          -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
           
           Commit Hashes (at the time of release):
           -> ${{ inputs.kernelsu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
@@ -323,42 +321,38 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        with:
+        with:          
           repository: NerestKernels/GKI_KernelSU_SUSFS
           token: ${{ secrets.RELEASE_TOKEN }}
-          tag_name: ${{ env.NEW_TAG }}
           prerelease: ${{ inputs.release_type == 'Pre-Release' }}
           files: ""
           name: ${{ env.RELEASE_NAME }}
           body_path: release_body.md
 
       - name: Upload Release Assets
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           shopt -s nullglob
-          anykernel_dirs=(./downloaded-artifacts/*-AK3/)
-          
+          anykernel_dirs=(./downloaded-artifacts/*/)
           if [ ${#anykernel_dirs[@]} -eq 0 ]; then
             echo "No artifact directories found under ./downloaded-artifacts; skipping upload."
           else
             for dir in "${anykernel_dirs[@]}"; do
+              # Check if this is an AnyKernel3 artifact directory
               if [[ "$(basename "$dir")" == *"-AK3" ]]; then
                 artifact_name=$(basename "$dir")
                 echo "Creating ZIP for $artifact_name..."
-                
+                # Navigate into the directory and zip its contents directly
                 cd "$dir"
                 zip -r -9 "../../${artifact_name}.zip" ./*
                 cd - > /dev/null
-                
                 echo "Uploading ${artifact_name}.zip to NerestKernels/GKI_KernelSU_SUSFS..."
                 gh release upload ${{ env.NEW_TAG }} "${artifact_name}.zip" \
                   --repo NerestKernels/GKI_KernelSU_SUSFS \
-                  --clobber
+                  --clobber            
               fi
             done
           fi
-
+            
       - name: Send Telegram Notification
         if: inputs.release_type != 'Actions'
         run: |
@@ -379,3 +373,4 @@ jobs:
           ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
           [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
+            
