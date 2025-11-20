@@ -839,9 +839,9 @@ jobs:
           
           CLANG_FOUND=false
           
-          for base in "$CONFIG/prebuilts/clang/host/linux-x86" "$CONFIG/build/build-tools/path/linux-x86"; do
+          for base in "$GITHUB_WORKSPACE/$CONFIG/prebuilts/clang/host/linux-x86" "$GITHUB_WORKSPACE/$CONFIG/build/build-tools/path/linux-x86"; do
             if [ -d "$base" ]; then
-              latest=$(ls -d "$base"/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
+              latest=$(ls -d "$base"/clang-r*/ 2>/dev/null | sort -V | tail -n1 | sed 's:/$::' || true)
               if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
                 CLANG_BIN="$latest/bin"
                 CLANG_FOUND=true
