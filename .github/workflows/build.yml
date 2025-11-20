@@ -21,7 +21,7 @@ on:
       kernelsu_variant:
         required: true
         type: string
-        description: 'KernelSU variant (WKSU, KSU, NEXT, SukiSU, MKSU)'
+        description: 'KernelSU variant (WKSU, KSU, NEXT, SukiSU, MKSU, KowXU)'
       kernelsu_branch:
         required: true
         type: string
@@ -218,7 +218,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          case "${{ inputs.kernelsu_branch }}" in
+          case "${{ inputs.kernelsu_variant }}" in
             "Stable")
               if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
                 echo "BRANCH=-s susfs-main" >> $GITHUB_ENV
@@ -233,6 +233,8 @@ jobs:
                 echo "BRANCH=-s next" >> $GITHUB_ENV
               elif [[ "${{ inputs.kernelsu_variant }}" == "WKSU" ]]; then
                 echo "BRANCH=-s wild" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "KowXU" ]]; then
+                echo "BRANCH=-s main" >> $GITHUB_ENV        
               elif [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
                 echo "BRANCH=-s susfs-test" >> $GITHUB_ENV
               fi
@@ -275,6 +277,10 @@ jobs:
               echo "Adding KernelSU MKSU..."
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
               ;;
+            "KowXU")
+              echo "Adding KowXU..."
+              curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
           esac
           
       - name: Getting KernelSU Version
@@ -309,6 +315,11 @@ jobs:
               echo "Getting MKSU version..."   
               cd ./KernelSU
               BASE_VERSION=20000         
+              ;;
+            "KowXU")
+              echo "Getting KowXU version..."
+              cd ./KernelSU
+              BASE_VERSION=20000
               ;;
           esac
           
@@ -397,6 +408,12 @@ jobs:
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true                   
               ;;
+            "KowXU")
+              echo "Applying SUSFS patches for KowXU..."
+              cd ./KernelSU
+              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              ;;
           esac
 
       - name: Apply Hooks Patches
@@ -410,17 +427,8 @@ jobs:
               cp -v ../../kernel_patches/wild/hooks/scope_min_manual_hooks_v1.4.patch ./
               patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
               ;;
-            "KSU")
-              echo "No additional hooks needed for Official KernelSU..."
-              ;;
-            "NEXT")
-              echo "No additional hooks needed for KernelSU-Next..."
-              ;;
-            "SukiSU")
-              echo "No additional hooks needed for SukiSU..."
-              ;;
-            "MKSU")
-              echo "No additional hooks needed for MKSU..."
+            "KSU"|"NEXT"|"SukiSU"|"MKSU"|"KowXU")
+              echo "No additional hooks needed for ${{ inputs.kernelsu_variant }}..."
               ;;
           esac
 
@@ -491,6 +499,26 @@ jobs:
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+          sed -i '/^CONFIG_KSU_SUSFS/d' "arch/arm64/configs/gki_defconfig" 2>/dev/null || true          
+          
+          # ========================================
+          # CLEAN UP LOCALVERSION - ВАЖНО!
+          # ========================================
+          echo "🧹 Cleaning up existing LOCALVERSION entries..."
+          
+          # Remove ALL existing LOCALVERSION entries
+          sed -i '/^CONFIG_LOCALVERSION=/d' "arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+          sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+          
+          # Verify cleanup
+          REMAINING_ENTRIES=$(grep -c '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
+          
+          if [ "$REMAINING_ENTRIES" -eq 0 ]; then
+            echo "✅ All LOCALVERSION entries removed successfully"
+          else
+            echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
+            grep '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" || true
+          fi
 
       - name: Configure KernelSU Core
         shell: bash
@@ -498,6 +526,9 @@ jobs:
           set -euo pipefail
           cd "$CONFIG"
           echo "# KernelSU Configuration" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_LOCALVERSION=\"-GKI-@NoFloresto\"" >> "${{ env.DEFCONFIG }}"
+          
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
           # BBG Support
@@ -524,23 +555,27 @@ jobs:
         run: |
           set -euo pipefail
           cd "$CONFIG"
+          # SUSFS Configuration
           echo "# SUSFS Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS=y" >> "${{ env.DEFCONFIG }}"
           echo "#CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> "${{ env.DEFCONFIG }}"
+
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "${{ env.DEFCONFIG }}"
+
           echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> "${{ env.DEFCONFIG }}"
+
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "${{ env.DEFCONFIG }}"                
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "${{ env.DEFCONFIG }}"          
           echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure Mountify Support
@@ -796,6 +831,47 @@ jobs:
           echo "CONFIG_CCACHE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
 
+      - name: Verify Kernel Version Configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          
+          echo "::group::Verify Kernel Version Configuration"
+          echo "🔍 Verifying kernel version configuration..."
+          
+          # Check current LOCALVERSION settings
+          VERSION_COUNT=$(grep -c '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
+          AUTO_VERSION=$(grep '^CONFIG_LOCALVERSION_AUTO' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "not set")
+          LOCAL_VERSION=$(grep '^CONFIG_LOCALVERSION=' "arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "not set")
+          
+          echo "📊 Current configuration:"
+          echo "  LOCALVERSION entries found: $VERSION_COUNT"
+          echo "  LOCALVERSION_AUTO: $AUTO_VERSION"
+          echo "  LOCALVERSION: $LOCAL_VERSION"
+          
+          # Verify we have exactly the configuration we want
+          if [ "$VERSION_COUNT" -ne 2 ]; then
+            echo "⚠️ Warning: Expected 2 LOCALVERSION entries, found $VERSION_COUNT"
+            echo "Current entries:"
+            grep '^CONFIG_LOCALVERSION' "arch/arm64/configs/gki_defconfig" || echo "  (none)"
+          fi
+          
+          # Check that LOCALVERSION_AUTO is disabled
+          if ! grep -q '^CONFIG_LOCALVERSION_AUTO=n' "arch/arm64/configs/gki_defconfig" 2>/dev/null; then
+            echo "❌ Error: LOCALVERSION_AUTO is not properly disabled"
+            exit 1
+          fi
+          
+          # Check that our custom LOCALVERSION is set
+          if ! grep -q '^CONFIG_LOCALVERSION="-@NoFloresto"' "arch/arm64/configs/gki_defconfig" 2>/dev/null; then
+            echo "❌ Error: Custom LOCALVERSION not found or incorrect"
+            exit 1
+          fi
+          
+          echo "✅ Kernel version configuration verified successfully"
+          echo "::endgroup::"
+
       - name: 🏷️ Set Build Identity (Hardcoded)
         shell: bash
         run: |
@@ -982,7 +1058,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.apply_bypass == 'bypass' && 'Bypass' || 'Normal' }}"
+          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
           
@@ -1472,6 +1548,10 @@ jobs:
               if [ "$KSU_SHA" != "unknown" ]; then
                 echo "- **KernelSU-Next Commit**: [\`${KSU_SHA:0:8}\`](https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_SHA)" >> build_summary.md
               fi
+             "KowXU")
+              if [ "$KSU_SHA" != "unknown" ]; then
+                echo "- **KowXU Commit**: [\`${KSU_SHA:0:8}\`](https://github.com/KOWX712/KernelSU/commit/$KSU_SHA)" >> build_summary.md
+              fi           
               ;;
             "SukiSU")
               if [ "$KSU_SHA" != "unknown" ]; then
@@ -1536,3 +1616,4 @@ jobs:
           echo "- **Image SHA256**: \`${{ steps.collect_stats.outputs.image_sha256 }}\`" >> build_summary.md
           echo "- **ccache Hit Rate**: ${{ steps.ccache_stats.outputs.hit_rate }}" >> build_summary.md
           echo "- **ccache Direct Rate**: ${{ steps.ccache_stats.outputs.direct_rate }}" >> build_summary.md
+          
