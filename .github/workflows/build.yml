@@ -349,6 +349,9 @@ jobs:
           
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
           
+          # ВАЖНО: Возвращаемся в CONFIG перед переходом к KSU
+          cd ..
+          
           # Apply KSU integration patches
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
@@ -399,6 +402,12 @@ jobs:
               cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              
+              cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./            
+              patch -p1 < 0001-KSU-kernel-side.patch             
+
+              cp -v ../../kernel_patches/next/0001-add-SuSFS-v2.0.0.patch ./
+              patch -p1 < 0001-add-SuSFS-v2.0.0.patch       
               ;;
           esac
 
