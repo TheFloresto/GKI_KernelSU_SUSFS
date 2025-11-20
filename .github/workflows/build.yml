@@ -997,7 +997,7 @@ jobs:
           ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.apply_bypass == 'bypass' && 'Bypass' || 'Normal' }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
-
+          
       - name: Build Kernel with Clang
         shell: bash
         env:
@@ -1049,15 +1049,17 @@ jobs:
           export LLVM=1 LLVM_IAS=1
           export ARCH=arm64 SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
+          export RUSTC="$KERNEL_PATH/prebuilts/rust/linux-x86/1.73.0b/bin/rustc"
+          export PAHOLE="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
           
-          if [ -f "$KERNEL_PATH/prebuilts/build-tools/linux-x86/bin/pahole" ]; then
-            export PAHOLE="$KERNEL_PATH/prebuilts/build-tools/linux-x86/bin/pahole"
-          elif [ -f "$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole" ]; then
-            export PAHOLE="$KERNEL_PATH/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
-          fi
-          
-          export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm 
-          export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+          # LLVM утилиты с полными путями
+          export LD="${CLANG_BIN_PATH}/ld.lld"
+          export HOSTLD="${CLANG_BIN_PATH}/ld.lld"
+          export AR="${CLANG_BIN_PATH}/llvm-ar"
+          export NM="${CLANG_BIN_PATH}/llvm-nm"
+          export OBJCOPY="${CLANG_BIN_PATH}/llvm-objcopy"
+          export OBJDUMP="${CLANG_BIN_PATH}/llvm-objdump"
+          export STRIP="${CLANG_BIN_PATH}/llvm-strip"
           
           OUT=out
           mkdir -p "$OUT"
