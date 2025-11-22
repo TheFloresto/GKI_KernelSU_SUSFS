@@ -431,36 +431,26 @@ jobs:
               echo "No additional hooks needed for ${{ inputs.kernelsu_variant }}..."
               ;;
           esac
-
-      - name: Scan and collect patch rejects
-        if: ${{ always() }}
+          
+      - name: Apply Performance Patches
         shell: bash
         run: |
-          set -e
-          CONFIG_DIR="$CONFIG"
-          REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
-          mkdir -p "$REJECTS_DIR"
-          
-          mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
-          REJ_COUNT=${#REJS[@]}
-          echo "Found $REJ_COUNT .rej files under $CONFIG_DIR"
-          echo "REJ_COUNT=$REJ_COUNT" >> $GITHUB_ENV
-          
-          if [ "$REJ_COUNT" -gt 0 ]; then
-            for REJ in "${REJS[@]}"; do
-              REL="${REJ#"$CONFIG_DIR"/}"
-              DEST="$REJECTS_DIR/$REL"
-              mkdir -p "$(dirname "$DEST")"
-              cp "$REJ" "$DEST"
-              
-              ORIG="${REJ%.rej}"
-              if [ -f "$ORIG" ]; then
-                ORIG_DEST="$REJECTS_DIR/${REL%.rej}"
-                mkdir -p "$(dirname "$ORIG_DEST")"
-                cp "$ORIG" "$ORIG_DEST"
-              fi
-              echo "$REL" >> "$REJECTS_DIR/index.txt"
-            done
+          set -euo pipefail
+          cd "$KERNEL_ROOT/common"
+          MIN_VERSION="5.16"
+          cp "$KERNEL_PATCHES/common/optimized_mem_operations.patch" ./
+          patch -p1 --forward < optimized_mem_operations.patch || true
+          cp "$KERNEL_PATCHES/common/file_struct_8bytes_align.patch" ./
+          patch -p1 --forward < file_struct_8bytes_align.patch || true
+          cp "$KERNEL_PATCHES/common/reduce_cache_pressure.patch" ./
+          patch -p1 --forward < reduce_cache_pressure.patch || true
+          if [ "$(printf '%s\n' "${{ inputs.kernel_version }}" "$MIN_VERSION" | sort -V | head -n1)" = "${{ inputs.kernel_version }}" ]; then
+            cp "$KERNEL_PATCHES/common/clear_page_16bytes_align.patch" ./
+            patch -p1 --forward < clear_page_16bytes_align.patch || true
+          else
+            cp "$KERNEL_PATCHES/common/clear_page_16bytes_align.patch" ./
+            sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' clear_page_16bytes_align.patch > clear_page_16bytes_align__pi.patch
+            patch -p1 -F3 --forward < clear_page_16bytes_align__pi.patch || true
           fi
 
       - name: Add BBG
@@ -635,60 +625,6 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
-
-      - name: Configure SND (vTomsonek - Always Enabled)
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$CONFIG"
-          echo "# Sound Configuration (vTomsonek)" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SND=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SND_DRIVERS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SND_PCM=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SND_TIMER=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SND_DYNAMIC_MINORS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SND_PROC_FS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SND_ALOOP=m" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_USB_GADGET=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CONFIGFS_FS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_USB_CONFIGFS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_USB_LIBCOMPOSITE=m" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_USB_AUDIO=m" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_USB_CONFIGFS_F_UAC1=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_USB_CONFIGFS_F_UAC2=y" >> "${{ env.DEFCONFIG }}"
-          
-          # Add modules to gki_aarch64_modules
-          echo "drivers/usb/gadget/legacy/g_audio.ko" >> common/android/gki_aarch64_modules
-          echo "sound/drivers/snd-aloop.ko" >> common/android/gki_aarch64_modules
-
-          if [[ -f common/modules.bzl ]]; then
-            echo "Audio modules injection: adding to module list"
-            if ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "5.15" ]] && (( $ACTUAL_SUBLEVEL <= 110 )) && [[ "${{ inputs.os_patch_level }}" != "2023-09" ]] ) \
-            || ( [[ "${{ inputs.android_version }}" == "android14" ]] && [[ "${{ inputs.kernel_version }}" == "6.1" ]] && (( $ACTUAL_SUBLEVEL <= 25 )) && [[ "${{ inputs.os_patch_level }}" != "2023-09" ]] ); then
-              sed -i '/COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "sound/drivers/snd-aloop.ko",
-              }' common/modules.bzl
-              sed -i '/COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/libcomposite.ko",
-              }' common/modules.bzl
-              sed -i '/COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/legacy/g_audio.ko",
-              }' common/modules.bzl
-            else
-              sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "sound/drivers/snd-aloop.ko",
-              }' common/modules.bzl
-              sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/libcomposite.ko",
-              }' common/modules.bzl
-              sed -i '/_COMMON_GKI_MODULES_LIST = \[/,/^[[:space:]]*\]/{/^[[:space:]]*\]$/i\    "drivers/usb/gadget/legacy/g_audio.ko",
-              }' common/modules.bzl
-            fi
-            
-            if grep -q '"sound/drivers/snd-aloop.ko"' common/modules.bzl && \
-              grep -q '"drivers/usb/gadget/libcomposite.ko"' common/modules.bzl && \
-              grep -q '"drivers/usb/gadget/legacy/g_audio.ko"' common/modules.bzl; then
-              echo "✓ Audio modules injection: successfully added all modules to list"
-            else
-              echo "✗ Audio modules injection: failed to add one or more modules"
-              exit 1
-            fi
-          fi
 
       - name: Configure Universal Kernel Optimizations
         shell: bash
@@ -1357,42 +1293,19 @@ jobs:
             exit 1
           fi
 
-          # Enable modules for vTomsonek
-          sed -i 's|^do\.modules=.*|do.modules=1|' ./AnyKernel3/anykernel.sh
-
-      - name: Copy snd-aloop module (vTomsonek)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p AnyKernel3/modules/data/adb/lkm
-          
-          if [ -f "./$CONFIG/common/out/sound/drivers/snd-aloop.ko" ]; then
-            cp "./$CONFIG/common/out/sound/drivers/snd-aloop.ko" AnyKernel3/modules/data/adb/lkm/
-            echo "✅ Copied snd-aloop.ko"
-          else
-            echo "⚠️ snd-aloop.ko not found"
-          fi
-          
-          if [ -f "./$CONFIG/common/out/drivers/usb/gadget/legacy/g_audio.ko" ]; then
-            cp "./$CONFIG/common/out/drivers/usb/gadget/legacy/g_audio.ko" AnyKernel3/modules/data/adb/lkm/
-            echo "✅ Copied g_audio.ko"
-          else
-            echo "⚠️ g_audio.ko not found"
-          fi
-
       - name: Search for Kernel Modules
         shell: bash
         run: |
           set -euo pipefail
           echo "Searching for kernel modules (.ko files)..."
           
-          if [ -d "./$CONFIG/common/out" ]; then
-            echo "Scanning: ./$CONFIG/common/out"
-            find "./$CONFIG/common/out" -name "*.ko" -type f -exec echo "Found: {}" \;
+          if [ -d "$KERNEL_ROOT/common/out" ]; then
+            echo "Scanning: $KERNEL_ROOT/common/out"
+            find "$KERNEL_ROOT/common/out" -name "*.ko" -type f -exec echo "Found: {}" \; | head -20
           fi
           
           echo "Searching specifically for snd-aloop.ko..."
-          snd_aloop_found=$(find ./$CONFIG/common/out -name "snd-aloop.ko" -type f 2>/dev/null | head -1)
+          snd_aloop_found=$(find "$KERNEL_ROOT/common/out" -name "snd-aloop.ko" -type f 2>/dev/null | head -1)
           if [ -n "$snd_aloop_found" ]; then
             echo "Found snd-aloop.ko at: $snd_aloop_found"
           else
@@ -1492,6 +1405,37 @@ jobs:
             ./AnyKernel3/**
           compression-level: 9
 
+      - name: Scan and collect patch rejects
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -e
+          CONFIG_DIR="$CONFIG"
+          REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
+          mkdir -p "$REJECTS_DIR"
+          
+          mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
+          REJ_COUNT=${#REJS[@]}
+          echo "Found $REJ_COUNT .rej files under $CONFIG_DIR"
+          echo "REJ_COUNT=$REJ_COUNT" >> $GITHUB_ENV
+          
+          if [ "$REJ_COUNT" -gt 0 ]; then
+            for REJ in "${REJS[@]}"; do
+              REL="${REJ#"$CONFIG_DIR"/}"
+              DEST="$REJECTS_DIR/$REL"
+              mkdir -p "$(dirname "$DEST")"
+              cp "$REJ" "$DEST"
+              
+              ORIG="${REJ%.rej}"
+              if [ -f "$ORIG" ]; then
+                ORIG_DEST="$REJECTS_DIR/${REL%.rej}"
+                mkdir -p "$(dirname "$ORIG_DEST")"
+                cp "$ORIG" "$ORIG_DEST"
+              fi
+              echo "$REL" >> "$REJECTS_DIR/index.txt"
+            done
+          fi
+
       - name: Extra Artifacts
         if: ${{ always() }}
         id: upload_misc
@@ -1527,7 +1471,6 @@ jobs:
           echo "- **KSU Variant**: ${{ inputs.kernelsu_variant }}" >> build_summary.md
           echo "- **KSU Version**: ${KSUVER:-unknown}" >> build_summary.md
           echo "- **SUSFS Version**: ${SUSVER:-unknown}" >> build_summary.md
-          echo "- **Variant**: vTomsonek (Always Enabled)" >> build_summary.md
           echo "- **Optimization**: O3 (Always)" >> build_summary.md
           echo "- **BBG**: Installed" >> build_summary.md
           echo "- **ccache**: Always Enabled" >> build_summary.md
