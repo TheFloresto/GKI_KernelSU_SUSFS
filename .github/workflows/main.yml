@@ -28,7 +28,7 @@ on:
           - Android14-5.15
           - Android14-6.1
           - Android15-6.6
-          - Test Build         
+          - test-build         
         default: All
       ksu_variant:
         description: "Choose KernelSU variant"
