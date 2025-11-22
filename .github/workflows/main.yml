@@ -28,7 +28,7 @@ on:
           - Android14-5.15
           - Android14-6.1
           - Android15-6.6
-          - test-build         
+          - Test Build         
         default: All
       ksu_variant:
         description: "Choose KernelSU variant"
@@ -115,7 +115,7 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
-      - test-build
+      - Test Build
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
