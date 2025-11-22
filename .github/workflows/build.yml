@@ -546,6 +546,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cd "$CONFIG"
           cd "$KERNEL_ROOT"
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
@@ -868,7 +869,7 @@ jobs:
           fi
           
           # Check that our custom LOCALVERSION is set
-          if ! grep -q '^CONFIG_LOCALVERSION="-GKI-@NoFloresto"' "$DEFCONFIG_PATH" 2>/dev/null; then
+          if ! grep -q '^CONFIG_LOCALVERSION="-@NoFloresto"' "$DEFCONFIG_PATH" 2>/dev/null; then
             echo "❌ Error: Custom LOCALVERSION not found or incorrect"
             exit 1
           fi
