@@ -5,16 +5,6 @@ permissions:
   actions: write
 
 on:
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - '.github/workflows/**'
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       release_type:
@@ -32,7 +22,6 @@ on:
         type: choice
         options:
           - All
-          - Test Build
           - Android12-5.10
           - Android13-5.10
           - Android13-5.15
@@ -40,8 +29,8 @@ on:
           - Android14-6.1
           - Android15-6.6
         default: All
-      kernelsu_variant:
-        description: "Choose KernelSU Variant"
+      ksu_variant:
+        description: "Choose KernelSU variant"
         required: true
         type: choice
         options:
@@ -51,95 +40,73 @@ on:
           - KSU
           - SukiSU
           - KowXU
-        default: NEXT
-      kernelsu_branch:
-        description: "Choose ksu branch"
-        required: true
-        type: choice
-        options:
-          - Stable
-          - Dev
-          - Other
-        default: Dev
-      kernelsu_branch_other:
-        description: "If 'Other' is selected, specify your custom branch"
+        default: WKSU
+      ksu_commit:
+        description: "Optional KernelSU commit SHA"
         required: false
         type: string
-        default: ""      
 
 jobs:
 
   build-a12-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android12-5.10')
     uses: ./.github/workflows/kernel-a12-5-10.yml
-    secrets: inherit    
+    secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-      
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
+
   build-a13-5-10:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.10')
     uses: ./.github/workflows/kernel-a13-5-10.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
 
   build-a13-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
 
   build-a14-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
     uses: ./.github/workflows/kernel-a14-5-15.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
-
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
 
   build-a14-6-1:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
 
   build-a15-6-6:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android15-6.6')
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
-
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
 
   test-build:
     if: inputs.build_selection == 'Test Build'
     uses: ./.github/workflows/test-build.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}    
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}         
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.release_type != 'Actions'
+    if: inputs.release_type != 'Actions' && always() && !cancelled()
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -147,19 +114,12 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
-      - test-build
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.kernelsu_variant }} & SUSFS v2.0.0"
-      RELEASE_BODY: ""
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0"
+
     steps:
-      - name: Download Apache Arrow's util_free_space.sh
-        run: |
-          curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
-          chmod +x util_free_space.sh
-          ./util_free_space.sh
-      
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -193,7 +153,7 @@ jobs:
 
       - name: Get KernelSU variant refs and links
         run: |
-          case "${{ inputs.kernelsu_variant }}" in
+          case "${{ inputs.ksu_variant }}" in
             "WKSU")
               KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
               KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
@@ -229,19 +189,18 @@ jobs:
           echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
 
       - name: Generate New Tag
-        if: inputs.release_type != 'Actions'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}        
         run: |
-            LATEST_TAG=$(gh api repos/repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-            if [ -z "$LATEST_TAG" ]; then
-              LATEST_TAG="v2.0.0-r0"
-            fi
-            
-            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-    
-            echo "New tag: $NEW_TAG"
-            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+          LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v2.0.0-r0"
+          fi
+          
+          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+  
+          echo "New tag: $NEW_TAG"
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
         uses: actions/download-artifact@v5
@@ -270,7 +229,7 @@ jobs:
           - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
 
           Features:
-          -> Wild KSU
+          -> ${{ inputs.ksu_variant }} KSU
           -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
           -> SUSFS ඞ v2.0.0
           -> Scope-Minimized Manual hooks susfs v2
@@ -306,7 +265,7 @@ jobs:
           -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
           
           Commit Hashes (at the time of release):
-          -> ${{ inputs.kernelsu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
+          -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
           
           -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
           
@@ -321,7 +280,8 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        with:          
+        with:
+          tag_name: ${{ env.NEW_TAG }}
           repository: NerestKernels/GKI_KernelSU_SUSFS
           token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: ${{ inputs.release_type == 'Pre-Release' }}
@@ -337,11 +297,9 @@ jobs:
             echo "No artifact directories found under ./downloaded-artifacts; skipping upload."
           else
             for dir in "${anykernel_dirs[@]}"; do
-              # Check if this is an AnyKernel3 artifact directory
               if [[ "$(basename "$dir")" == *"-AK3" ]]; then
                 artifact_name=$(basename "$dir")
                 echo "Creating ZIP for $artifact_name..."
-                # Navigate into the directory and zip its contents directly
                 cd "$dir"
                 zip -r -9 "../../${artifact_name}.zip" ./*
                 cd - > /dev/null
@@ -354,7 +312,6 @@ jobs:
           fi
             
       - name: Send Telegram Notification
-        if: inputs.release_type != 'Actions'
         run: |
           RELEASE_TYPE_TEXT=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
@@ -368,9 +325,8 @@ jobs:
             -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
             -F text="
           🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
-          🛑 *Variant:* ${{ inputs.kernelsu_variant }}
+          🛑 *Variant:* ${{ inputs.ksu_variant }}
           📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
           ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
           [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
             -F parse_mode="Markdown"
-            
