@@ -1299,25 +1299,6 @@ jobs:
             exit 1
           fi
 
-      - name: Search for Kernel Modules
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Searching for kernel modules (.ko files)..."
-          
-          if [ -d "$KERNEL_ROOT/common/out" ]; then
-            echo "Scanning: $KERNEL_ROOT/common/out"
-            find "$KERNEL_ROOT/common/out" -name "*.ko" -type f -exec echo "Found: {}" \; | head -20
-          fi
-          
-          echo "Searching specifically for snd-aloop.ko..."
-          snd_aloop_found=$(find "$KERNEL_ROOT/common/out" -name "snd-aloop.ko" -type f 2>/dev/null | head -1)
-          if [ -n "$snd_aloop_found" ]; then
-            echo "Found snd-aloop.ko at: $snd_aloop_found"
-          else
-            echo "snd-aloop.ko not found"
-          fi
-
       - name: Create Bootimgs Folder and Copy Images
         shell: bash
         run: |
