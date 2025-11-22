@@ -7,16 +7,12 @@ permissions:
 on:
   workflow_call:
     inputs:
-      kernelsu_variant:
+      ksu_variant:
         required: true
         type: string
-      kernelsu_branch:
-        required: true
-        type: string
-      kernelsu_branch_other:
+      ksu_commit:
         required: false
         type: string
-        default: ""
 
 jobs:
   build-kernels-a14-5-15:
@@ -71,7 +67,6 @@ jobs:
       android_version: "android14"
       kernel_version: "5.15"
       sub_level: ${{ matrix.sub_level }}
-      os_patch_level: ${{ matrix.os_patch_level }}              
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
-      kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      os_patch_level: ${{ matrix.os_patch_level }}
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
