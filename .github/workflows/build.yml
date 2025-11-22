@@ -436,7 +436,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd "$KERNEL_ROOT/common"
+          cd "$CONFIG/common"
           MIN_VERSION="5.16"
           cp "$KERNEL_PATCHES/common/optimized_mem_operations.patch" ./
           patch -p1 --forward < optimized_mem_operations.patch || true
