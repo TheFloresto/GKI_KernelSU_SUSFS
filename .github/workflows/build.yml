@@ -356,8 +356,8 @@ jobs:
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
           cd "$KERNEL_ROOT"
           
-          # Get SUSFS version
-          susfs_version=$(grep '#define SUSFS_VERSION' ./include/linux/susfs.h | awk -F'"' '{print $2}')
+          # Get SUSFS version — всегда от корня ядра
+          susfs_version=$(grep '#define SUSFS_VERSION' "$KERNEL_ROOT/common/include/linux/susfs.h" | awk -F'"' '{print $2}')
           echo "SUSVER=$susfs_version" >> $GITHUB_ENV
           echo "SusFS Version: $susfs_version"
           
