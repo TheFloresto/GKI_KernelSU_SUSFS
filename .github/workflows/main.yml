@@ -28,7 +28,7 @@ on:
           - Android14-5.15
           - Android14-6.1
           - Android15-6.6
-          - test-build         
+          - Test Build         
         default: All
       ksu_variant:
         description: "Choose KernelSU variant"
@@ -98,7 +98,7 @@ jobs:
       ksu_commit: ${{ inputs.ksu_commit }}
 
   test-build:
-    if: inputs.build_selection == 'test-build'
+    if: inputs.build_selection == 'Test Build'
     uses: ./.github/workflows/test-build.yml
     secrets: inherit
     with:
