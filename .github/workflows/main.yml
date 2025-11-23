@@ -115,7 +115,6 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
-      - test-build
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
