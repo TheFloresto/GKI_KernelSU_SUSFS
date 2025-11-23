@@ -453,7 +453,6 @@ jobs:
               fi
               ;;
             KSU)
-              # Удалено лишнее fi
               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               ;;
             NEXT)
@@ -461,12 +460,24 @@ jobs:
             SukiSU)
               ;;
             MKSU)
-              # Удалено лишнее fi
               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               ;;
             KowXU)
-              # Удалено лишнее fi
               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+
+              cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+              patch -p1 < fix_fdinfo.c.patch || true
+              cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+              patch -p1 < fix_namespace.c.patch || true
+              cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+              patch -p1 < fix_open.c.patch || true
+              sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c   
+              cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
+              patch -p1 < 1_fix_base.c.patch || true
+              cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
+              patch -p1 < 2_fix_base.c.patch || true          
+              cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
+              patch -p1 < fix_task_mmu.c.patch || true    
               ;;
           esac
 
