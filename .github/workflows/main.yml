@@ -270,7 +270,7 @@ jobs:
           - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
 
           Features:
-          -> Wild KSU
+          -> ${{ inputs.kernelsu_variant }} KSU
           -> Multi Manager Support for WKSU, KernelSU-Next! Needs Testing: KSU, MKSU RKSU, xxKSU, KowSU and SukiSU (Best compatibility with WKSU, no support will be provided for other managers)
           -> SUSFS ඞ v2.0.0
           -> Scope-Minimized Manual hooks susfs v2
@@ -324,6 +324,7 @@ jobs:
         with:          
           repository: NerestKernels/GKI_KernelSU_SUSFS
           token: ${{ secrets.RELEASE_TOKEN }}
+          tag_name: ${{ env.NEW_TAG }}
           prerelease: ${{ inputs.release_type == 'Pre-Release' }}
           files: ""
           name: ${{ env.RELEASE_NAME }}
