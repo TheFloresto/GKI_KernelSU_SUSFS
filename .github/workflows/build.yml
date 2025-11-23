@@ -489,7 +489,7 @@ jobs:
 
       - name: Apply FIX 22 clang Patches
         run: |
-          cd "$KERNEL_ROOT/common"
+          cd "$CONFIG/common"
           
           # Получаем версию ядра
           KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
