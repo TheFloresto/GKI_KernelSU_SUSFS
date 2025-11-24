@@ -33,8 +33,12 @@ on:
 
 jobs:
   build-gki:
-    name: "${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }}"
+    name: "${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ matrix.build_type }})"
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: ["normal", "bypass"]
 
     steps:
       - name: Check Initial Disk Space
@@ -309,7 +313,7 @@ jobs:
             "SukiSU")
               echo "Getting SukiSU version... "
               cd ./KernelSU
-              BASE_VERSION=37227
+              BASE_VERSION=37233
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
@@ -405,14 +409,20 @@ jobs:
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true                   
+              cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+
+              cp -v ../../kernel_patches/mksu/fix_proc_base.patch ./
+              patch -p1 < fix_proc_base.patch          
               ;;
             "KowXU")
               echo "Applying SUSFS patches for KowXU..."
               cd ./KernelSU
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
+
+              cp -v ../../kernel_patches/mksu/fix_proc_base.patch ./
+              patch -p1 < fix_proc_base.patch || true
               ;;
           esac
 
@@ -468,6 +478,19 @@ jobs:
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' common/security/Kconfig
+
+      - name: Apply Module Check Bypass
+        if: ${{ matrix.build_type == 'bypass' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            cd "$CONFIG/common/kernel/module"
+            sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' version.c
+          else
+            cd "$CONFIG/common/kernel"
+            sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' module.c
+          fi
 
       - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
         if: ${{ ( inputs.kernel_version == '6.6' ) }}
@@ -632,134 +655,6 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
 
-      - name: Configure Universal Kernel Optimizations
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$CONFIG"
-          
-          # ============================================================================
-          # БАЗОВЫЕ ARM64 ОПЦИИ (обязательны для всех GKI)
-          # ============================================================================
-          echo "# Universal ARM64 Configuration" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64_VA_BITS=48" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64_PA_BITS=48" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64_TAGGED_ADDR_ABI=y" >> "${{ env.DEFCONFIG }}"
-          
-          # Современные ARM64 фичи (безопасны для ядер 5.10+)
-          if [[ "${{ inputs.kernel_version }}" != "5.10" ]] || (( ${ACTUAL_SUBLEVEL:-999} >= 100 )); then
-            echo "CONFIG_ARM64_BTI=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ARM64_PTR_AUTH=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          if [[ "${{ inputs.kernel_version }}" == "5.15" ]] || [[ "${{ inputs.kernel_version }}" == "6.1" ]] || [[ "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            echo "CONFIG_ARM64_SVE=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          if [[ "${{ inputs.kernel_version }}" == "6.1" ]] || [[ "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            echo "CONFIG_ARM64_SME=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          # ============================================================================
-          # УНИВЕРСАЛЬНЫЕ CORTEX CORES (работают на ВСЕХ устройствах)
-          # ============================================================================
-          echo "# Generic Cortex Cores Support" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64_CORTEX_A53=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64_CORTEX_A55=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64_CORTEX_A76=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM64_CORTEX_A78=y" >> "${{ env.DEFCONFIG }}"
-          
-          # Более новые cores для современных SoC
-          if [[ "${{ inputs.kernel_version }}" == "6.1" ]] || [[ "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            echo "CONFIG_ARM64_CORTEX_X1=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ARM64_CORTEX_X2=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ARM64_CORTEX_X3=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ARM64_CORTEX_A710=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ARM64_CORTEX_A715=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ARM64_CORTEX_A510=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          if [[ "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            echo "CONFIG_ARM64_CORTEX_A720=y" >> "${{ env.DEFCONFIG }}"
-            echo "CONFIG_ARM64_CORTEX_A520=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          # ============================================================================
-          # CPU SCHEDULER - универсальные оптимизации
-          # ============================================================================
-          echo "# CPU Scheduler Optimization" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_SCHED_MC=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ENERGY_MODEL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_UCLAMP_TASK=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_UCLAMP_TASK_GROUP=y" >> "${{ env.DEFCONFIG }}"
-          
-          if [[ "${{ inputs.kernel_version }}" != "5.10" ]]; then
-            echo "CONFIG_SCHED_CORE=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          # ============================================================================
-          # CPU FREQUENCY & POWER MANAGEMENT
-          # ============================================================================
-          echo "# CPU Frequency & Power Management" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CPU_FREQ=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CPU_FREQ_STAT=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CPUFREQ_DT=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_OPP=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CPU_IDLE=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_ARM_PSCI_CPUIDLE=y" >> "${{ env.DEFCONFIG }}"
-          
-          # ============================================================================
-          # THERMAL MANAGEMENT (важно для производительности)
-          # ============================================================================
-          echo "# Thermal Management" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_THERMAL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CPU_THERMAL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_DEVFREQ_THERMAL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_THERMAL_GOV_STEP_WISE=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_THERMAL_GOV_FAIR_SHARE=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_THERMAL_EMULATION=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_THERMAL_WRITABLE_TRIPS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_POWER_CAP=y" >> "${{ env.DEFCONFIG }}"
-          
-          # ============================================================================
-          # MEMORY MANAGEMENT
-          # ============================================================================
-          echo "# Memory Management" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CMA=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CMA_AREAS=7" >> "${{ env.DEFCONFIG }}"
-          
-          if [[ "${{ inputs.kernel_version }}" != "5.10" ]]; then
-            echo "CONFIG_NUMA_BALANCING=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          # ============================================================================
-          # FILE SYSTEMS (важно для Android)
-          # ============================================================================
-          echo "# File Systems" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_F2FS_FS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_F2FS_FS_XATTR=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_F2FS_FS_POSIX_ACL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_F2FS_FS_SECURITY=y" >> "${{ env.DEFCONFIG }}"
-          
-          if [[ "${{ inputs.kernel_version }}" != "5.10" ]] || (( ${ACTUAL_SUBLEVEL:-999} >= 50 )); then
-            echo "CONFIG_F2FS_FS_COMPRESSION=y" >> "${{ env.DEFCONFIG }}"
-          fi
-          
-          echo "CONFIG_EXT4_FS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_EXT4_FS_POSIX_ACL=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_EXT4_FS_SECURITY=y" >> "${{ env.DEFCONFIG }}"
-          
-          # ============================================================================
-          # PERFORMANCE & DEBUG
-          # ============================================================================
-          echo "# Performance Events" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_PERF_EVENTS=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_HW_PERF_EVENTS=y" >> "${{ env.DEFCONFIG }}"
-
       - name: Configure Build Options
         shell: bash
         run: |
@@ -894,7 +789,7 @@ jobs:
           
           echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
           echo "::endgroup::"
-
+          
       - name: Set Cache Environment
         shell: bash
         run: |
@@ -1001,7 +896,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}"
+          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type == 'bypass' && 'Bypass' || 'Normal' }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
           
