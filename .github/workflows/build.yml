@@ -410,10 +410,7 @@ jobs:
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
               cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
-
-              cp -v ../../kernel_patches/mksu/fix_proc_base.patch ./
-              patch -p1 < fix_proc_base.patch          
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true       
               ;;
             "KowXU")
               echo "Applying SUSFS patches for KowXU..."
