@@ -485,10 +485,10 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ inputs.kernel_version }}" == "6.1" || "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            cd "$KERNEL_ROOT/common/kernel/module"
+            cd "$CONFIG/common/kernel/module"
             sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' version.c
           else
-            cd "$KERNEL_ROOT/common/kernel"
+            cd "$CONFIG/common/kernel"
             sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' module.c
           fi
 
