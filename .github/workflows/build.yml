@@ -518,6 +518,7 @@ jobs:
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+          sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
           sed -i '/^CONFIG_KSU_SUSFS/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true          
           
           # ========================================
