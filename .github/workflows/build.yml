@@ -502,6 +502,29 @@ jobs:
               ;;
           esac
 
+
+      - name: Fix SUSFS Headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$KERNEL_ROOT/common"
+          
+          echo "Checking fs/open.c for SUSFS header..."
+          
+          # Check if susfs function is used but header is missing
+          if grep -q "susfs_is_current_proc_umounted" fs/open.c; then
+            if ! grep -q "#include <linux/susfs.h>" fs/open.c; then
+              # Find the last #include line and add susfs.h after it
+              last_include=$(grep -n "^#include" fs/open.c | tail -1 | cut -d: -f1)
+              sed -i "${last_include}a #include <linux/susfs.h>" fs/open.c
+              echo "✅ Added #include <linux/susfs.h> to fs/open.c"
+            else
+              echo "✅ SUSFS header already present in fs/open.c"
+            fi
+          else
+            echo "ℹ️  No SUSFS functions found in fs/open.c"
+          fi
+
       - name: Apply Hooks Patches
         shell: bash
         run: |
