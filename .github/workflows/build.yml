@@ -403,6 +403,8 @@ jobs:
               cp -v $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true       
 
+              # Apply fix_proc_base from kernel root since it patches fs/proc/base.c
+              cd "$KERNEL_ROOT/common"
               cp -v $KERNEL_PATCHES/mksu/fix_proc_base.patch ./
               patch -p1 < fix_proc_base.patch
               ;;
