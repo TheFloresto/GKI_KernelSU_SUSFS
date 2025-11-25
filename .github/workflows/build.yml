@@ -461,8 +461,7 @@ jobs:
             SukiSU)
               ;;
             MKSU)
-              cp -v $KERNEL_PATCHES/mksu/fix_proc_base.patch ./
-              patch -p1 < fix_proc_base.patch || true         
+              sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c         
               ;;
             KowXU)
               ;;
