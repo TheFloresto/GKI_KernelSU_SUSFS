@@ -406,7 +406,7 @@ jobs:
               # Apply fix_proc_base from kernel root since it patches fs/proc/base.c
               cd "$KERNEL_ROOT/common"
               cp -v $KERNEL_PATCHES/mksu/fix_proc_base.patch ./
-              patch -p1 < fix_proc_base.patch
+              patch -p1 < fix_proc_base.patch || true
               ;;
             KowXU)
               cd "$KERNEL_ROOT/KernelSU"
@@ -414,7 +414,7 @@ jobs:
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
 
               cp -v $KERNEL_PATCHES/mksu/fix_proc_base.patch ./
-              patch -p1 < fix_proc_base.patch || true
+              patch -p1 -F 3 --forward < fix_proc_base.patch || true
               ;;
           esac
           
