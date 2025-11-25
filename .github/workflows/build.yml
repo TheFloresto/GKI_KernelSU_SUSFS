@@ -409,8 +409,6 @@ jobs:
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
-              cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./
-              patch -p1 < 0001-KSU-kernel-side.patch
               cp -v ../../kernel_patches/next/0001-add-SuSFS-v2.0.0.patch ./
               patch -p1 < 0001-add-SuSFS-v2.0.0.patch          
               cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
