@@ -400,11 +400,11 @@ jobs:
               ;;
             MKSU)
               cd "$KERNEL_ROOT/KernelSU"
-              cp -v $KERNEL_PATCHES/mksu/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              cp -v $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true       
 
               cp -v $KERNEL_PATCHES/mksu/fix_proc_base.patch ./
-              patch -p1 < fix_proc_base.patch || true
+              patch -p1 < fix_proc_base.patch
               ;;
             KowXU)
               cd "$KERNEL_ROOT/KernelSU"
