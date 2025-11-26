@@ -5,6 +5,16 @@ permissions:
   actions: write
 
 on:
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - '.github/workflows/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       release_type:
@@ -28,7 +38,9 @@ on:
           - Android14-5.15
           - Android14-6.1
           - Android15-6.6
-          - Test Build         
+          - Android16-6.12
+          - Custom
+          - Test Build          
         default: All
       ksu_variant:
         description: "Choose KernelSU variant"
@@ -41,7 +53,7 @@ on:
           - KSU
           - SukiSU
           - KowXU
-        default: WKSU
+        default: NEXT
       ksu_commit:
         description: "Optional KernelSU commit SHA"
         required: false
@@ -65,6 +77,7 @@ jobs:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
 
+
   build-a13-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android13-5.15')
     uses: ./.github/workflows/kernel-a13-5-15.yml
@@ -73,6 +86,7 @@ jobs:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
 
+
   build-a14-5-15:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-5.15')
     uses: ./.github/workflows/kernel-a14-5-15.yml
@@ -80,6 +94,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+
 
   build-a14-6-1:
     if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android14-6.1')
@@ -97,17 +112,35 @@ jobs:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
 
+  build-a16-6-12:
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android16-6.12')
+    uses: ./.github/workflows/kernel-a16-612.yml
+    secrets: inherit
+    with:
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
+
+
+  build-custom:
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Custom')
+    uses: ./.github/workflows/kernel-custom.yml
+    secrets: inherit
+    with:
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
+
+
   test-build:
     if: inputs.build_selection == 'Test Build'
     uses: ./.github/workflows/test-build.yml
     secrets: inherit
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
-      ksu_commit: ${{ inputs.ksu_commit }}         
+      ksu_commit: ${{ inputs.ksu_commit }}
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.release_type != 'Actions' && always() && !cancelled()
+    if: inputs.release_type != 'Actions'
     needs:
       - build-a12-5-10
       - build-a13-5-10
@@ -115,12 +148,20 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
+      - build-custom      
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0"
-
+      RELEASE_BODY: ""
     steps:
+      - name: Download Apache Arrow's util_free_space.sh
+        if: false
+        run: |
+          curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
+          chmod +x util_free_space.sh
+          ./util_free_space.sh
+      
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -191,17 +232,14 @@ jobs:
 
       - name: Generate New Tag
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}        
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}      
+        if: inputs.release_type != 'Actions'
         run: |
-          LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v2.0.0-r0"
-          fi
-          
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-  
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+            LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
+            NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+    
+            echo "New tag: $NEW_TAG"
+            echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Download Artifacts
         uses: actions/download-artifact@v5
@@ -278,13 +316,13 @@ jobs:
             -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
-
+          
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.NEW_TAG }}
           repository: NerestKernels/GKI_KernelSU_SUSFS
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.RELEASE_TOKEN }}         
           prerelease: ${{ inputs.release_type == 'Pre-Release' }}
           files: ""
           name: ${{ env.RELEASE_NAME }}
@@ -298,21 +336,24 @@ jobs:
             echo "No artifact directories found under ./downloaded-artifacts; skipping upload."
           else
             for dir in "${anykernel_dirs[@]}"; do
+              # Check if this is an AnyKernel3 artifact directory
               if [[ "$(basename "$dir")" == *"-AK3" ]]; then
                 artifact_name=$(basename "$dir")
                 echo "Creating ZIP for $artifact_name..."
+                # Navigate into the directory and zip its contents directly
                 cd "$dir"
                 zip -r -9 "../../${artifact_name}.zip" ./*
                 cd - > /dev/null
-                echo "Uploading ${artifact_name}.zip to NerestKernels/GKI_KernelSU_SUSFS..."
-                gh release upload ${{ env.NEW_TAG }} "${artifact_name}.zip" \
-                  --repo NerestKernels/GKI_KernelSU_SUSFS \
-                  --clobber            
+                echo "Uploading ${artifact_name}.zip..."
+                gh release upload ${{ env.NEW_TAG }} "${artifact_name}.zip"
+                 --repo NerestKernels/GKI_KernelSU_SUSFS \
+                 --clobber               
               fi
             done
           fi
             
       - name: Send Telegram Notification
+        if: inputs.release_type != 'Actions'
         run: |
           RELEASE_TYPE_TEXT=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
