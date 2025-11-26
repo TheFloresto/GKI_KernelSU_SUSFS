@@ -25,11 +25,6 @@ jobs:
             sub_level: "226"
             os_patch_level: "2024-11"
             variant: "vTomsonek"
-          - android_version: "android14"
-            kernel_version: "6.1"
-            sub_level: "134"
-            os_patch_level: "2025-05"
-            variant: "TheWildJames"
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
