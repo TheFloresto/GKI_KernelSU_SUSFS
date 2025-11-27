@@ -313,7 +313,7 @@ jobs:
             "SukiSU")
               echo "Getting SukiSU version... "
               cd ./KernelSU
-              BASE_VERSION=37233
+              BASE_VERSION=37235
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
@@ -512,7 +512,7 @@ jobs:
         run: |
           set -eo pipefail
           cd "$CONFIG"
-          cd "$KERNEL_ROOT"
+          KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
           
