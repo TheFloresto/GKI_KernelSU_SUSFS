@@ -510,7 +510,7 @@ jobs:
       - name: Set Kernel Configuration Variables
         shell: bash
         run: |
-          set -euo pipefail
+          set -eo pipefail
           cd "$CONFIG"
           cd "$KERNEL_ROOT"
           echo "Initializing kernel configuration..."
