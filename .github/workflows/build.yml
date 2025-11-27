@@ -340,7 +340,7 @@ jobs:
           
           # Now go back
           cd ..
-          
+
       - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
@@ -418,13 +418,14 @@ jobs:
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
-              cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
+              cp -v ../../susfs4ksukernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
 
-              cd common
+              # Return to CONFIG, then go to common
+              cd ../common
               echo "📋 Applying fix_proc_base.patch"
               curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix_proc_base.patch" \
-              -o /tmp/fix_proc_base.patch
+                -o /tmp/fix_proc_base.patch
               patch -p1 --forward < /tmp/fix_proc_base.patch || true    
               ;;
             "KowXU")
