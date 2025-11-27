@@ -395,8 +395,14 @@ jobs:
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
-              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              cp -v ../../kernel_patches/wild/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true 
+
+              # Return to CONFIG, then go to common
+              cd ../common
+              echo "📋 Applying fix_proc_base.patch"
+              curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix_proc_base.patch" \
+              patch -p1 --forward < fix_proc_base.patch || true               
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
@@ -418,15 +424,14 @@ jobs:
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
-              cp -v ../../susfs4ksukernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              cp -v ../../kernel_patches/wild/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
 
               # Return to CONFIG, then go to common
               cd ../common
               echo "📋 Applying fix_proc_base.patch"
               curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix_proc_base.patch" \
-                -o /tmp/fix_proc_base.patch
-              patch -p1 --forward < /tmp/fix_proc_base.patch || true    
+              patch -p1 --forward < fix_proc_base.patch || true    
               ;;
             "KowXU")
               echo "Applying SUSFS patches for KowXU..."
