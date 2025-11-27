@@ -894,19 +894,6 @@ jobs:
           
           echo "::endgroup::"
 
-      - name: Customize Kernel Branding
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::group::Customize Kernel Branding"
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          cd "$KERNEL_PATH/common"
-          mkdir -p out
-          CUSTOM_LOCALVERSION="-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
-          echo "✅ Custom localversion set: $CUSTOM_LOCALVERSION"
-          echo "::endgroup::"
-
       - name: Set file name
         shell: bash
         run: |
@@ -1004,17 +991,10 @@ jobs:
           
           make O="$OUT" gki_defconfig
           
-          # Apply custom localversion
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-          fi
-          
           # Always use O3 optimization
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          KCFLAGS_EXTRA="-O3"
+          KCFLAGS_EXTRA="-O2"
           
           scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
           scripts/config --file "$OUT/.config" -e LTO_CLANG
@@ -1031,7 +1011,7 @@ jobs:
           echo "Kernel: ${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL"
           echo "KSU Variant: ${{ inputs.kernelsu_variant }}"
           echo "Threads: $(nproc --all)"
-          echo "Optimization: O3 (Always) + LTO=thin"
+          echo "Optimization: O2 (Always) + LTO=thin"
           echo "KCFLAGS: ${KCFLAGS:0:150}..."
           echo "KCPPFLAGS: ${KCPPFLAGS:0:150}..."
           echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
@@ -1368,7 +1348,7 @@ jobs:
           echo "- **KSU Variant**: ${{ inputs.kernelsu_variant }}" >> build_summary.md
           echo "- **KSU Version**: ${KSUVER:-unknown}" >> build_summary.md
           echo "- **SUSFS Version**: ${SUSVER:-unknown}" >> build_summary.md
-          echo "- **Optimization**: O3 (Always)" >> build_summary.md
+          echo "- **Optimization**: O2 (Always)" >> build_summary.md
           echo "- **BBG**: Installed" >> build_summary.md
           echo "- **ccache**: Always Enabled" >> build_summary.md
           echo "" >> build_summary.md
