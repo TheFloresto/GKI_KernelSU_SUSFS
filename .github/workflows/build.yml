@@ -597,6 +597,7 @@ jobs:
             awk '/name = "kernel_aarch64"/,/^\)/ {if(/check_defconfig = "disabled"/) found=1} END{if(found) print "SUCCESS: check_defconfig = \"disabled\" is in the kernel_aarch64 block"; else print "FAILED: NOT in the kernel_aarch64 block"}' common/BUILD.bazel
           else
             sed -i 's/check_defconfig//' ./common/build.config.gki
+          fi
             sed -i 's/-dirty//' ./common/scripts/setlocalversion
             #Remove Dirty Flag
             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
@@ -847,6 +848,37 @@ jobs:
           elif [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
             perl -i -pe 's/^(\s*)return 1$/$1print("Who Cares? Bypassing Now!")\n$1return 0/g if /if missing_symbols:/../return 1/' build/kernel/abi/check_buildtime_symbol_protection.py
           fi
+
+      - name: Append ashmem exports if missing     
+        if: ${{ inputs.android_version == 'android16' && inputs.kernel_version == '6.12' }}
+        working-directory: ${{ env.KERNEL_ROOT }}
+        run: |
+          set -euo pipefail
+          FILE=common/drivers/staging/android/ashmem.c
+          if [[ -f "$FILE" ]] && ! grep -q 'is_ashmem_file' "$FILE"; then
+          cat >>"$FILE" <<'EOF'
+
+          bool is_ashmem_file(struct file *file) { return false; }
+          int ashmem_area_name(struct file *file, char *name) { return 0; }
+          long ashmem_area_size(struct file *file) { return 0; }
+          struct file *ashmem_area_vmfile(struct file *file) { return NULL; }
+          EXPORT_SYMBOL_GPL(is_ashmem_file);
+          EXPORT_SYMBOL_GPL(ashmem_area_name);
+          EXPORT_SYMBOL_GPL(ashmem_area_size);
+          EXPORT_SYMBOL_GPL(ashmem_area_vmfile);
+          EOF
+          fi
+          
+          #if [[ "${{ inputs.os_patch_level }}" == "lts" ]]; then
+          #  sed -i 's/^obj-y += binder\//obj-m += binder\//' common/drivers/android/Makefile
+          #fi
+
+          if [[ "${{ inputs.os_patch_level }}" == "lts" ]]; then
+            sed -i -E 's/\$\(CONFIG_ANDROID_BINDER_IPC_RUST\)/m/g' common/drivers/android/binder/Makefile
+          else
+            sed -i -E 's/\$\(CONFIG_ANDROID_BINDER_IPC_RUST\)/m/g' common/drivers/android/Makefile
+          fi
+
 
       - name: Verify Kernel Version Configuration
         shell: bash
