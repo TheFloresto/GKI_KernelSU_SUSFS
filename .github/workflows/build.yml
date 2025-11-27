@@ -587,18 +587,26 @@ jobs:
         run: |
           set -eo pipefail
           cd "$CONFIG"
-          cd "$KERNEL_ROOT"
+          KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
           sed -i 's/-dirty//' ./common/scripts/setlocalversion
-          #Remove Dirty Flag
-          sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-          #Remove Abi Exports and Error
-          rm -rf ./common/android/abi_gki_protected_exports_*
-          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+          
+          # Remove Dirty Flag (только для Bazel/Kleaf builds)
+          if [ -f "./build/kernel/kleaf/impl/stamp.bzl" ]; then
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+          fi
+          
+          # Remove Abi Exports and Error
+          rm -rf ./common/android/abi_gki_protected_exports_* 2>/dev/null || true
+          
+          if [ -f "./common/BUILD.bazel" ]; then
+            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+          fi
+          
           sed -i '/^CONFIG_KSU_SUSFS/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true          
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           
