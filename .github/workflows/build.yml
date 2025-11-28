@@ -366,11 +366,6 @@ jobs:
           # Apply kernel patch
           patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
           
-          # Add SUSFS header to proc/base.c if not present
-          if ! grep -q '#include <linux/susfs.h>' fs/proc/base.c; then
-            sed -i '/#include <linux\/proc_fs.h>/a #include <linux/susfs.h>' fs/proc/base.c
-          fi
-          
           # Return to CONFIG directory
           cd ..
           
