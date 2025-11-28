@@ -390,7 +390,7 @@ jobs:
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
-              cp -v ../../kernel_patches/wild/10_enable_susfs_for_ksu.patch ./
+              cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true 
 
               # Return to CONFIG, then go to common
