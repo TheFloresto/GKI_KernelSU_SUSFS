@@ -392,12 +392,6 @@ jobs:
               cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true 
-
-              # Return to CONFIG, then go to common
-              cd ../common
-              echo "📋 Applying fix_proc_base.patch"
-              curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix_proc_base.patch" \
-              patch -p1 --forward < fix_proc_base.patch || true               
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
