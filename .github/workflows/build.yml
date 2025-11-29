@@ -313,7 +313,7 @@ jobs:
             "SukiSU")
               echo "Getting SukiSU version... "
               cd ./KernelSU
-              BASE_VERSION=37235
+              BASE_VERSION=37236
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
@@ -912,7 +912,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type == 'bypass' && 'Bypass' || 'Normal' }}"
+          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type == 'bypass' && 'Bypass' || 'Normal' }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
           
