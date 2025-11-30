@@ -576,9 +576,9 @@ jobs:
           
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
-          echo "#CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "#CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "#CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"                                    
+          echo "CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"                                    
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "${{ env.DEFCONFIG }}"
