@@ -797,13 +797,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Fetching latest ZyCromerZ Clang release..."
-          LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
-          if [ -z "$LATEST_CLANG_TAG" ]; then
-            echo "Error: Could not fetch latest ZyCromerZ Clang tag"
-            exit 1
-          fi
-          echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
+          echo "Using fixed ZyCromerZ Clang version..."
+          LATEST_CLANG_TAG="22.0.0git-20250928-release"
+          echo "ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
           
           # Extract version info
           CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
@@ -829,7 +825,7 @@ jobs:
           # Verify installation
           echo "Verifying ZyCromerZ Clang installation..."
           "$CLANG_BIN/clang" --version
-          echo "✅ ZyCromerZ Clang installed successfully at: $CLANG_BIN"
+          echo "✅ ZyCromerZ Clang $CLANG_VERSION installed successfully at: $CLANG_BIN"
 
       - name: Derive ZyCromerZ Clang Version
         shell: bash
