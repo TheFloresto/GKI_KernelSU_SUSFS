@@ -303,7 +303,7 @@ jobs:
             "KSU")
               echo "Getting Official KernelSU version..."
               cd ./KernelSU
-              BASE_VERSION=20000
+              BASE_VERSION=30000
               ;;
             "NEXT")
               echo "Getting NEXT version..."
@@ -313,17 +313,17 @@ jobs:
             "SukiSU")
               echo "Getting SukiSU version... "
               cd ./KernelSU
-              BASE_VERSION=37234
+              BASE_VERSION=37236
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
               cd ./KernelSU
-              BASE_VERSION=20000         
+              BASE_VERSION=30000         
               ;;
             "KowXU")
               echo "Getting KowXU version..."
               cd ./KernelSU
-              BASE_VERSION=20000
+              BASE_VERSION=30000
               ;;
           esac
           
@@ -340,7 +340,7 @@ jobs:
           
           # Now go back
           cd ..
-          
+
       - name: Apply SUSFS Patches for KernelSU Variants
         shell: bash
         run: |
@@ -350,10 +350,11 @@ jobs:
           # Apply compatibility fixes
           SUSFS_VERSION="1.5.12"
           
+          echo "📦 Copying SUSFS source files..."
           cp -v ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp -v ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           
-          # Apply core SUSFS patches
+          echo "📋 Applying core SUSFS kernel patches..."
           cp -v ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
           cd common
           
@@ -362,45 +363,48 @@ jobs:
           echo "SUSVER=$susfs_version" >> $GITHUB_ENV
           echo "SusFS Version: $susfs_version"
           
-          patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+          # Apply kernel patch
+          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
           
-          # ВАЖНО: Возвращаемся в CONFIG перед переходом к KSU
+          # Return to CONFIG directory
           cd ..
           
           # Apply KSU integration patches
+          echo "📋 Applying KSU-specific SUSFS patches..."
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Applying SUSFS patches for Wild KSU..."
               cd ./Wild_KSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
               
               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch ./
-              patch -p1 --fuzz=3 < fix_core_hook.c.patch
+              patch -p1 --fuzz=3 --forward < fix_core_hook.c.patch || true
               
               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch ./
-              patch -p1 < fix_sucompat.c.patch
+              patch -p1 --forward < fix_sucompat.c.patch || true
 
               cp -v ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
-              patch -p1 < fix_kernel_compat.c.patch
+              patch -p1 --forward < fix_kernel_compat.c.patch || true
               ;;
             "KSU")
               echo "Applying SUSFS patches for Official KernelSU..."
               cd ./KernelSU
               cp -v ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true 
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true 
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
+              
               cp -v ../../kernel_patches/next/0001-KSU-kernel-side.patch ./
-              patch -p1 < 0001-KSU-kernel-side.patch
+              patch -p1 --forward < 0001-KSU-kernel-side.patch || true
 
               cp -v ../../kernel_patches/next/0001-add-SuSFS-v2.0.0.patch ./
-              patch -p1 < 0001-add-SuSFS-v2.0.0.patch         
+              patch -p1 --forward < 0001-add-SuSFS-v2.0.0.patch || true
 
               cp -v ../../kernel_patches/next/0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch ./
-              patch -p1 < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch              
+              patch -p1 --forward < 0001-add-only-WKSU-and-MKSU-managers-and-KSUN.patch || true
               ;;
             "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
@@ -410,19 +414,23 @@ jobs:
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
               cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
 
-              cp -v ../../kernel_patches/mksu/fix_proc_base.patch ./
-              patch -p1 < fix_proc_base.patch || true          
+              # Return to CONFIG, then go to common
+              cd ../common
+              echo "📋 Applying fix_proc_base.patch"
+              curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix_proc_base.patch" \
+              patch -p1 --forward < fix_proc_base.patch || true    
               ;;
             "KowXU")
               echo "Applying SUSFS patches for KowXU..."
               cd ./KernelSU
+              
               cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
 
               cp -v ../../kernel_patches/mksu/fix_proc_base.patch ./
-              patch -p1 < fix_proc_base.patch || true
+              patch -p1 --forward < fix_proc_base.patch || true
               ;;
           esac
 
@@ -529,14 +537,32 @@ jobs:
           fi
 
       - name: Set Kernel Configuration Variables
+        shell: bash
         run: |
+          set -eo pipefail
           cd "$CONFIG"
+          KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
           echo "Initializing kernel configuration..."
-          echo "DEFCONFIG=./common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
+          echo "DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+          sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          
+          # Remove Dirty Flag (только для Bazel/Kleaf builds)
+          if [ -f "./build/kernel/kleaf/impl/stamp.bzl" ]; then
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+          fi
+          
+          # Remove Abi Exports and Error
+          rm -rf ./common/android/abi_gki_protected_exports_* 2>/dev/null || true
+          
+          if [ -f "./common/BUILD.bazel" ]; then
+            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+          fi
+          
           sed -i '/^CONFIG_KSU_SUSFS/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true          
+          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           
           # ========================================
           # CLEAN UP LOCALVERSION - ВАЖНО!
@@ -568,6 +594,9 @@ jobs:
           
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"                                    
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "${{ env.DEFCONFIG }}"
@@ -583,8 +612,9 @@ jobs:
           
           # SukiSU Support
           echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPM=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KALLSYMS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPM=n" >> "${{ env.DEFCONFIG }}"
+          echo "#CONFIG_KALLSYMS=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_MANUAL_SU=n" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure SUSFS
@@ -681,8 +711,8 @@ jobs:
           echo "# Build Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG_THIN=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_CCACHE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_OPTIMIZE_INLINING=y" >> "${{ env.DEFCONFIG }}"
 
@@ -810,7 +840,7 @@ jobs:
           echo "CLANG_VERSION_SHORT=$SHORT_VERSION" >> "$GITHUB_ENV"
           echo "✅ ZyCromerZ Clang version: $SHORT_VERSION"
           echo "::endgroup::"
-
+          
       - name: Set Cache Environment
         shell: bash
         run: |
@@ -900,24 +930,11 @@ jobs:
           
           echo "::endgroup::"
 
-      - name: Customize Kernel Branding
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::group::Customize Kernel Branding"
-          KERNEL_PATH="$GITHUB_WORKSPACE/$CONFIG"
-          cd "$KERNEL_PATH/common"
-          mkdir -p out
-          CUSTOM_LOCALVERSION="-@NoFloresto"
-          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
-          echo "✅ Custom localversion set: $CUSTOM_LOCALVERSION"
-          echo "::endgroup::"
-
       - name: Set file name
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type == 'bypass' && 'Bypass' || 'Normal' }}"
+          ARTIFACT_BASE="${{ inputs.kernelsu_variant }}-${{ env.KSUVER }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type == 'bypass' && 'Bypass' || 'Normal' }}"
           echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
           echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
           
@@ -1010,17 +1027,10 @@ jobs:
           
           make O="$OUT" gki_defconfig
           
-          # Apply custom localversion
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-            scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-            scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-            sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-          fi
-          
           # Always use O3 optimization
-          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE
-          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-          KCFLAGS_EXTRA="-O3"
+          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          KCFLAGS_EXTRA="-O2"
           
           scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
           scripts/config --file "$OUT/.config" -e LTO_CLANG
@@ -1037,7 +1047,7 @@ jobs:
           echo "Kernel: ${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL"
           echo "KSU Variant: ${{ inputs.kernelsu_variant }}"
           echo "Threads: $(nproc --all)"
-          echo "Optimization: O3 (Always) + LTO=thin"
+          echo "Optimization: O2 (Always) + LTO=thin"
           echo "KCFLAGS: ${KCFLAGS:0:150}..."
           echo "KCPPFLAGS: ${KCPPFLAGS:0:150}..."
           echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
@@ -1191,7 +1201,7 @@ jobs:
           echo "   - Build time: ${BUILD_TIME}s"
 
       - name: Patch KPM for SukiSU-Ultra
-        if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
+        if: ${{ inputs.kernelsu_variant == 'SukiSU' && false }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1374,7 +1384,7 @@ jobs:
           echo "- **KSU Variant**: ${{ inputs.kernelsu_variant }}" >> build_summary.md
           echo "- **KSU Version**: ${KSUVER:-unknown}" >> build_summary.md
           echo "- **SUSFS Version**: ${SUSVER:-unknown}" >> build_summary.md
-          echo "- **Optimization**: O3 (Always)" >> build_summary.md
+          echo "- **Optimization**: O2 (Always)" >> build_summary.md
           echo "- **BBG**: Installed" >> build_summary.md
           echo "- **ccache**: Always Enabled" >> build_summary.md
           echo "" >> build_summary.md
