@@ -596,7 +596,6 @@ jobs:
           # SukiSU Support
           echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KPM=n" >> "${{ env.DEFCONFIG }}"
-          echo "#CONFIG_KALLSYMS=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_MANUAL_SU=n" >> "${{ env.DEFCONFIG }}"
 
