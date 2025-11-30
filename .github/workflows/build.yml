@@ -312,8 +312,9 @@ jobs:
               ;;
             "SukiSU")
               echo "Getting SukiSU version... "
-              cd ./KernelSU
-              BASE_VERSION=37236
+              git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
+              cd SukiSU-Ultra
+              BASE_VERSION=37185
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
@@ -576,9 +577,9 @@ jobs:
           
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"                                    
+          echo "#CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "#CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "#CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"                                    
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "${{ env.DEFCONFIG }}"
@@ -684,6 +685,7 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_NET_SCH_CAKE=y" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure Build Options
         shell: bash
