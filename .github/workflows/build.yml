@@ -312,8 +312,9 @@ jobs:
               ;;
             "SukiSU")
               echo "Getting SukiSU version... "
-              cd ./KernelSU
-              BASE_VERSION=37236
+              git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
+              cd SukiSU-Ultra
+              BASE_VERSION=37185
               ;;
             "MKSU")
               echo "Getting MKSU version..."   
@@ -677,6 +678,7 @@ jobs:
           echo "CONFIG_TCP_CONG_BIC=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_HTCP=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_NET_SCH_CAKE=y" >> "${{ env.DEFCONFIG }}"        
 
       - name: Configure IPSet Support
         shell: bash
