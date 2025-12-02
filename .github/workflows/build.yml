@@ -312,7 +312,7 @@ jobs:
               ;;
             "SukiSU")
               echo "Getting SukiSU version... "
-              cd ./SukiSU-Ultra
+              cd ./KernelSU
               BASE_VERSION=‭37181
               ;;
             "MKSU")
