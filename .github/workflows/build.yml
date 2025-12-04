@@ -30,7 +30,7 @@ on:
 
 jobs:
   build-gki:
-    name: "${{ inputs.ksu_variant }}-${{ env.KSUVER }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ matrix.build_type }})"
+    name: "${{ inputs.ksu_variant }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ matrix.build_type }})"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
