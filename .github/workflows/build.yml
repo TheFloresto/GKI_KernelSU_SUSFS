@@ -583,6 +583,16 @@ jobs:
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"      
 
+      - name: Configure KSU
+        if: ${{ inputs.kernelsu_variant == 'KSU' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          
+          # KSU Support
+          echo "# KSU Support" >> "${{ env.DEFCONFIG }}"
+
       - name: Configure SukiSU
         if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
         shell: bash
