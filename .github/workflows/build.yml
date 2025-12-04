@@ -409,7 +409,7 @@ jobs:
               ;;
             "SukiSU")
               echo "Applying SUSFS patches for SukiSU..."
-              cd ./SukiSU-Ultra
+              cd ./KernelSU
               ;;
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
@@ -443,22 +443,31 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Applying hooks for WKSU..."
-              cp -v ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+              cp -fv ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
               patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
               ;;
             "KSU")
               echo "Applying hooks for Official KernelSU..."
+              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward -F 3 < ksu_hooks.patch
               ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
-              cp -v ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
+              cp -fv ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
               patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
               ;;
             "SukiSU")
-              echo "Applying hooks for SukiSU..."          
+              echo "Applying hooks for SukiSU..."
               ;;
             "MKSU")
-              echo "Applying hooks for MKSU..."             
+              echo "Applying hooks for MKSU..."
+              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward -F 3 < ksu_hooks.patch
+              ;;
+            "KowXU")
+              echo "Applying hooks for KowXU..."
+              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward -F 3 < ksu_hooks.patch         
               ;;
           esac 
           
@@ -606,14 +615,24 @@ jobs:
           
           echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
-          echo "#CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "#CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "#CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"                                    
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"      
+
+      - name: Configure KSU
+        if: ${{ inputs.kernelsu_variant == 'KSU' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONFIG"
+          
+          # KSU Support
+          echo "# KSU Support" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure SukiSU
         if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
@@ -624,8 +643,7 @@ jobs:
           
           # SukiSU Support
           echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPM=n" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KPM=n" >> "${{ env.DEFCONFIG }}"         
           echo "CONFIG_KSU_MANUAL_SU=n" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure SUSFS
@@ -688,7 +706,6 @@ jobs:
           echo "CONFIG_TCP_CONG_BIC=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_WESTWOOD=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_TCP_CONG_HTCP=n" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_NET_SCH_CAKE=y" >> "${{ env.DEFCONFIG }}"        
 
       - name: Configure IPSet Support
         shell: bash
@@ -714,6 +731,7 @@ jobs:
           echo "CONFIG_IP_SET_HASH_NETPORT=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_HASH_NETIFACE=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_IP_SET_LIST_SET=y" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_NET_SCH_CAKE=y" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure Build Options
         shell: bash
@@ -792,7 +810,7 @@ jobs:
           echo "   User: $BUILD_USER"
           echo "   Host: $BUILD_HOST"
           echo "::endgroup::"
-
+          
       - name: Setup ZyCromerZ Clang Toolchain
         env:
           GH_TOKEN: ${{ github.token }}
