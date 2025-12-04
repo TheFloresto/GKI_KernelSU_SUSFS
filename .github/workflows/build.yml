@@ -443,13 +443,35 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "WKSU")
               echo "Applying hooks for WKSU..."
-              cp -v ../../kernel_patches/wild/hooks/scope_min_manual_hooks_v1.4.patch ./
-              patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
+              cp -fv ../../kernel_patches/next/60_scope-minimized_manual_hooks.patch ./
+              patch -p1 --forward -F 3 < 60_scope-minimized_manual_hooks.patch
               ;;
-            "KSU"|"NEXT"|"SukiSU"|"MKSU"|"KowXU")
-              echo "No additional hooks needed for ${{ inputs.kernelsu_variant }}..."
+            "KSU")
+              echo "Applying hooks for Official KernelSU..."
+              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward -F 3 < ksu_hooks.patch
               ;;
-          esac
+            "NEXT")
+              echo "Applying hooks for KernelSU-Next..."
+              cp -fv ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
+              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
+              ;;
+            "SukiSU")
+              echo "Applying hooks for SukiSU..."          
+              cp -fv ../../SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch
+              ;;
+            "MKSU")
+              echo "Applying hooks for MKSU..."
+              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward -F 3 < ksu_hooks.patch
+              ;;
+            "KowXU")
+              echo "Applying hooks for KowXU..."
+              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
+              patch -p1 --forward -F 3 < ksu_hooks.patch         
+              ;;
+          esac 
           
       - name: Apply Performance Patches
         shell: bash
@@ -575,23 +597,13 @@ jobs:
           echo "CONFIG_LOCALVERSION_AUTO=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LOCALVERSION=\"-@NoFloresto\"" >> "${{ env.DEFCONFIG }}"
           
-          echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"                                    
+          echo "CONFIG_KSU=y" >> "${{ env.DEFCONFIG }}
+          echo "CONFIG_KSU_KPROBES_HOOK=n" >> "${{ env.DEFCONFIG }}"
           # BBG Support
           echo "CONFIG_KSU_DEBUG=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_ALLOWLIST_WORKAROUND=n" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KSU_LSM_SECURITY_HOOKS=y" >> "${{ env.DEFCONFIG }}"      
-
-      - name: Configure KSU
-        if: ${{ inputs.kernelsu_variant == 'KSU' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$CONFIG"
-          
-          # KSU Support
-          echo "# KSU Support" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure SukiSU
         if: ${{ inputs.kernelsu_variant == 'SukiSU' }}
@@ -603,6 +615,7 @@ jobs:
           # SukiSU Support
           echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_KPM=n" >> "${{ env.DEFCONFIG }}"
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> "${{ env.DEFCONFIG }}"         
           echo "CONFIG_KSU_MANUAL_SU=n" >> "${{ env.DEFCONFIG }}"
 
       - name: Configure SUSFS
