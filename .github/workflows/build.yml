@@ -415,23 +415,13 @@ jobs:
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
               cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-
-              # Return to CONFIG, then go to common
-              cd ../common
-              echo "📋 Applying fix_proc_base.patch"
-              curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix_proc_base.patch" \
-              patch -p1 --forward < fix_proc_base.patch || true    
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true    
               ;;
             "KowXU")
               echo "Applying SUSFS patches for KowXU..."
-              cd ./KernelSU
-              
+              cd ./KernelSU          
               cp -v ../../kernel_patches/mksu/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-
-              cp -v ../../kernel_patches/mksu/fix_proc_base.patch ./
-              patch -p1 --forward < fix_proc_base.patch || true
               ;;
           esac
 
@@ -448,8 +438,6 @@ jobs:
               ;;
             "KSU")
               echo "Applying hooks for Official KernelSU..."
-              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
-              patch -p1 --forward -F 3 < ksu_hooks.patch
               ;;
             "NEXT")
               echo "Applying hooks for KernelSU-Next..."
@@ -461,8 +449,6 @@ jobs:
               ;;
             "MKSU")
               echo "Applying hooks for MKSU..."
-              cp -fv ../../kernel_patches/sultan/ksu_hooks.patch ./
-              patch -p1 --forward -F 3 < ksu_hooks.patch
               ;;
             "KowXU")
               echo "Applying hooks for KowXU..."
