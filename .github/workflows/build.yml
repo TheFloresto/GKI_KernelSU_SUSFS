@@ -739,7 +739,6 @@ jobs:
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           set -euo pipefail
-          cd "$CONFIG"
           echo "# Build Configuration" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG_THIN=y" >> "${{ env.DEFCONFIG }}"
           echo "CONFIG_LTO_CLANG=y" >> "${{ env.DEFCONFIG }}"
