@@ -225,7 +225,7 @@ jobs:
           case "${{ inputs.kernelsu_variant }}" in
             "Stable")
               if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]]; then
-                echo "BRANCH=-s susfs-main" >> $GITHUB_ENV
+                echo "BRANCH=-s builtin" >> $GITHUB_ENV
               else
                 echo "BRANCH=-" >> $GITHUB_ENV
               fi
