@@ -38,9 +38,9 @@ on:
           - Android14-5.15
           - Android14-6.1
           - Android15-6.6
-          - Custom
-          - Test Build          
-        default: All
+          - Android16-6.12
+          - Test Build
+        default: Android16-6.12
       ksu_variant:
         description: "Choose KernelSU variant"
         required: true
@@ -52,7 +52,7 @@ on:
           - KSU
           - SukiSU
           - KowXU
-        default: NEXT
+        default: KSU
       ksu_commit:
         description: "Optional KernelSU commit SHA"
         required: false
@@ -110,11 +110,10 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
-      
 
-  build-custom:
-    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Custom')
-    uses: ./.github/workflows/kernel-custom.yml
+  build-a16-6-12:
+    if: (inputs.build_selection == 'All' || inputs.build_selection == 'Android16-6.12')
+    uses: ./.github/workflows/kernel-a16-612.yml
     secrets: inherit
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
@@ -139,7 +138,6 @@ jobs:
       - build-a14-5-15
       - build-a14-6-1
       - build-a15-6-6
-      - build-custom      
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -155,6 +153,7 @@ jobs:
       
       - name: Checkout code
         uses: actions/checkout@v4
+
 
       - name: Get commit hashes and generate commit URLs
         run: |
@@ -232,12 +231,6 @@ jobs:
             echo "New tag: $NEW_TAG"
             echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-      - name: Download Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./downloaded-artifacts
-          pattern: '*-AK3'
-
       - name: Set release body
         run: |
           cat << 'EOF' > release_body.md
@@ -307,7 +300,7 @@ jobs:
             -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
             -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
           EOF
-          
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -318,6 +311,12 @@ jobs:
           files: ""
           name: ${{ env.RELEASE_NAME }}
           body_path: release_body.md
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: ./downloaded-artifacts
+          pattern: '*-AK3'
 
       - name: Upload Release Assets
         run: |
@@ -361,5 +360,4 @@ jobs:
           🛑 *Variant:* ${{ inputs.ksu_variant }}
           📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
           ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-          [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
-            -F parse_mode="Markdown"
+          [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUS
