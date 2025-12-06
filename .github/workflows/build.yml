@@ -18,9 +18,6 @@ on:
       os_patch_level:
         required: true
         type: string
-      variant:
-        required: false
-        type: string
       ksu_variant:
         required: true
         type: string
