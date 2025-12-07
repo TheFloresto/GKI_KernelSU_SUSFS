@@ -499,12 +499,12 @@ jobs:
 
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               #if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]] && [[ ${{ inputs.sub_level }} -le 41 ]]; then
-                #cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
-                #patch -p1 < fix_fdinfo.c.patch || true
-                #cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
-                #patch -p1 < fix_namespace.c.patch || true
-                #cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
-                #patch -p1 < fix_open.c.patch || true
+                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+                patch -p1 < fix_fdinfo.c.patch || true
+                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+                patch -p1 < fix_namespace.c.patch || true
+                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+                patch -p1 < fix_open.c.patch || true
                 #sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
               #fi
               ;;
