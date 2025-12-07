@@ -414,6 +414,9 @@ jobs:
               cd ./KernelSU
               cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+
+              cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+              patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true            
               ;;
             "NEXT")
               echo "Applying SUSFS patches for KernelSU Next..."
@@ -435,14 +438,20 @@ jobs:
             "MKSU")
               echo "Applying SUSFS patches for MKSU..."
               cd ./KernelSU
-              cp -v "$KERNEL_PATCHES/mksu/10_enable_susfs_for_ksu.patch" ./
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+
+              cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+              patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true             
               ;;
             "KowXU")
               echo "Applying SUSFS patches for KowXU..."
               cd ./KernelSU
-              cp -v "$KERNEL_PATCHES/mksu/10_enable_susfs_for_ksu.patch" ./
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+
+              cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+              patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true        
               ;;
           esac
 
