@@ -93,6 +93,8 @@ jobs:
           os_patch_level: "2025-06"
         - sub_level: "240"
           os_patch_level: "2025-09"
+        - sub_level: "246"
+          os_patch_level: "2025-12"
         # LTS meta
         - sub_level: "X"
           os_patch_level: "lts"
