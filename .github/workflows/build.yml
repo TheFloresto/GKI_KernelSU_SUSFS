@@ -699,18 +699,22 @@ jobs:
         if: ${{ inputs.ksu_variant == 'KSU' }}
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
-          echo "# KSU Support" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_HAVE_KPROBES=y" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPROBE_EVENTS=y" >> "${{ env.DEFCONFIG }}"
+          cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+          echo "# KSU Support"
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+          EOF
 
       - name: Configure SukiSU
         if: ${{ inputs.ksu_variant == 'SukiSU' }}
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
-          echo "# SukiSU Support" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KPM=n" >> "${{ env.DEFCONFIG }}"
-          echo "CONFIG_KSU_MANUAL_SU=n" >> "${{ env.DEFCONFIG }}"
+          cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+          echo "# SukiSU Support"
+          CONFIG_KPM=n
+          CONFIG_KSU_MANUAL_SU=n
+          EOF
 
       - name: 🏷️ Set Build Identity
         shell: bash
