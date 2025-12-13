@@ -111,6 +111,18 @@ jobs:
             kernel_version: "6.6"
             sub_level: "X"
             os_patch_level: "lts"
+
+          # Android 16 - 6.12 oldest (NEW)
+          - android_version: "android16"
+            kernel_version: "6.12"
+          - sub_level: "30"
+            os_patch_level: "2025-07"
+          
+          # Android 15 - 6.12 LTS (OLD)
+          - android_version: "android16"
+            kernel_version: "6.12"
+            sub_level: "X"
+            os_patch_level: "lts"
     
     uses: ./.github/workflows/build.yml
     secrets: inherit
