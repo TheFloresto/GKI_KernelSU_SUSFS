@@ -410,7 +410,8 @@ jobs:
               echo "Applying SUSFS patches for KernelSU Next..."
               cd ./KernelSU-Next
               
-              # Your Next-specific code goes here
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
               ;;
             SukiSU)
               echo "Applying SUSFS patches for SukiSU..."
@@ -459,6 +460,7 @@ jobs:
               patch -p1 < fix_namespace.c.patch || true
               cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
               patch -p1 < fix_open.c.patch || true
+              sed -i '/#include <linux\/syscalls.h>/a #include <linux/susfs.h>' fs/open.c
               sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
             fi
 
@@ -510,12 +512,10 @@ jobs:
             WKSU)
               echo "Applying hooks for WKSU..."
               cp -fv "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.4.patch" ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch || true
+              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true
               ;;
             Next)
               echo "Applying hooks for KernelSU-Next..."
-              cp -fv "$KERNEL_PATCHES/next/scope_min_manual_hooks_v1.6.patch" ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true
               ;;
           esac
 
