@@ -1,8 +1,8 @@
 name: Kernel Config - A12 5.10
 
 permissions:
-  contents: write  # Allow writing to repository contents
-  actions: write   # Allows triggering actions
+  contents: write # Allow writing to repository contents
+  actions: write # Allows triggering actions
 
 on:
   workflow_call:
