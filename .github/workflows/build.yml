@@ -308,7 +308,7 @@ jobs:
             Next)
               echo "Getting Next version..."
               cd ./KernelSU-Next
-              BASE_VERSION=10200
+              BASE_VERSION=30000
               ;;
             SukiSU)
               echo "Getting SukiSU version..."
