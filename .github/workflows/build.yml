@@ -399,7 +399,10 @@ jobs:
               patch -p1 < fix_kernel_compat.c.patch
               ;;
             Next)
-              cp "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+            
+              cp -v "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
               for p in ./*.patch; do
                 patch -p1 < "$p" || true
               done
