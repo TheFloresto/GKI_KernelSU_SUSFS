@@ -599,28 +599,50 @@ jobs:
         shell: bash
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
-          set -euo pipefail
+          set -eo pipefail
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
-          
+
           if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
             sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
+          fi
+          
+          # Remove check_defconfig
+          sed -i 's/check_defconfig//' ./common/build.config.gki
+          sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          
+          # Remove Dirty Flag (только для Bazel/Kleaf builds)
+          if [ -f "./build/kernel/kleaf/impl/stamp.bzl" ]; then
+            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+          fi
+          
+          # Remove Abi Exports and Error
+          rm -rf ./common/android/abi_gki_protected_exports_* 2>/dev/null || true
+          
+          if [ -f "./common/BUILD.bazel" ]; then
+            perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+          fi
+          
+          sed -i '/^CONFIG_KSU_SUSFS/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true          
+          sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
+          
+          # ========================================
+          # CLEAN UP LOCALVERSION - ВАЖНО!
+          # ========================================
+          echo "🧹 Cleaning up existing LOCALVERSION entries..."
+          
+          # Remove ALL existing LOCALVERSION entries
+          sed -i '/^CONFIG_LOCALVERSION=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+          sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+          
+          # Verify cleanup
+          REMAINING_ENTRIES=$(grep -c '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
+          
+          if [ "$REMAINING_ENTRIES" -eq 0 ]; then
+            echo "✅ All LOCALVERSION entries removed successfully"
           else
-            sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
-            sed -i 's/-dirty//' ./common/scripts/setlocalversion
-            
-            echo "🧹 Cleaning up existing LOCALVERSION entries..."
-            sed -i '/^CONFIG_LOCALVERSION=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
-            sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
-            
-            REMAINING_ENTRIES=$(grep -c '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
-            
-            if [ "$REMAINING_ENTRIES" -eq 0 ]; then
-              echo "✅ All LOCALVERSION entries removed successfully"
-            else
-              echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
-              grep '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" || true
-            fi
+            echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
+            grep '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" || true
           fi
 
       - name: Append ashmem exports if missing
