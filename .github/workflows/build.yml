@@ -352,7 +352,7 @@ jobs:
         shell: bash
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
-          set -euo pipefail
+          set -eo pipefail
           case "${{ inputs.ksu_variant }}" in
             WKSU)
               SUSFS_VERSION="1.5.12"
