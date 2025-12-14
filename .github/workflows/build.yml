@@ -512,9 +512,7 @@ jobs:
               patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true
               ;;
             Next)
-              echo "Applying hooks for KernelSU-Next..."
-              cp -fv "$KERNEL_PATCHES/next/hooks/scope_min_manual_hooks_v1.6.patch" ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true   
+              echo "Applying hooks for KernelSU-Next..."   
               ;;
           esac
 
@@ -685,18 +683,19 @@ jobs:
         run: |
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-          # Kernel Identity
+          # Kernel Version
           CONFIG_LOCALVERSION_AUTO=n
           CONFIG_LOCALVERSION="-@NoFloresto"
-          
-          # KernelSU Configuration
+
+          # Kprobes (required for KernelSU)
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+
+          # KernelSU Base Config (all variants)
           CONFIG_KSU=y
-          CONFIG_KSU_KPROBES_HOOK=n
           CONFIG_KSU_DEBUG=n
-          CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y
-          CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-          CONFIG_KSU_LSM_SECURITY_HOOKS=y
-          
+                  
           # SUSFS Configuration
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -767,9 +766,35 @@ jobs:
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # KSU Support
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
+          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+          CONFIG_KSU_LSM_SECURITY_HOOKS=y
+          EOF
+
+      - name: Configure MKSU
+        if: ${{ inputs.ksu_variant == 'MKSU' }}
+        shell: bash
+        working-directory: ${{ env.KERNEL_ROOT }}
+        run: |
+          set -euo pipefail
+          cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+          # MKSU Support
+          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+          CONFIG_KSU_LSM_SECURITY_HOOKS=y
+          EOF
+
+      - name: Configure KowXU
+        if: ${{ inputs.ksu_variant == 'KowXU' }}
+        shell: bash
+        working-directory: ${{ env.KERNEL_ROOT }}
+        run: |
+          set -euo pipefail
+          cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+          # KowXU Support
+          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+          CONFIG_KSU_LSM_SECURITY_HOOKS=y
           EOF
 
       - name: Configure SukiSU
@@ -781,6 +806,19 @@ jobs:
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # SukiSU Support
           CONFIG_KSU_SUSFS_SUS_KSTAT_USE_INLINE_HOOK=y
+          EOF
+
+      - name: Configure Next
+        if: ${{ inputs.ksu_variant == 'Next' }}
+        shell: bash
+        working-directory: ${{ env.KERNEL_ROOT }}
+        run: |
+          set -euo pipefail
+          cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+          # Next Support
+          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+          CONFIG_KSU_LSM_SECURITY_HOOKS=y
           EOF
 
       - name: Set Build Identity
