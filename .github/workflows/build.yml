@@ -399,19 +399,9 @@ jobs:
               patch -p1 < fix_kernel_compat.c.patch
               ;;
             Next)
-              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-            
-              cp -v "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
-              for p in ./*.patch; do
-                patch -p1 < "$p" || true
-              done
-              ;;
-            KSU)
-              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-
               echo "Applying Next-specific SUSFS patches"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true           
               cp "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
               echo "Applying Makefile.patch"
               patch -p1 < Makefile.patch
@@ -435,6 +425,20 @@ jobs:
               patch -p1 < sucompat.h.patch
               echo "Applying supercalls.c.patch"
               patch -p1 < supercalls.c.patch
+              sed -i '/if *(ksu_get_manager_appid() == new_uid % PER_USER_RANGE) {/,/^ *}/c\
+              pr_info("install fd for manager: %d\\n", new_uid);\
+              ksu_install_fd();\
+              spin_lock_irq(&current->sighand->siglock);\
+              ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);\
+              ksu_set_task_tracepoint_flag(current);\
+              spin_unlock_irq(&current->sighand->siglock);\
+              return 0;
+              ' kernel/setuid_hook.c
+              sed -i 's/ksu_get_manager_appid/ksu_get_manager_uid/g' kernel/manager.h
+              ;;
+            KSU)
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
 
               cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
               patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
