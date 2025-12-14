@@ -115,10 +115,10 @@ jobs:
           # Android 16 - 6.12 oldest (NEW)
           - android_version: "android16"
             kernel_version: "6.12"
-          - sub_level: "30"
+            sub_level: "30"
             os_patch_level: "2025-07"
           
-          # Android 15 - 6.12 LTS (OLD)
+          # Android 16 - 6.12 LTS (OLD)
           - android_version: "android16"
             kernel_version: "6.12"
             sub_level: "X"
