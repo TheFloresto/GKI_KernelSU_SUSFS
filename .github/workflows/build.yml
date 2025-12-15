@@ -282,9 +282,9 @@ jobs:
             KowXU)
               echo "Adding KowXU..."
               if [ -n "${{ inputs.ksu_commit }}" ]; then
-                curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
+                curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
               else
-                curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/main/kernel/setup.sh" | bash -s main
+                curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s master
               fi
               ;;
           esac
