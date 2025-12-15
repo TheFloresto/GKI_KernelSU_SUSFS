@@ -128,7 +128,9 @@ jobs:
           
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           git clone https://github.com/TheFloresto/kernel_patches.git
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          #git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://gitlab.com/WildKernels/susfs4ksu.git -b "$SUSFS_BRANCH"
+          
           
           cd susfs4ksu
           TARGET="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
@@ -403,8 +405,6 @@ jobs:
               cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true           
               cp "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
-              echo "Applying Makefile.patch"
-              patch -p1 < Makefile.patch
               echo "Applying allowlist.c.patch"
               patch -p1 < allowlist.c.patch
               echo "Applying apk_sign.c.patch"
@@ -415,26 +415,14 @@ jobs:
               patch -p1 < ksu.c.patch
               echo "Applying ksud.c.patch"
               patch -p1 < ksud.c.patch
+              echo "Applying Makefile.patch"
+              patch -p1 < Makefile.patch
               echo "Applying selinux.c.patch"
               patch -p1 < selinux.c.patch
-              echo "Applying selinux.h.patch"
-              patch -p1 < selinux.h.patch
               echo "Applying sucompat.c.patch"
               patch -p1 < sucompat.c.patch
-              echo "Applying sucompat.h.patch"
-              patch -p1 < sucompat.h.patch
               echo "Applying supercalls.c.patch"
               patch -p1 < supercalls.c.patch
-              sed -i '/if *(ksu_get_manager_appid() == new_uid % PER_USER_RANGE) {/,/^ *}/c\
-              pr_info("install fd for manager: %d\\n", new_uid);\
-              ksu_install_fd();\
-              spin_lock_irq(&current->sighand->siglock);\
-              ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);\
-              ksu_set_task_tracepoint_flag(current);\
-              spin_unlock_irq(&current->sighand->siglock);\
-              return 0;
-              ' kernel/setuid_hook.c
-              sed -i 's/ksu_get_manager_appid/ksu_get_manager_uid/g' kernel/manager.h
               ;;
             KSU)
               cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
