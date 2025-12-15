@@ -348,6 +348,8 @@ jobs:
 
       - name: Upload Release Assets
         shell: bash
+        env:
+         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           shopt -s nullglob
