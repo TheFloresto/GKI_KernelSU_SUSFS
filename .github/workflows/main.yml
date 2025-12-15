@@ -140,7 +140,6 @@ jobs:
       
     steps:
       - name: Download Apache Arrow's util_free_space.sh
-        if: false
         shell: bash
         run: |
           set -euo pipefail
@@ -185,6 +184,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          
           case "${{ inputs.ksu_variant }}" in
             "WKSU")
               KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
@@ -208,15 +208,39 @@ jobs:
               ;;
             "KowXU")
               KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"             
+              KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"
+              ;;
+            *)
+              echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
+              exit 1
               ;;
           esac
+          
+          # Verify that KSU_REF is not empty
+          if [[ -z "$KSU_REF" ]]; then
+            echo "ERROR: Failed to get KSU_REF for variant ${{ inputs.ksu_variant }}"
+            exit 1
+          fi
+          
+          echo "KSU Variant: ${{ inputs.ksu_variant }}"
+          echo "KSU_REF: $KSU_REF"
+          echo "KSU_URL: $KSU_URL"
           
           echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
           echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
           
+          # Get Baseband-guard refs
           BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
           BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
+          
+          if [[ -z "$BBG_REF" ]]; then
+            echo "ERROR: Failed to get BBG_REF"
+            exit 1
+          fi
+          
+          echo "BBG_REF: $BBG_REF"
+          echo "BBG_URL: $BBG_URL"
+          
           echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
           echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
 
