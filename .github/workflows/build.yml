@@ -666,9 +666,9 @@ jobs:
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # KSU Support
-          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_KPROBES_HOOK=y
           CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-          CONFIG_KSU_LSM_SECURITY_HOOKS=y
+          CONFIG_KSU_LSM_SECURITY_HOOKS=n
           EOF
 
       - name: Configure MKSU
@@ -679,9 +679,9 @@ jobs:
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # MKSU Support
-          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_KPROBES_HOOK=y
           CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-          CONFIG_KSU_LSM_SECURITY_HOOKS=y
+          CONFIG_KSU_LSM_SECURITY_HOOKS=n
           EOF
 
       - name: Configure KowXU
@@ -692,9 +692,9 @@ jobs:
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # KowXU Support
-          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_KPROBES_HOOK=y
           CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-          CONFIG_KSU_LSM_SECURITY_HOOKS=y
+          CONFIG_KSU_LSM_SECURITY_HOOKS=n
           EOF
 
       - name: Configure SukiSU
@@ -716,9 +716,9 @@ jobs:
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # Next Support
-          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_KPROBES_HOOK=y
           CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-          CONFIG_KSU_LSM_SECURITY_HOOKS=y
+          CONFIG_KSU_LSM_SECURITY_HOOKS=n
           EOF
 
       - name: Set Build Identity
