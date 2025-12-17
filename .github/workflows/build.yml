@@ -397,19 +397,19 @@ jobs:
 
           case "${{ inputs.ksu_variant }}" in
             WKSU)
-            cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch" ./
+            cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch" ./
             echo "================================================="
             echo "Applying fix_core_hook.c.patch"
             echo "================================================="
             patch -p1 < fix_core_hook.c.patch
             
-            cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch" ./
+            cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch" ./
             echo "================================================="
             echo "Applying fix_sucompat.c.patch"
             echo "================================================="
             patch -p1 < fix_sucompat.c.patch
             
-            cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch" ./
+            cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch" ./
             echo "================================================="
             echo "Applying fix_kernel_compat.c.patch"
             echo "================================================="
@@ -417,39 +417,9 @@ jobs:
               ;;
             Next)
               echo "Applying Next-specific SUSFS patches"
-            cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
+            cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
             echo "================================================="
-            echo "Applying allowlist.c.patch"
-            echo "================================================="
-            patch -p1 < allowlist.c.patch
-            echo "================================================="
-            echo "Applying kernel_umount.c.patch"
-            echo "================================================="
-            patch -p1 < kernel_umount.c.patch
-            echo "================================================="
-            echo "Applying ksu.c.patch"
-            echo "================================================="
-            patch -p1 < ksu.c.patch
-            echo "================================================="
-            echo "Applying ksud.c.patch"
-            echo "================================================="
-            patch -p1 < ksud.c.patch
-            echo "================================================="
-            echo "Applying Kbuild.patch"
-            echo "================================================="
-            patch -p1 < Kbuild.patch
-            echo "================================================="
-            echo "Applying selinux.c.patch"
-            echo "================================================="
-            patch -p1 < selinux.c.patch
-            echo "================================================="
-            echo "Applying sucompat.c.patch"
-            echo "================================================="
-            patch -p1 < sucompat.c.patch
-            echo "================================================="
-            echo "Applying supercalls.c.patch"
-            echo "================================================="
-            patch -p1 < supercalls.c.patch
+            patch -p1 < Next-3.0.0-susfs-2.0.0-AIO.patch
               ;;
             KSU)
               cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
@@ -482,11 +452,11 @@ jobs:
 
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]] && [[ ${{ inputs.sub_level }} -le 41 ]]; then
-                cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+                cp -v $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
                 patch -p1 < fix_fdinfo.c.patch || true
-                cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+                cp -v $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
                 patch -p1 < fix_namespace.c.patch || true
-                cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+                cp -v $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
                 patch -p1 < fix_open.c.patch || true
                 sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
               fi
@@ -495,17 +465,17 @@ jobs:
               if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 43 ]] ||
                  [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" && $ACTUAL_SUBLEVEL -ge 145 ]] ||
                  [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" && $ACTUAL_SUBLEVEL -ge 98 ]]; then
-                cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
+                cp -v $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/1_fix_base.c.patch ./
                 patch -p1 < 1_fix_base.c.patch || true
               fi
 
               if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 43 ]]; then
-                cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
+                cp -v $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/2_fix_base.c.patch ./
                 patch -p1 < 2_fix_base.c.patch || true
               fi
 
               if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" && $ACTUAL_SUBLEVEL -le 58 ]]; then
-                cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
+                cp -v $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_task_mmu.c.patch ./
                 patch -p1 < fix_task_mmu.c.patch || true
               fi
               ;;
@@ -529,11 +499,11 @@ jobs:
 
               # Apply additional SUSFS patches for Android 13 5.15 compatibility
               #if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]] && [[ ${{ inputs.sub_level }} -le 41 ]]; then
-                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
+                cp -v $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
                 patch -p1 < fix_fdinfo.c.patch || true
-                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
+                cp -v $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
                 patch -p1 < fix_namespace.c.patch || true
-                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
+                cp -v $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
                 patch -p1 < fix_open.c.patch || true
                 #sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
               #fi
