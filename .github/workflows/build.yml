@@ -263,7 +263,7 @@ jobs:
               if [ -n "${{ inputs.ksu_commit }}" ]; then
                 curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
               else
-                curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s
+                curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
               fi
               ;;
             SukiSU)
@@ -374,65 +374,50 @@ jobs:
           cd "$KERNEL_ROOT/common"
           cp -v "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" ./
           patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
-          cd "$KERNEL_ROOT"
-
-          if [ "${{ inputs.ksu_variant }}" == "WKSU" ]; then
-            cd "$KERNEL_ROOT/Wild_KSU"
-          elif [ "${{ inputs.ksu_variant }}" == "Next" ]; then
-            cd "$KERNEL_ROOT/KernelSU-Next"
-          elif [ "${{ inputs.ksu_variant }}" == "KSU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"
-          elif [ "${{ inputs.ksu_variant }}" == "MKSU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"
-          elif [ "${{ inputs.ksu_variant }}" == "KowXU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"
-          elif [ "${{ inputs.ksu_variant }}" == "SukiSU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"  
-          fi
-              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-              echo "================================================="
-              echo "Applying 10_enable_susfs_for_ksu.patch"
-              echo "================================================="
-              patch -p1 < 10_enable_susfs_for_ksu.patch || true    
 
           case "${{ inputs.ksu_variant }}" in
             WKSU)
+            cd "$KERNEL_ROOT/Wild_KSU"
+            cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+            patch -p1 < 10_enable_susfs_for_ksu.patch || true
             cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch" ./
-            echo "================================================="
-            echo "Applying fix_core_hook.c.patch"
-            echo "================================================="
             patch -p1 < fix_core_hook.c.patch
-            
             cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_sucompat.c.patch" ./
-            echo "================================================="
-            echo "Applying fix_sucompat.c.patch"
-            echo "================================================="
             patch -p1 < fix_sucompat.c.patch
-            
             cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch" ./
-            echo "================================================="
-            echo "Applying fix_kernel_compat.c.patch"
-            echo "================================================="
             patch -p1 < fix_kernel_compat.c.patch
               ;;
             Next)
-              echo "Applying Next-specific SUSFS patches"
+            echo "Applying Next-specific SUSFS patches"
+            cd "$KERNEL_ROOT/KernelSU-Next"
             cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
-            echo "================================================="
             patch -p1 < Next-3.0.0-susfs-2.0.0-AIO.patch
               ;;
             KSU)
+              cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            
               cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
               patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
               ;;
             KowXU)
+              cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              
               cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
               patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
               ;;
             SukiSU)
+              cd "$KERNEL_ROOT/KernelSU"  
               # Your KSU-specific code goes here
               ;;
-            MKSU)
+            MKSU)      
+              cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              
               cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
               patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true      
               ;;
