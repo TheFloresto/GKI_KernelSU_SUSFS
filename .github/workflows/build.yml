@@ -395,7 +395,7 @@ jobs:
               ;;
             KSU)
               cd "$KERNEL_ROOT/KernelSU"
-              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
             
               cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
@@ -403,7 +403,7 @@ jobs:
               ;;
             KowXU)
               cd "$KERNEL_ROOT/KernelSU"
-              cp -v "$KERNEL_PATCHES/kowsu/Next-3.0.0-susfs-2.0.0-AIO.patch ./
+              cp -v "$KERNEL_PATCHES/kowsu/Next-3.0.0-susfs-2.0.0-AIO.patch" ./
               patch -p1 < Next-3.0.0-susfs-2.0.0-AIO.patch
               
               cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
@@ -415,7 +415,7 @@ jobs:
               ;;
             MKSU)      
               cd "$KERNEL_ROOT/KernelSU"
-              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
               patch -p1 < 10_enable_susfs_for_ksu.patch || true
               
               cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
