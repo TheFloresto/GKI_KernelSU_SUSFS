@@ -503,13 +503,13 @@ jobs:
           case "${{ inputs.ksu_variant }}" in
             WKSU)
               echo "Applying hooks for WKSU..."
-              cp -fv "$KERNEL_PATCHES/next/hooks/scope_min_manual_hooks_v1.6.patch" ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true
+              cp -v "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.4.patch" ./
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
               ;;
             SukiSU)
               echo "Applying hooks for SukiSU..."
-              cp -fv "$KERNEL_PATCHES/next/hooks/scope_min_manual_hooks_v1.6.patch" ./
-              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true              
+              cp -v "$KERNEL_PATCHES/next/hooks/scope_min_manual_hooks_v1.6.patch" ./
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch              
               ;;
             Next)
               echo "Applying hooks for KernelSU-Next..."   
