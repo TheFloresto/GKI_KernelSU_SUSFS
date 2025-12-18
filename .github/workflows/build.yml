@@ -508,7 +508,7 @@ jobs:
               ;;
             SukiSU)
               echo "Applying hooks for SukiSU..."
-              cp -v "$KERNEL_PATCHES/next/hooks/scope_min_manual_hooks_v1.6.patch" ./
+              cp -v "$KERNEL_PATCHES/next/scope_min_manual_hooks_v1.6.patch" ./
               patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch              
               ;;
             Next)
