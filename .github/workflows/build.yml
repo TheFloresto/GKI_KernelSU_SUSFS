@@ -378,7 +378,7 @@ jobs:
           case "${{ inputs.ksu_variant }}" in
             WKSU)
             cd "$KERNEL_ROOT/Wild_KSU"
-            cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+            cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
             patch -p1 < 10_enable_susfs_for_ksu.patch || true
             cp -v "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_core_hook.c.patch" ./
             patch -p1 < fix_core_hook.c.patch
@@ -403,6 +403,9 @@ jobs:
               ;;
             KowXU)
               cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              
               cp -v "$KERNEL_PATCHES/kowsu/Next-3.0.0-susfs-2.0.0-AIO.patch" ./
               patch -p1 < Next-3.0.0-susfs-2.0.0-AIO.patch
               
