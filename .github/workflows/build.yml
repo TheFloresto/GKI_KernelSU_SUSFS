@@ -506,6 +506,11 @@ jobs:
               cp -fv "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.6.patch" ./
               patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true
               ;;
+            SukiSU)
+              echo "Applying hooks for SukiSU..."
+              cp -fv "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.6.patch" ./
+              patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.6.patch || true              
+              ;;
             Next)
               echo "Applying hooks for KernelSU-Next..."   
               ;;
