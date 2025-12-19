@@ -128,7 +128,7 @@ jobs:
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-          git clone https://github.com/TheFloresto/kernel_patches.git
+          git clone https://github.com/TheFloresto/kernel_patches.git -b main
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           
           cd susfs4ksu
@@ -365,53 +365,32 @@ jobs:
             ;;
           esac
 
-          cd "$KERNEL_ROOT"
-
-          if [ "${{ inputs.ksu_variant }}" == "WKSU" ]; then
-            cd "$KERNEL_ROOT/Wild_KSU"
-          elif [ "${{ inputs.ksu_variant }}" == "Next" ]; then
-            cd "$KERNEL_ROOT/KernelSU-Next"
-          elif [ "${{ inputs.ksu_variant }}" == "KSU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"
-          elif [ "${{ inputs.ksu_variant }}" == "MKSU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"
-          elif [ "${{ inputs.ksu_variant }}" == "KowXU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"
-          elif [ "${{ inputs.ksu_variant }}" == "SukiSU" ]; then
-            cd "$KERNEL_ROOT/KernelSU"  
-          fi
-
           case "${{ inputs.ksu_variant }}" in
             WKSU)
+            cd "$KERNEL_ROOT/Wild_KSU"
               ;;
             Next)
+            echo "Applying Next-specific SUSFS patches"
+            cd "$KERNEL_ROOT/KernelSU-Next"
               ;;
             KSU)
+              cd "$KERNEL_ROOT/KernelSU"        
               cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
               patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
               ;;
             KowXU)
+              cd "$KERNEL_ROOT/KernelSU"           
               cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
               patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
               ;;
             SukiSU)
+              cd "$KERNEL_ROOT/KernelSU"  
               # Your KSU-specific code goes here
               ;;
-            MKSU)
+            MKSU)      
+              cd "$KERNEL_ROOT/KernelSU"           
               cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
               patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true      
-              ;;
-          esac
-
-          cd "$KERNEL_ROOT/common"
-          # Post-SUSFS sed safeguards for task_mmu.c 'goto show_pad' handling
-          case "${{ inputs.ksu_variant }}" in
-            WKSU)
-              ;;
-            Next)
-              # Your Next-specific code goes here
-              ;;
-          MKSU|KSU|KowXU)
               ;;
           esac
 
@@ -423,6 +402,13 @@ jobs:
           case "${{ inputs.ksu_variant }}" in
             WKSU)
               echo "Applying hooks for WKSU..."
+              cp -v "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.4.patch" ./
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
+              ;;
+            KowXU)
+              echo "Applying hooks for KowXU..."
+              cp -v "$KERNEL_PATCHES/next/scope_min_manual_hooks_v1.6.patch" ./
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch           
               ;;
             Next)
               echo "Applying hooks for KernelSU-Next..."   
