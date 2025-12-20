@@ -297,13 +297,15 @@ jobs:
           
           Notes:
           -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
-          -> Official Kernel Flasher is broken with latest susfs, try https://github.com/fatalcoder524/KernelFlasher/
           -> **boot.img files**: Available as CI artifacts only - download from the Actions tab in the "Misc" Artifact
           -> **Warning**: boot.img files may not boot on some devices
           -> **Note:** For detailed commit information and component versions, please check the build summary in the "Misc" Artifact
           
           Module: 
           -> https://github.com/backslashxx/mountify
+
+          Kernel Flasher:
+          -> https://github.com/fatalcoder524/KernelFlasher/
           
           Managers:
           -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
