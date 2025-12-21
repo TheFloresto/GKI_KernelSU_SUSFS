@@ -134,7 +134,8 @@ jobs:
           
           git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           rm -rf AnyKernel3/.git
-          git clone https://github.com/TheFloresto/kernel_patches.git
+          git clone https://github.com/TheFloresto/kernel_patches.git -b main
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git -b main
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           #git clone https://gitlab.com/WildKernels/susfs4ksu.git -b "$SUSFS_BRANCH"
           
@@ -478,6 +479,9 @@ jobs:
                  [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" && "${{ inputs.os_patch_level }}" != "2024-05" && $ACTUAL_SUBLEVEL -le 75 ]]; then
                 sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               fi
+              ;;             
+            SukiSU)
+              # Your KSU-specific code goes here
               ;;
             KSU|MKSU|KowXU)
               if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 209 ]] ||
@@ -513,9 +517,18 @@ jobs:
               patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
               ;;
             Next)
-              echo "Applying hooks for KernelSU-Next..."   
+              echo "Applying hooks for KernelSU-Next..."               
+              ;;      
+            SukiSU)
+              echo "Applying hooks for SukiSU..."
+              cp -v "/SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch" ./
+              patch -p1 -F 3 < scope_min_manual_hooks_v1.6.patch
               ;;
-          esac
+             *)
+              echo "Unknown KSU variant: ${{ inputs.ksu_variant }}"
+              exit 1
+              ;;
+           esac
 
       - name: Apply Performance Patches
         shell: bash
