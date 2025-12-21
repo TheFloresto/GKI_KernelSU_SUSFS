@@ -585,16 +585,17 @@ jobs:
         shell: bash
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          set -euo pipefail
-          KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
-          
-          if [ "$KERNEL_VERSION" == "6.6" ]; then
-            echo "Skipping fix 22 clang patch for kernel 6.6"
-          else
-            echo "Applying fix 22 clang..."
-            cp -v "$KERNEL_PATCHES/fix-clidr-uninitialized.patch" ./
-            patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch || true
-          fi
+              set -euo pipefail
+              KERNEL_VERSION=$(make kernelversion | cut -d. -f1,2)
+              
+              echo "Applying fix 22 clang..."
+              if [ "$KERNEL_VERSION" != "6.6" ] && [ "$KERNEL_VERSION" != "6.12" ]; then
+                echo "Applying fix 22 clang..."
+                cp -v "../../../kernel_patches/fix-clidr-uninitialized.patch" ./
+                patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch || true
+              else
+                echo "Skipping fix 22 clang patch for kernel $KERNEL_VERSION"
+              fi
 
       - name: Set Kernel Configuration Variables
         shell: bash
