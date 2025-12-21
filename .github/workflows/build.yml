@@ -507,7 +507,7 @@ jobs:
         shell: bash
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
-          set -eo pipefail
+          set -eo pipefail          
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
 
@@ -516,8 +516,10 @@ jobs:
           fi
           
           # Remove check_defconfig
-          sed -i 's/check_defconfig//' ./common/build.config.gki
-          sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          if [[ "${{ inputs.android_version }}" !== "android16" && "${{ inputs.kernel_version }}" !== "6.12" ]]; then
+           sed -i 's/check_defconfig//' ./common/build.config.gki
+           sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          fi
           
           # Remove Dirty Flag (только для Bazel/Kleaf builds)
           if [ -f "./build/kernel/kleaf/impl/stamp.bzl" ]; then
@@ -552,6 +554,24 @@ jobs:
             echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
             grep '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" || true
           fi
+
+      - name: Customize Kernel Branding
+        shell: bash
+        working-directory: ${{ env.KERNEL_ROOT }}
+        run: |
+          set -euo pipefail
+          echo "::group::Customize Kernel Branding"
+          
+          # Define custom LOCALVERSION
+          CUSTOM_LOCALVERSION="-@NoFloresto"
+          
+          echo "📝 Setting custom kernel branding: $CUSTOM_LOCALVERSION"
+          
+          # Save to environment for use in other steps
+          echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
+          
+          echo "✅ Kernel branding configured"
+          echo "::endgroup::"
 
       - name: Append ashmem exports if missing
         if: ${{ inputs.android_version == 'android16' && inputs.kernel_version == '6.12' }}
@@ -591,10 +611,6 @@ jobs:
         run: |
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-          # Kernel Version
-          CONFIG_LOCALVERSION_AUTO=n
-          CONFIG_LOCALVERSION="-@NoFloresto"
-
           # Kprobes (required for KernelSU)
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
@@ -945,6 +961,12 @@ jobs:
           echo "============================================"
           
           make O="$OUT" gki_defconfig
+
+          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
+           scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
+           scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+           sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
+          fi
           
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
