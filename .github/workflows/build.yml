@@ -493,7 +493,7 @@ jobs:
               echo "Applying fix 22 clang..."
               if [ "$KERNEL_VERSION" != "6.6" ] && [ "$KERNEL_VERSION" != "6.12" ]; then
                 echo "Applying fix 22 clang..."
-                cp -v "../../../kernel_patches/fix-clidr-uninitialized.patch" ./
+                cp -v "../../kernel_patches/fix-clidr-uninitialized.patch" ./
                 patch -p1 --forward --fuzz=3 < fix-clidr-uninitialized.patch || true
               else
                 echo "Skipping fix 22 clang patch for kernel $KERNEL_VERSION"
