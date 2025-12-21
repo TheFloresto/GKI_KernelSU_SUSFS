@@ -510,16 +510,16 @@ jobs:
           set -eo pipefail          
           echo "Initializing kernel configuration..."
           echo "DEFCONFIG=$KERNEL_ROOT/common/arch/arm64/configs/gki_defconfig" >> $GITHUB_ENV
-
+          
           if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
             sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
           fi
           
-          # Remove check_defconfig
-          if [[ "${{ inputs.android_version }}" !== "android16" && "${{ inputs.kernel_version }}" !== "6.12" ]]; then
-           sed -i 's/check_defconfig//' ./common/build.config.gki
+          # Remove check_defconfig (для всех версий кроме android16/6.12)
+          if [[ "${{ inputs.android_version }}" != "android16" || "${{ inputs.kernel_version }}" != "6.12" ]]; then
+            sed -i 's/check_defconfig//' ./common/build.config.gki
           fi
-
+          
           # Remove -dirty flag (для ВСЕХ версий)
           sed -i 's/-dirty//' ./common/scripts/setlocalversion
           
@@ -534,7 +534,7 @@ jobs:
           if [ -f "./common/BUILD.bazel" ]; then
             perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
           fi
-           
+          
           sed -i '/# Check for uncommitted changes\./,/fi/d' ./common/scripts/setlocalversion
           
           # ========================================
@@ -555,7 +555,7 @@ jobs:
             echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
             grep '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" || true
           fi
-
+          
       - name: Customize Kernel Branding
         shell: bash
         working-directory: ${{ env.KERNEL_ROOT }}
