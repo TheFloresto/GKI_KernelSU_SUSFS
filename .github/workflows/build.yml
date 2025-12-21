@@ -612,7 +612,11 @@ jobs:
         run: |
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-          # Kprobes (required for KernelSU)
+          # Kernel Version
+          CONFIG_LOCALVERSION_AUTO=n
+          CONFIG_LOCALVERSION="-@NoFloresto"
+          
+          # Kprobes (required for KernelSU)         
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
           CONFIG_KPROBE_EVENTS=y
