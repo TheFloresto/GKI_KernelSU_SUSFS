@@ -417,6 +417,10 @@ jobs:
             Next)
               echo "Applying hooks for KernelSU-Next..."   
               ;;
+             *)
+              echo "Unknown KSU variant: ${{ inputs.ksu_variant }}"
+              exit 1  
+              ;;
           esac
 
       - name: Apply Performance Patches
