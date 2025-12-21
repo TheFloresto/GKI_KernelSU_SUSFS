@@ -697,7 +697,9 @@ jobs:
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # SukiSU Support
-          CONFIG_KSU_SUSFS_SUS_KSTAT_USE_INLINE_HOOK=y
+          CONFIG_KSU_KPROBES_HOOK=n
+          CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+          CONFIG_KSU_LSM_SECURITY_HOOKS=y
           EOF
 
       - name: Configure Next
