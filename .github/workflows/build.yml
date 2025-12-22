@@ -613,8 +613,6 @@ jobs:
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
           # Kernel Version
-          CONFIG_LOCALVERSION_AUTO=n
-          CONFIG_LOCALVERSION="-@NoFloresto"
           
           # Kprobes (required for KernelSU)         
           CONFIG_KPROBES=y
@@ -759,38 +757,6 @@ jobs:
           echo "✅ Build identity configured:"
           echo "   User: $BUILD_USER"
           echo "   Host: $BUILD_HOST"
-          echo "::endgroup::"
-
-      - name: Verify Kernel Version Configuration
-        shell: bash
-        working-directory: ${{ env.KERNEL_ROOT }}
-        run: |
-          set -euo pipefail
-          echo "::group::Verify Kernel Version Configuration"
-          echo "🔍 Verifying kernel version configuration..."
-          
-          DEFCONFIG_PATH="common/arch/arm64/configs/gki_defconfig"
-          VERSION_COUNT=$(grep -c '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" 2>/dev/null || echo "0")
-          AUTO_VERSION=$(grep '^CONFIG_LOCALVERSION_AUTO' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
-          LOCAL_VERSION=$(grep '^CONFIG_LOCALVERSION=' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
-          
-          echo "📊 Current configuration:"
-          echo "  LOCALVERSION entries found: $VERSION_COUNT"
-          echo "  LOCALVERSION_AUTO: $AUTO_VERSION"
-          echo "  LOCALVERSION: $LOCAL_VERSION"
-          
-          if [ "$VERSION_COUNT" -ne 2 ]; then
-            echo "⚠️ Warning: Expected 2 LOCALVERSION entries, found $VERSION_COUNT"
-            echo "Current entries:"
-            grep '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" || echo "  (none)"
-          fi
-          
-          if ! grep -q '^CONFIG_LOCALVERSION_AUTO=n' "$DEFCONFIG_PATH" 2>/dev/null; then
-            echo "❌ Error: LOCALVERSION_AUTO is not properly disabled"
-            exit 1
-          fi
-          
-          echo "✅ Kernel version configuration verified successfully"
           echo "::endgroup::"
 
       - name: Setup ZyCromerZ Clang Toolchain
@@ -1042,6 +1008,38 @@ jobs:
           echo "============================================"
           ccache -s
           echo "============================================"
+          echo "::endgroup::"
+
+      - name: Verify Kernel Version Configuration
+        shell: bash
+        working-directory: ${{ env.KERNEL_ROOT }}
+        run: |
+          set -euo pipefail
+          echo "::group::Verify Kernel Version Configuration"
+          echo "🔍 Verifying kernel version configuration..."
+          
+          DEFCONFIG_PATH="common/arch/arm64/configs/gki_defconfig"
+          VERSION_COUNT=$(grep -c '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" 2>/dev/null || echo "0")
+          AUTO_VERSION=$(grep '^CONFIG_LOCALVERSION_AUTO' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
+          LOCAL_VERSION=$(grep '^CONFIG_LOCALVERSION=' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
+          
+          echo "📊 Current configuration:"
+          echo "  LOCALVERSION entries found: $VERSION_COUNT"
+          echo "  LOCALVERSION_AUTO: $AUTO_VERSION"
+          echo "  LOCALVERSION: $LOCAL_VERSION"
+          
+          if [ "$VERSION_COUNT" -ne 2 ]; then
+            echo "⚠️ Warning: Expected 2 LOCALVERSION entries, found $VERSION_COUNT"
+            echo "Current entries:"
+            grep '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" || echo "  (none)"
+          fi
+          
+          if ! grep -q '^CONFIG_LOCALVERSION_AUTO=n' "$DEFCONFIG_PATH" 2>/dev/null; then
+            echo "❌ Error: LOCALVERSION_AUTO is not properly disabled"
+            exit 1
+          fi
+          
+          echo "✅ Kernel version configuration verified successfully"
           echo "::endgroup::"
 
       - name: ccache Post-Build Statistics
