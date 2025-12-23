@@ -612,8 +612,6 @@ jobs:
         run: |
           set -euo pipefail
           cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-          # Kernel Version
-          
           # Kprobes (required for KernelSU)         
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
@@ -857,8 +855,6 @@ jobs:
           set -euo pipefail
           echo "::group::Build kernel with ccache optimization"
           
-          : > "$KERNEL_ROOT/common/.scmversion"
-          
           export PYTHONWARNINGS="${PYTHONWARNINGS}"
           
           echo "Getting last commit timestamp from kernel source..."
@@ -933,11 +929,29 @@ jobs:
           
           make O="$OUT" gki_defconfig
 
-          if [ -n "${CUSTOM_LOCALVERSION:-}" ]; then
-           scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-           scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-           sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
-          fi
+          # ========================================
+          # ИСПРАВЛЕННАЯ НАСТРОЙКА ВЕРСИИ
+          # ========================================
+          echo "============================================"
+          echo "🔧 Setting Kernel Version"
+          echo "============================================"
+          
+          # Установка LOCALVERSION через scripts/config
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
+          scripts/config --file "$OUT/.config" --disable LOCALVERSION_AUTO
+          
+          # Проверка установленной версии
+          echo "Checking .config for LOCALVERSION:"
+          grep "CONFIG_LOCALVERSION" "$OUT/.config" || echo "No LOCALVERSION found"
+          
+          # Применяем изменения
+          make O="$OUT" olddefconfig
+          
+          # Финальная проверка после olddefconfig
+          echo ""
+          echo "Final verification after olddefconfig:"
+          grep "CONFIG_LOCALVERSION" "$OUT/.config" || echo "No LOCALVERSION found"
+          echo "============================================"
           
           scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
           scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
@@ -945,8 +959,6 @@ jobs:
           
           scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
           scripts/config --file "$OUT/.config" -e LTO_CLANG
-          
-          make O="$OUT" olddefconfig
           
           KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
           KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
@@ -1010,36 +1022,35 @@ jobs:
           echo "============================================"
           echo "::endgroup::"
 
-      - name: Verify Kernel Version Configuration
+      - name: Verify Kernel Version in Built Image
         shell: bash
-        working-directory: ${{ env.KERNEL_ROOT }}
+        working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
           set -euo pipefail
-          echo "::group::Verify Kernel Version Configuration"
-          echo "🔍 Verifying kernel version configuration..."
+          echo "::group::Verify Kernel Version String"
           
-          DEFCONFIG_PATH="common/arch/arm64/configs/gki_defconfig"
-          VERSION_COUNT=$(grep -c '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" 2>/dev/null || echo "0")
-          AUTO_VERSION=$(grep '^CONFIG_LOCALVERSION_AUTO' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
-          LOCAL_VERSION=$(grep '^CONFIG_LOCALVERSION=' "$DEFCONFIG_PATH" 2>/dev/null || echo "not set")
+          IMG="out/arch/arm64/boot/Image"
           
-          echo "📊 Current configuration:"
-          echo "  LOCALVERSION entries found: $VERSION_COUNT"
-          echo "  LOCALVERSION_AUTO: $AUTO_VERSION"
-          echo "  LOCALVERSION: $LOCAL_VERSION"
+          echo "=== Extracting version from Image ==="
+          VERSION_STRING=$(strings "$IMG" | grep "Linux version" | head -n 1)
           
-          if [ "$VERSION_COUNT" -ne 2 ]; then
-            echo "⚠️ Warning: Expected 2 LOCALVERSION entries, found $VERSION_COUNT"
-            echo "Current entries:"
-            grep '^CONFIG_LOCALVERSION' "$DEFCONFIG_PATH" || echo "  (none)"
-          fi
+          echo "Full version string:"
+          echo "$VERSION_STRING"
           
-          if ! grep -q '^CONFIG_LOCALVERSION_AUTO=n' "$DEFCONFIG_PATH" 2>/dev/null; then
-            echo "❌ Error: LOCALVERSION_AUTO is not properly disabled"
+          if [ -z "$VERSION_STRING" ]; then
+            echo "::error::No version string found in kernel image!"
             exit 1
           fi
           
-          echo "✅ Kernel version configuration verified successfully"
+          if [[ ! "$VERSION_STRING" =~ "@NoFloresto" ]]; then
+            echo "::error::Custom version string '@NoFloresto' not found in kernel!"
+            echo "Expected: @NoFloresto"
+            echo "Got: $VERSION_STRING"
+            exit 1
+          fi
+          
+          echo "✅ Version string verified successfully"
+          echo "KERNEL_VERSION_STRING=$VERSION_STRING" >> "$GITHUB_ENV"
           echo "::endgroup::"
 
       - name: ccache Post-Build Statistics
@@ -1322,7 +1333,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 9
-
+          
       - name: Upload AnyKernel3 Artifacts
         uses: actions/upload-artifact@v4
         with:
