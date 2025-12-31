@@ -109,19 +109,6 @@ jobs:
         docker builder prune -af || true
         df -h
 
-    - name: Maximize build space
-      uses: AdityaGarg8/remove-unwanted-software@v5
-      with:
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
-        remove-large-packages: 'true'
-        remove-cached-tools: 'true'
-        remove-swapfile: 'false'
-        verbose: 'true'
-
     - name: Free Disk Space
       if: false
       uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
