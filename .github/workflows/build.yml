@@ -309,6 +309,7 @@ jobs:
         echo "CCACHE_MAXSIZE=50G" >> $GITHUB_ENV
         echo "CCACHE_SLOPPINESS=include_file_ctime,include_file_mtime,time_macros" >> $GITHUB_ENV
 
+
     - name: Add KernelSU Variant
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
@@ -353,6 +354,13 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s main
             fi
             ;;
+          KowXU)
+            if [ -n "${{ inputs.ksu_commit }}" ]; then
+              curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
+            else
+              curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s master
+            fi          
+            ;;
           Sukisu)
             if [ -n "${{ inputs.ksu_commit }}" ]; then
               curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
@@ -362,64 +370,69 @@ jobs:
             ;;
         esac
 
-      - name: Getting KernelSU Version
-        shell: bash
-        working-directory: ${{ env.KERNEL_ROOT }}
-        run: |
-          set -euo pipefail
-          case "${{ inputs.ksu_variant }}" in
-            WKSU)
-              echo "Getting WKSU version..."
-              cd ./Wild_KSU
-              BASE_VERSION=10200
-              ;;
-            KSU)
-              echo "Getting Official KernelSU version..."
-              cd ./KernelSU
-              BASE_VERSION=30000
-              ;;
-            Next)
-              echo "Getting Next version..."
-              cd ./KernelSU-Next
-              BASE_VERSION=30000
-              ;;
-            SukiSU)
-              echo "Getting SukiSU version..."
-              git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
-              cd SukiSU-Ultra
-              BASE_VERSION=37185
-              ;;
-            MKSU)
-              echo "Getting MKSU version..."
-              cd ./KernelSU
-              BASE_VERSION=30000
-              ;;
-            RKSU)
-              echo "Getting KowXU version..."
-              cd ./KernelSU
-              BASE_VERSION=30000
-              ;;
-          esac
-          
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          echo "Commits: $COMMIT_COUNT"
-          KSU_VERSION=$(expr $COMMIT_COUNT + $BASE_VERSION)
-          echo "KSUVER=$KSU_VERSION"
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          
-          KSU_COMMIT_SHA=$(git rev-parse HEAD)
-          echo "KSU_COMMIT_SHA=$KSU_COMMIT_SHA" >> $GITHUB_ENV
-          echo "KSU commit: ${KSU_COMMIT_SHA:0:8}"
-          
-          cd ..
+    - name: Getting KernelSU Version
+      shell: bash
+      working-directory: ${{ env.KERNEL_ROOT }}
+      run: |
+        set -euo pipefail
+        case "${{ inputs.ksu_variant }}" in
+          WKSU)
+            echo "Getting WKSU version..."
+            cd ./Wild_KSU
+            BASE_VERSION=10200
+            ;;
+          KSU)
+            echo "Getting Official KernelSU version..."
+            cd ./KernelSU
+            BASE_VERSION=30000
+            ;;
+          Next)
+            echo "Getting Next version..."
+            cd ./KernelSU-Next
+            BASE_VERSION=30000
+            ;;
+          SukiSU)
+            echo "Getting SukiSU version..."
+            git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
+            cd SukiSU-Ultra
+            BASE_VERSION=37185
+            ;;
+          MKSU)
+            echo "Getting MKSU version..."
+            cd ./KernelSU
+            BASE_VERSION=30000
+            ;;
+          RKSU)
+            echo "Getting RKSU version..."
+            cd ./KernelSU
+            BASE_VERSION=30000
+            ;;
+            KowXU)
+            echo "Getting KowXU version..."
+            cd ./KernelSU
+            BASE_VERSION=30000          
+            ;;
+        esac
+        
+        COMMIT_COUNT=$(git rev-list --count HEAD)
+        echo "Commits: $COMMIT_COUNT"
+        KSU_VERSION=$(expr $COMMIT_COUNT + $BASE_VERSION)
+        echo "KSUVER=$KSU_VERSION"
+        echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+        
+        KSU_COMMIT_SHA=$(git rev-parse HEAD)
+        echo "KSU_COMMIT_SHA=$KSU_COMMIT_SHA" >> $GITHUB_ENV
+        echo "KSU commit: ${KSU_COMMIT_SHA:0:8}"
+        
+        cd ..
 
-      - name: Set file name
-        shell: bash
-        run: |
-          set -euo pipefail
-          ARTIFACT_BASE="${{ inputs.ksu_variant }}-${{ env.KSUVER }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}"
-          echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
-          echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
+    - name: Set file name
+      shell: bash
+      run: |
+        set -euo pipefail
+        ARTIFACT_BASE="${{ inputs.ksu_variant }}-${{ env.KSUVER }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}"
+        echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
+        echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
     - name: Clone & Apply SUSFS Patches for KernelSU Variants
       run: |
@@ -485,7 +498,7 @@ jobs:
               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
             fi
             ;;
-          KSU|RKSU|MKSU)
+          KSU|RKSU|MKSU|KowXU)
             cd "$KERNEL_ROOT/KernelSU"
             cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
             patch -p1 < 10_enable_susfs_for_ksu.patch
@@ -493,7 +506,7 @@ jobs:
         esac
 
         case "${{ inputs.ksu_variant }}" in
-          KSU|RKSU|MKSU)
+          KSU|RKSU|MKSU|KowXU)
             cd "$KERNEL_ROOT/common"
             if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 209 ]] ||
                [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && "${{ inputs.os_patch_level }}" != "2024-05" && $ACTUAL_SUBLEVEL -le 209 ]] ||
