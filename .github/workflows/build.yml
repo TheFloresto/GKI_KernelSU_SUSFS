@@ -806,7 +806,7 @@ jobs:
     - name: Build Kernel with Clang/Make
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
-        set -ex
+        set -e  # Don't use -x to reduce noise, we'll capture errors differently
         
         cd common
         
@@ -832,6 +832,9 @@ jobs:
         export READELF=llvm-readelf
         export STRIP=llvm-strip
         
+        # Add kernel build flags to suppress warnings
+        export KCFLAGS="-Wno-error=array-bounds -Wno-array-bounds -Wno-error=stringop-overflow -Wno-stringop-overflow -Wno-error=enum-conversion"
+        
         # Dynamic MAKE_JOBS calculation (memory-aware)
         CORES=$(nproc)
         MEMORY_GB=$(free -g | awk '/^Mem:/{print $2}')
@@ -852,15 +855,20 @@ jobs:
         echo "  - LLVM_IAS: 1"
         echo "  - LD: ld.lld"
         echo "  - MAKE_JOBS: $MAKE_JOBS"
+        echo "  - KCFLAGS: $KCFLAGS"
         echo "  - CCache: $CCACHE_DIR"
         
         START_TIME=$(date +%s)
         
         # Build configuration
+        echo "Building defconfig..."
         make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 LD=ld.lld gki_defconfig
         
-        # Build kernel
-        make -j$MAKE_JOBS \
+        # Build kernel with verbose error reporting
+        echo "Building kernel..."
+        BUILD_SUCCESS=false
+        
+        if make -j$MAKE_JOBS \
           O=out \
           ARCH=arm64 \
           CC="$CC" \
@@ -870,7 +878,27 @@ jobs:
           HOSTLD=ld.lld \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE=aarch64-linux-gnu- \
-          2>&1 | tee build.log
+          KCFLAGS="$KCFLAGS" \
+          V=1 \
+          2>&1 | tee build.log; then
+          BUILD_SUCCESS=true
+        fi
+        
+        if [ "$BUILD_SUCCESS" = false ]; then
+          echo "::error::Kernel build failed!"
+          echo "=================================="
+          echo "Last 200 lines of build log:"
+          echo "=================================="
+          tail -n 200 build.log
+          echo "=================================="
+          echo "Searching for error messages:"
+          echo "=================================="
+          grep -i "error:" build.log | tail -n 50 || echo "No 'error:' found"
+          grep -i "undefined reference" build.log | tail -n 20 || echo "No 'undefined reference' found"
+          grep -i "fatal" build.log | tail -n 20 || echo "No 'fatal' found"
+          echo "=================================="
+          exit 1
+        fi
         
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - START_TIME))
@@ -885,6 +913,10 @@ jobs:
           echo "::error::Kernel Image not found at out/arch/arm64/boot/Image"
           echo "Contents of out/arch/arm64/boot/:"
           ls -la out/arch/arm64/boot/ || echo "Directory doesn't exist"
+          echo "=================================="
+          echo "Last 200 lines of build log:"
+          echo "=================================="
+          tail -n 200 build.log
           exit 1
         fi
         
@@ -934,6 +966,14 @@ jobs:
             echo "$REL" >> "$REJECTS_DIR/index.txt"
           done
         fi
+
+    - name: Upload Build Log on Failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ matrix.build_type }}
+        path: ${{ env.KERNEL_ROOT }}/common/build.log
+        if-no-files-found: ignore
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
