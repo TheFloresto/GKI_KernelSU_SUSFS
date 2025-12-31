@@ -881,7 +881,7 @@ jobs:
         echo "MAKE_JOBS=$MAKE_JOBS" >> $GITHUB_ENV
         
         # Verify Image exists
-        if [ ! -f "out/arch/arm64/boot/Image" ]; then
+        if [ ! -f "$KERNEL_ROOT/common/out/arch/arm64/boot/Image" ]; then
           echo "::error::Kernel Image not found!"
           exit 1
         fi
