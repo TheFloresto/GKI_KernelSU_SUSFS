@@ -288,14 +288,13 @@ jobs:
         mkdir -p "$CCACHE_DIR"
         export CCACHE_COMPRESS=true
         export CCACHE_COMPRESSLEVEL=6
-        export CCACHE_MAXSIZE=50G
+        export CCACHE_MAXSIZE=5G
         export CCACHE_SLOPPINESS="include_file_ctime,include_file_mtime,time_macros"
         ccache -M 50G
         echo "CCACHE_COMPRESS=true" >> $GITHUB_ENV
         echo "CCACHE_COMPRESSLEVEL=6" >> $GITHUB_ENV
-        echo "CCACHE_MAXSIZE=50G" >> $GITHUB_ENV
+        echo "CCACHE_MAXSIZE=5G" >> $GITHUB_ENV
         echo "CCACHE_SLOPPINESS=include_file_ctime,include_file_mtime,time_macros" >> $GITHUB_ENV
-
 
     - name: Add KernelSU Variant
       working-directory: ${{ env.KERNEL_ROOT }}
@@ -380,9 +379,8 @@ jobs:
             ;;
           SukiSU)
             echo "Getting SukiSU version..."
-            git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
-            cd SukiSU-Ultra
-            BASE_VERSION=37185
+            cd ./KernelSU
+            BASE_VERSION=40000
             ;;
           MKSU)
             echo "Getting MKSU version..."
