@@ -283,6 +283,33 @@ jobs:
         echo "✅ Detected Clang: $CLANG_VERSION"
         echo "::endgroup::"
 
+    - name: Derive Clang Short Version
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "::group::Derive Clang fingerprint"
+        
+        # Try to extract clang-r version from version string
+        short="$("${CLANG_BIN_PATH}/clang" --version | sed -n '1s/.*clang-r\([0-9.]\+\).*/\1/p')"
+        
+        if [ -z "$short" ]; then
+          # Fallback to hash if clang-r version not found
+          short="$("${CLANG_BIN_PATH}/clang" --version | sha256sum | cut -c1-8)"
+          echo "⚠️ Could not extract clang-r version, using hash: $short"
+        else
+          echo "✅ Clang version fingerprint: $short"
+        fi
+        
+        echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
+        
+        # Store full version for reference
+        CLANG_FULL_VERSION="$("${CLANG_BIN_PATH}/clang" --version | head -n1)"
+        echo "CLANG_FULL_VERSION=$CLANG_FULL_VERSION" >> "$GITHUB_ENV"
+        
+        echo "Full Clang version: $CLANG_FULL_VERSION"
+        echo "Short version/fingerprint: $short"
+        echo "::endgroup::"
+
     - name: Setup CCache
       run: |
         mkdir -p "$CCACHE_DIR"
@@ -381,8 +408,9 @@ jobs:
             ;;
           Sukisu)
             echo "Getting SukiSU version..."
-            KSU_DIR="./KernelSU"
-            BASE_VERSION=40000
+            git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
+            KSU_DIR="./SukiSU-Ultra"
+            BASE_VERSION=37185           
             ;;
           MKSU)
             echo "Getting MKSU version..."
@@ -504,15 +532,43 @@ jobs:
               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
             fi
             ;;
-          KSU|RKSU|MKSU|KowXU)
-            cd "$KERNEL_ROOT/KernelSU"
-            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-            patch -p1 < 10_enable_susfs_for_ksu.patch
+            KSU)
+              cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+            
+              cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+              patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
+              ;;
+            KowXU)
+              cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              
+              cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+              patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
+              ;;
+            SukiSU)
+              cd "$KERNEL_ROOT/KernelSU"  
+              # Your KSU-specific code goes here
+              ;;
+            MKSU)      
+              cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
+              
+              cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+              patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
+              ;;
+            RKSU)      
+              cd "$KERNEL_ROOT/KernelSU"
+              cp -v "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" ./
+              patch -p1 < 10_enable_susfs_for_ksu.patch || true
             ;;
         esac
 
         case "${{ inputs.ksu_variant }}" in
-          KSU|RKSU|MKSU|KowXU)
+          KSU|RKSU|MKSU)
             cd "$KERNEL_ROOT/common"
             if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 209 ]] ||
                [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && "${{ inputs.os_patch_level }}" != "2024-05" && $ACTUAL_SUBLEVEL -le 209 ]] ||
