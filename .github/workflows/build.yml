@@ -394,12 +394,26 @@ jobs:
             cd ./KernelSU
             BASE_VERSION=30000
             ;;
-            KowXU)
+          KowXU)
             echo "Getting KowXU version..."
             cd ./KernelSU
             BASE_VERSION=30000          
             ;;
         esac
+        
+        if [ ! -d "$KSU_DIR" ]; then
+          echo "ERROR: KSU directory not found: $KSU_DIR"
+          echo "Available directories:"
+          ls -la
+          exit 1
+        fi
+        
+        cd "$KSU_DIR"
+        
+        if [ ! -d ".git" ]; then
+          echo "ERROR: Not a git repository: $KSU_DIR"
+          exit 1
+        fi
         
         COMMIT_COUNT=$(git rev-list --count HEAD)
         echo "Commits: $COMMIT_COUNT"
