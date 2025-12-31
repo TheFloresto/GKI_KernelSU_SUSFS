@@ -15,7 +15,7 @@ on:
       ksu_variant:
         description: "KernelSU Variant"
         type: choice
-        options: [ KSU, WKSU, Next, MKSU, RKSU, Sukisu ]
+        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, Sukisu ]
         default: Next
       ksu_commit:
         description: "KSU Commit (optional)"
@@ -195,7 +195,11 @@ jobs:
             ;;
           "RKSU")
             KSU_REF=$(git ls-remote "https://github.com/rsuntk/KernelSU.git" refs/heads/main | awk '{print $1}')
-            KSU_URL="https://github.com/rsuntk/KernelSU/commit/$KSU_REF"
+            KSU_URL="https://github.com/rsuntk/KernelSU/commit/$KSU_REF"             
+            ;;
+          "KowXU")
+            KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
+            KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"           
             ;;
           "Sukisu")
             KSU_REF=$(git ls-remote "https://github.com/Ylarod/KernelSU.git" refs/heads/main | awk '{print $1}')
@@ -294,6 +298,7 @@ jobs:
         -> MKSU: [Github](https://github.com/MollySophia/KernelSU) [Telegram](https://t.me/mksu_ci)
         -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
         -> RKSU: [Github](https://github.com/rsuntk/KernelSU) [Telegram](https://t.me/rsuntk)
+        -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
         -> Sukisu: [Github](https://github.com/Ylarod/KernelSU) [Telegram](https://t.me/Sukiksu)
         
         Commit Hashes (at the time of release):
