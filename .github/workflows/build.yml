@@ -361,44 +361,46 @@ jobs:
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
         set -euo pipefail
+        
+        # Determine KSU directory and base version based on variant
         case "${{ inputs.ksu_variant }}" in
           WKSU)
             echo "Getting WKSU version..."
-            cd ./Wild_KSU
+            KSU_DIR="./Wild_KSU"
             BASE_VERSION=10200
             ;;
           KSU)
             echo "Getting Official KernelSU version..."
-            cd ./KernelSU
+            KSU_DIR="./KernelSU"
             BASE_VERSION=30000
             ;;
           Next)
             echo "Getting Next version..."
-            cd ./KernelSU-Next
+            KSU_DIR="./KernelSU-Next"
             BASE_VERSION=30000
             ;;
-          SukiSU)
+          Sukisu)
             echo "Getting SukiSU version..."
-            cd ./KernelSU
+            KSU_DIR="./KernelSU"
             BASE_VERSION=40000
             ;;
           MKSU)
             echo "Getting MKSU version..."
-            cd ./KernelSU
+            KSU_DIR="./KernelSU"
             BASE_VERSION=30000
             ;;
           RKSU)
             echo "Getting RKSU version..."
-            cd ./KernelSU
+            KSU_DIR="./KernelSU"
             BASE_VERSION=30000
             ;;
-          KowXU)
-            echo "Getting KowXU version..."
-            cd ./KernelSU
-            BASE_VERSION=30000          
+          *)
+            echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
+            exit 1
             ;;
         esac
         
+        # Verify directory exists
         if [ ! -d "$KSU_DIR" ]; then
           echo "ERROR: KSU directory not found: $KSU_DIR"
           echo "Available directories:"
@@ -406,23 +408,28 @@ jobs:
           exit 1
         fi
         
+        # Change to KSU directory
         cd "$KSU_DIR"
         
+        # Verify it's a git repository
         if [ ! -d ".git" ]; then
           echo "ERROR: Not a git repository: $KSU_DIR"
           exit 1
         fi
         
+        # Get commit count and calculate version
         COMMIT_COUNT=$(git rev-list --count HEAD)
         echo "Commits: $COMMIT_COUNT"
         KSU_VERSION=$(expr $COMMIT_COUNT + $BASE_VERSION)
         echo "KSUVER=$KSU_VERSION"
         echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
         
+        # Get commit SHA
         KSU_COMMIT_SHA=$(git rev-parse HEAD)
         echo "KSU_COMMIT_SHA=$KSU_COMMIT_SHA" >> $GITHUB_ENV
         echo "KSU commit: ${KSU_COMMIT_SHA:0:8}"
         
+        # Return to parent directory
         cd ..
 
     - name: Set file name
