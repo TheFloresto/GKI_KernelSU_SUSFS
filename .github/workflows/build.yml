@@ -806,7 +806,7 @@ jobs:
     - name: Build Kernel with Clang/Make
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
-        set -e  # Don't use -x to reduce noise, we'll capture errors differently
+        set -e
         
         cd common
         
@@ -838,7 +838,9 @@ jobs:
         # Dynamic MAKE_JOBS calculation (memory-aware)
         CORES=$(nproc)
         MEMORY_GB=$(free -g | awk '/^Mem:/{print $2}')
+        # Each compile job needs ~2GB RAM, leave 2GB for system
         MAX_JOBS=$(( (MEMORY_GB - 2) / 2 ))
+        # Use the smaller of cores or memory-based limit
         if [ $MAX_JOBS -lt $CORES ]; then
           MAKE_JOBS=$MAX_JOBS
           echo "⚠️  Limited by RAM: Using $MAKE_JOBS jobs (have $CORES cores, ${MEMORY_GB}GB RAM)"
@@ -846,26 +848,27 @@ jobs:
           MAKE_JOBS=$CORES
           echo "✅ Using $MAKE_JOBS jobs ($CORES cores available, ${MEMORY_GB}GB RAM)"
         fi
+        # Ensure at least 1 job
         [ $MAKE_JOBS -lt 1 ] && MAKE_JOBS=1
         
         echo "🔧 Build configuration:"
         echo "  - ARCH: $ARCH"
         echo "  - CC: $CC"
-        echo "  - LLVM: 1"
-        echo "  - LLVM_IAS: 1"
-        echo "  - LD: ld.lld"
-        echo "  - MAKE_JOBS: $MAKE_JOBS"
+        echo "  - LLVM: 1 (full LLVM toolchain for LTO)"
+        echo "  - LLVM_IAS: 1 (LLVM integrated assembler)"
+        echo "  - LD: ld.lld (LLVM linker)"
+        echo "  - MAKE_JOBS: $MAKE_JOBS (auto-detected)"
         echo "  - KCFLAGS: $KCFLAGS"
-        echo "  - CCache: $CCACHE_DIR"
+        echo "  - CCache: $CCACHE_DIR (compress=true, maxsize=50G)"
         
         START_TIME=$(date +%s)
         
         # Build configuration
-        echo "Building defconfig..."
+        echo "📋 Building defconfig..."
         make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 LD=ld.lld gki_defconfig
         
-        # Build kernel with verbose error reporting
-        echo "Building kernel..."
+        # Build kernel with full LLVM toolchain for LTO support
+        echo "🗿 Building kernel for ${{ inputs.ksu_variant }}-${{ matrix.build_type }}..."
         BUILD_SUCCESS=false
         
         if make -j$MAKE_JOBS \
@@ -906,6 +909,8 @@ jobs:
         BUILD_SECS=$((BUILD_TIME % 60))
         
         echo "BUILD_TIME=${BUILD_MINS}m ${BUILD_SECS}s" >> $GITHUB_ENV
+        echo "BUILD_MINS=$BUILD_MINS" >> $GITHUB_ENV
+        echo "BUILD_SECS=$BUILD_SECS" >> $GITHUB_ENV
         echo "MAKE_JOBS=$MAKE_JOBS" >> $GITHUB_ENV
         
         # Verify Image exists
