@@ -421,6 +421,11 @@ jobs:
             echo "Getting RKSU version..."
             KSU_DIR="./KernelSU"
             BASE_VERSION=30000
+            ;;            
+         KowXU)
+            echo "Getting RKSU version..."
+            KSU_DIR="./KernelSU"
+            BASE_VERSION=30000       
             ;;
           *)
             echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
