@@ -840,7 +840,8 @@ jobs:
         MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
         FPMAP="-ffile-prefix-map=${WORKSPACE}=."
         
-        export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-error=array-bounds -Wno-array-bounds -Wno-error=stringop-overflow -Wno-stringop-overflow -Wno-error=enum-conversion"
+        # Ключевое изменение: добавлен -Wno-unknown-warning-option и упрощены флаги
+        export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-error=array-bounds -Wno-array-bounds -Wno-error=stringop-overflow -Wno-stringop-overflow -Wno-error=enum-conversion -D__ANDROID_COMMON_KERNEL__"
         export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
         
         export CC="ccache clang"
@@ -916,6 +917,7 @@ jobs:
         
         make O="$OUT" olddefconfig
         
+        # Ключевое изменение: добавлен -Wno-unknown-warning-option
         KCFLAGS="$KCFLAGS -Wno-error -Wno-unknown-warning-option -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
         
@@ -930,6 +932,7 @@ jobs:
         echo "Optimization: O2 + LTO=thin"
         echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
         echo "ccache: $CCACHE_DIR"
+        echo "KCFLAGS: ${KCFLAGS:0:150}..."
         echo "============================================"
         
         BUILD_START=$(date +%s)
