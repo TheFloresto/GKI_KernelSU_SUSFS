@@ -803,129 +803,161 @@ jobs:
           cat common/drivers/android/Makefile
         fi
 
-    - name: Build Kernel with Clang/Make
-      working-directory: ${{ env.KERNEL_ROOT }}
-      run: |
-        set -e
-        
-        cd common
-        
-        # Set up build environment variables
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export LLVM=1
-        export LLVM_IAS=1
-        export CLANG_TRIPLE=aarch64-linux-gnu-
-        export CROSS_COMPILE=aarch64-linux-gnu-
-        export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-        
-        # Use detected clang with ccache
-        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:$PATH"
-        export CC="ccache clang"
-        export CXX="ccache clang++"
-        export LD=ld.lld
-        export HOSTLD=ld.lld
-        export AR=llvm-ar
-        export NM=llvm-nm
-        export OBJCOPY=llvm-objcopy
-        export OBJDUMP=llvm-objdump
-        export READELF=llvm-readelf
-        export STRIP=llvm-strip
-        
-        # Add kernel build flags to suppress warnings
-        export KCFLAGS="-Wno-error=array-bounds -Wno-array-bounds -Wno-error=stringop-overflow -Wno-stringop-overflow -Wno-error=enum-conversion"
-        
-        # Dynamic MAKE_JOBS calculation (memory-aware)
-        CORES=$(nproc)
-        MEMORY_GB=$(free -g | awk '/^Mem:/{print $2}')
-        # Each compile job needs ~2GB RAM, leave 2GB for system
-        MAX_JOBS=$(( (MEMORY_GB - 2) / 2 ))
-        # Use the smaller of cores or memory-based limit
-        if [ $MAX_JOBS -lt $CORES ]; then
-          MAKE_JOBS=$MAX_JOBS
-          echo "⚠️  Limited by RAM: Using $MAKE_JOBS jobs (have $CORES cores, ${MEMORY_GB}GB RAM)"
-        else
-          MAKE_JOBS=$CORES
-          echo "✅ Using $MAKE_JOBS jobs ($CORES cores available, ${MEMORY_GB}GB RAM)"
-        fi
-        # Ensure at least 1 job
-        [ $MAKE_JOBS -lt 1 ] && MAKE_JOBS=1
-        
-        echo "🔧 Build configuration:"
-        echo "  - ARCH: $ARCH"
-        echo "  - CC: $CC"
-        echo "  - LLVM: 1 (full LLVM toolchain for LTO)"
-        echo "  - LLVM_IAS: 1 (LLVM integrated assembler)"
-        echo "  - LD: ld.lld (LLVM linker)"
-        echo "  - MAKE_JOBS: $MAKE_JOBS (auto-detected)"
-        echo "  - KCFLAGS: $KCFLAGS"
-        echo "  - CCache: $CCACHE_DIR (compress=true, maxsize=50G)"
-        
-        START_TIME=$(date +%s)
-        
-        # Build configuration
-        echo "📋 Building defconfig..."
-        make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 LD=ld.lld gki_defconfig
-        
-        # Build kernel with full LLVM toolchain for LTO support
-        echo "🗿 Building kernel for ${{ inputs.ksu_variant }}-${{ matrix.build_type }}..."
-        BUILD_SUCCESS=false
-        
-        if make -j$MAKE_JOBS \
-          O=out \
-          ARCH=arm64 \
-          CC="$CC" \
-          LLVM=1 \
-          LLVM_IAS=1 \
-          LD=ld.lld \
-          HOSTLD=ld.lld \
-          CLANG_TRIPLE=aarch64-linux-gnu- \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          KCFLAGS="$KCFLAGS" \
-          V=1 \
-          2>&1 | tee build.log; then
-          BUILD_SUCCESS=true
-        fi
-        
-        if [ "$BUILD_SUCCESS" = false ]; then
-          echo "::error::Kernel build failed!"
-          echo "=================================="
-          echo "Last 200 lines of build log:"
-          echo "=================================="
-          tail -n 200 build.log
-          echo "=================================="
-          echo "Searching for error messages:"
-          echo "=================================="
-          grep -i "error:" build.log | tail -n 50 || echo "No 'error:' found"
-          grep -i "undefined reference" build.log | tail -n 20 || echo "No 'undefined reference' found"
-          grep -i "fatal" build.log | tail -n 20 || echo "No 'fatal' found"
-          echo "=================================="
-          exit 1
-        fi
-        
-        BUILD_END=$(date +%s)
-        BUILD_TIME=$((BUILD_END - START_TIME))
-        BUILD_MINS=$((BUILD_TIME / 60))
-        BUILD_SECS=$((BUILD_TIME % 60))
-        
-        echo "BUILD_TIME=${BUILD_MINS}m ${BUILD_SECS}s" >> $GITHUB_ENV
-        echo "BUILD_MINS=$BUILD_MINS" >> $GITHUB_ENV
-        echo "BUILD_SECS=$BUILD_SECS" >> $GITHUB_ENV
-        echo "MAKE_JOBS=$MAKE_JOBS" >> $GITHUB_ENV
-        
-        # Verify Image exists
-        if [ ! -f "out/arch/arm64/boot/Image" ]; then
-          echo "::error::Kernel Image not found at out/arch/arm64/boot/Image"
-          echo "Contents of out/arch/arm64/boot/:"
-          ls -la out/arch/arm64/boot/ || echo "Directory doesn't exist"
-          echo "=================================="
-          echo "Last 200 lines of build log:"
-          echo "=================================="
-          tail -n 200 build.log
-          exit 1
-        fi
-        
-        echo "✅ Build completed successfully in ${BUILD_MINS}m ${BUILD_SECS}s"
+    - name: Build Kernel with Clang
+      shell: bash
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      env:
+        PYTHONWARNINGS: "ignore:invalid escape sequence"
+        run: |
+          set -euo pipefail
+          echo "::group::Build kernel with ccache optimization"
+          
+          : > "$KERNEL_ROOT/common/.scmversion"
+          
+          export PYTHONWARNINGS="${PYTHONWARNINGS}"
+          
+          echo "Getting last commit timestamp from kernel source..."
+          COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+          COMMIT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S')
+          COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          
+          KERNEL_BUILD_DATE=$(date -u)
+          export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
+          export KBUILD_BUILD_TIMESTAMP="$STATIC_DATE"
+          export KBUILD_BUILD_USER="${BUILD_USER}"
+          export KBUILD_BUILD_HOST="${BUILD_HOST}"
+          export KBUILD_BUILD_VERSION=1
+          
+          echo "📅 Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
+          echo "🔢 SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+          echo "👤 Build user: $KBUILD_BUILD_USER"
+          echo "🖥️  Build host: $KBUILD_BUILD_HOST"
+          
+          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/rust/linux-x86/1.73.0b/bin/:${PATH}"
+          
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          MAP="-fdebug-prefix-map=${WORKSPACE}=."
+          MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
+          FPMAP="-ffile-prefix-map=${WORKSPACE}=."
+          
+          export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument"
+          export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
+          
+          export CC="ccache clang"
+          export CXX="ccache clang++"
+          export HOSTCC="ccache clang"
+          export HOSTCXX="ccache clang++"
+          
+          export LLVM=1 LLVM_IAS=1
+          export ARCH=arm64 SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export RUSTC="$KERNEL_ROOT/prebuilts/rust/linux-x86/1.73.0b/bin/rustc"
+          export PAHOLE="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
+          
+          export LD="${CLANG_BIN_PATH}/ld.lld"
+          export HOSTLD="${CLANG_BIN_PATH}/ld.lld"
+          export AR="${CLANG_BIN_PATH}/llvm-ar"
+          export NM="${CLANG_BIN_PATH}/llvm-nm"
+          export OBJCOPY="${CLANG_BIN_PATH}/llvm-objcopy"
+          export OBJDUMP="${CLANG_BIN_PATH}/llvm-objdump"
+          export STRIP="${CLANG_BIN_PATH}/llvm-strip"
+          
+          OUT=out
+          mkdir -p "$OUT"
+          
+          echo "============================================"
+          echo "🔍 Compiler & ccache Verification"
+          echo "============================================"
+          echo "PATH: ${PATH:0:200}..."
+          echo "which clang: $(which clang)"
+          echo "CC: $CC"
+          echo "LLVM: $LLVM"
+          echo "CLANG_VERSION: $CLANG_VERSION"
+          echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+          echo ""
+          
+          echo "ccache wrapper test:"
+          clang --version 2>&1 | head -n1 || true
+          echo ""
+          echo "ccache configuration:"
+          ccache -p | grep -E "(compression|direct_mode|readonly_direct|depend|sloppiness)" || true
+          echo ""
+          echo "ccache pre-build status:"
+          ccache -s | head -n 20
+          echo "============================================"
+          
+          make O="$OUT" gki_defconfig
+          
+          scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+          scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+          KCFLAGS_EXTRA="-O2"
+          
+          scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
+          scripts/config --file "$OUT/.config" -e LTO_CLANG
+          
+          make O="$OUT" olddefconfig
+          
+          KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
+          KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+          
+          echo "============================================"
+          echo "🔧 Build Configuration"
+          echo "============================================"
+          echo "Android: ${{ inputs.android_version }}"
+          echo "Kernel: ${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL"
+          echo "KSU Variant: ${{ inputs.ksu_variant }}"
+          echo "Threads: $(nproc --all)"
+          echo "Optimization: O2 (Always) + LTO=thin"
+          echo "KCFLAGS: ${KCFLAGS:0:150}..."
+          echo "KCPPFLAGS: ${KCPPFLAGS:0:150}..."
+          echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
+          echo "Workspace: $WORKSPACE"
+          echo "ccache: ENABLED (Always)"
+          echo "  Dir: $CCACHE_DIR"
+          echo "  Base: $CCACHE_BASEDIR"
+          echo "  Max size: $CCACHE_MAXSIZE"
+          echo "============================================"
+          
+          if [ ! -d "$CCACHE_DIR" ] || [ -z "$(find "$CCACHE_DIR" -type f 2>/dev/null | head -n1)" ]; then
+            echo "🔥 Priming cache with header preprocessing..."
+            make -C "$KERNEL_ROOT/common" O="$OUT" headers_install prepare 2>&1 | head -n 20 || true
+            echo ""
+          fi
+          
+          BUILD_START=$(date +%s)
+          set -o pipefail
+          
+          make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+          
+          BUILD_END=$(date +%s)
+          BUILD_TIME=$((BUILD_END - BUILD_START))
+          
+          echo "BUILD_START=$BUILD_START" >> "$GITHUB_ENV"
+          echo "BUILD_END=$BUILD_END" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+          
+          IMG="$OUT/arch/arm64/boot/Image"
+          if [ ! -f "$IMG" ]; then
+            echo "::error::Kernel Image missing"
+            echo "::group::Last 555 lines of build log"
+            tail -n 555 build.log || echo "Build log not available"
+            echo "::endgroup::"
+            exit 1
+          fi
+          
+          IMG_SIZE=$(stat -c%s "$IMG")
+          
+          echo "============================================"
+          echo "✅ Build Completed Successfully"
+          echo "============================================"
+          echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
+          echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
+          echo ""
+          echo "📊 ccache Post-Build Statistics"
+          echo "============================================"
+          ccache -s
+          echo "============================================"
+          echo "::endgroup::"
 
     - name: Show CCache Statistics
       if: always()
