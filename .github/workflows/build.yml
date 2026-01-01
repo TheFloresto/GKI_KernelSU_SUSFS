@@ -271,7 +271,7 @@ jobs:
         export CCACHE_COMPRESSLEVEL=6
         export CCACHE_MAXSIZE=5G
         export CCACHE_SLOPPINESS="include_file_ctime,include_file_mtime,time_macros"
-        ccache -M 50G
+        ccache -M 5G
         echo "CCACHE_COMPRESS=true" >> $GITHUB_ENV
         echo "CCACHE_COMPRESSLEVEL=6" >> $GITHUB_ENV
         echo "CCACHE_MAXSIZE=5G" >> $GITHUB_ENV
