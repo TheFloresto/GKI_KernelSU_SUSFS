@@ -63,54 +63,8 @@ jobs:
         echo "Disk space before:"
         df -h
 
-    - name: Maximize build disk space
-      uses: easimon/maximize-build-space@v10
-
-    - name: Maximize Build Space
-      run: |
-        curl -Ls https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh | bash
-
-    - name: Aggressive cleanup
-      run: |
-        # Remove Java (JDKs)
-        sudo rm -rf /usr/lib/jvm
-
-        # Remove .NET SDKs
-        sudo rm -rf /usr/share/dotnet
-
-        # Remove Swift toolchain
-        sudo rm -rf /usr/share/swift
-
-        # Remove Haskell (GHC)
-        sudo rm -rf /usr/local/.ghcup
-
-        # Remove Julia
-        sudo rm -rf /usr/local/julia*
-
-        # Remove Android SDKs
-        sudo rm -rf /usr/local/lib/android
-
-        # Remove Chromium (optional if not using for browser tests)
-        sudo rm -rf /usr/local/share/chromium
-
-        # Remove Microsoft/Edge and Google Chrome builds
-        sudo rm -rf /opt/microsoft /opt/google
-
-        # Remove Azure CLI
-        sudo rm -rf /opt/az
-
-        # Remove PowerShell
-        sudo rm -rf /usr/local/share/powershell
-
-        # Remove CodeQL and other toolcaches
-        sudo rm -rf /opt/hostedtoolcache
-
-        docker system prune -af || true
-        docker builder prune -af || true
-        df -h
-
     - name: Free Disk Space
-      if: false
+      if: true
       uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
       with:
         remove_android: true
@@ -496,7 +450,7 @@ jobs:
           Next)
             SUSFS_VERSION="2.0.0"
             ;;
-          KSU|RKSU|MKSU|Sukisu)
+          KSU|Next|SukiSU|MKSU|KowXU)
             SUSFS_VERSION="2.0.0"
             echo "Not Needed"
             ;;
@@ -505,6 +459,7 @@ jobs:
         cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
         cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
 
+        # Apply core SUSFS patches
         cd "$KERNEL_ROOT/common"
         PATCH_FILE="50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch"
         cp "$SUSFS4KSU/kernel_patches/$PATCH_FILE" ./
@@ -524,17 +479,59 @@ jobs:
             ;;
           Next)
             cd "$KERNEL_ROOT/KernelSU-Next"
+            #cp "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
+            #patch -p1 < Next-3.0.0-susfs-2.0.0-AIO.patch
+
             cd "$KERNEL_ROOT/common"
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 43 ]]; then
-              cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_base.c.patch ./
-              patch -p1 < fix_base.c.patch
+            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+              if [ "$ACTUAL_SUBLEVEL" -le 43 ]; then
+                cp $KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10-fix-base.c.patch ./
+                patch -p1 < a12-5.10-fix-base.c.patch
+              fi
+              if [ "$ACTUAL_SUBLEVEL" -le 117 ]; then
+                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/1-fix-fdinfo.c.patch ./
+                patch -p1 < a12-5.10-fix-fdinfo.c.patch
+              fi
+              if [ "$ACTUAL_SUBLEVEL" -le 209 ]; then
+                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+              fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]] && [[ $ACTUAL_SUBLEVEL -le 117 ]]; then
-              cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
-              patch -p1 < fix_fdinfo.c.patch
+            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+              if [ "$ACTUAL_SUBLEVEL" -le 117 ]; then
+                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/1-fix-fdinfo.c.patch ./
+                patch -p1 < a13-5.10-fix-fdinfo.c.patch
+              fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 209 ]]; then
-              sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 41 ]]; then
+              cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15-fix-fdinfo.c.patch ./
+                patch -p1 < a13-5.15-fix-fdinfo.c.patch
+                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15-fix-namespace.c.patch ./
+                patch -p1 < a13-5.15-fix-namespace.c.patch
+                cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15-fix-open.c.patch ./
+                patch -p1 < a13-5.15-fix-open.c.patch
+                sed -i 's/i_uid_into_mnt(i_user_ns(inode), inode)/i_uid_into_mnt(inode->i_sb->s_user_ns, inode)/g' fs/susfs.c
+              fi
+            fi
+            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+              if [ "$ACTUAL_SUBLEVEL" -le 9999 ]; then
+                echo "Not Needed"
+              fi
+            fi
+            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+              if [ "$ACTUAL_SUBLEVEL" -le 9999 ]; then
+                echo "Not Needed"
+              fi
+            fi
+            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+              if [ "$ACTUAL_SUBLEVEL" -le 9999 ]; then
+                echo "Not Needed"
+              fi
+            fi
+            if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
+              if [ "$ACTUAL_SUBLEVEL" -ge 9999 ]; then
+                echo "Not Needed"
+              fi
             fi
             ;;
             KSU)
@@ -574,7 +571,6 @@ jobs:
 
         case "${{ inputs.ksu_variant }}" in
           KSU|RKSU|MKSU)
-            cd "$KERNEL_ROOT/common"
             if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 209 ]] ||
                [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && "${{ inputs.os_patch_level }}" != "2024-05" && $ACTUAL_SUBLEVEL -le 209 ]] ||
                [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && "${{ inputs.os_patch_level }}" != "2024-05" && $ACTUAL_SUBLEVEL -le 148 ]] ||
@@ -600,6 +596,7 @@ jobs:
               patch -p1 < fix_task_mmu.c.patch || true
             fi
 
+            # Apply additional SUSFS patches for Android 13 5.15 compatibility
             if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]] && [[ ${{ inputs.sub_level }} -le 41 ]]; then
               cp $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
               patch -p1 < fix_fdinfo.c.patch || true
