@@ -1,4 +1,3 @@
-
 name: Kernel Config - A14 5.15
 
 permissions:
@@ -14,6 +13,9 @@ on:
       ksu_commit:
         required: false
         type: string
+      build_bypass:
+        required: true
+        type: boolean
 
 jobs:
   build-kernels-a14-5-15:
@@ -71,3 +73,4 @@ jobs:
       os_patch_level: ${{ matrix.os_patch_level }}
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
