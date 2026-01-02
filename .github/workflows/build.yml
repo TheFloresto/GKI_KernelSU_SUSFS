@@ -883,31 +883,40 @@ jobs:
       run: |
         set -euo pipefail
         RAMDISK_ARGS=""
-        
+
         if [[ "${{ inputs.android_version }}" == "android12" ]]; then
           GKI_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-${{ inputs.os_patch_level }}_r1.zip"
           FALLBACK_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip"
-          
+
           if curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null | grep -q 200; then
             curl -Lo gki-kernel.zip "$GKI_URL"
           else
             curl -Lo gki-kernel.zip "$FALLBACK_URL"
           fi
-          
+
           unzip -q gki-kernel.zip && rm gki-kernel.zip
-          $UNPACK_BOOTIMG --boot_img="$(pwd)/boot-5.10.img"
+          \( UNPACK_BOOTIMG --boot_img=" \)(pwd)/boot-5.10.img"
           RAMDISK_ARGS="--ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level ${{ inputs.os_patch_level }}"
         fi
-        
+
         for suffix in "" ".gz" ".lz4"; do
           kernel="Image${suffix}"
-          output="boot${suffix//./-}.img"
-          [ -z "$suffix" ] && output="boot.img"
-          
+          if [ -z "$suffix" ]; then
+            output="boot.img"
+          else
+            output="boot${suffix//./-}.img"
+          fi
+
           $MKBOOTIMG --header_version 4 --kernel "$kernel" --output "$output" $RAMDISK_ARGS
-          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) \
-            --image "$output" --algorithm SHA256_RSA2048 --key "$BOOT_SIGN_KEY_PATH"
-          cp "./$output" "$GITHUB_WORKSPACE/${{ env.FILE_NAME }}-$output"
+
+          $AVBTOOL add_hash_footer \
+            --partition_name boot \
+            --partition_size $((64 * 1024 * 1024)) \
+            --image "$output" \
+            --algorithm SHA256_RSA2048 \
+            --key "$BOOT_SIGN_KEY_PATH"
+
+          cp "./$output" "\( GITHUB_WORKSPACE/ \){{ env.FILE_NAME }}-$output"
         done
 
     - name: Collect Build Stats
