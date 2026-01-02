@@ -15,13 +15,17 @@ on:
       ksu_variant:
         description: "KernelSU Variant"
         type: choice
-        options: [ KSU, WKSU, Next, MKSU, SukiSU, KowXU ]
-        default: KSU
+        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, Sukisu ]
+        default: Next
       ksu_commit:
         description: "KSU Commit (optional)"
         type: string
+        default: "pershoot"
         required: false
-
+      build_bypass:
+        description: "Build Bypass"
+        type: boolean
+        default: true
       # Build Selection
       build_a12_5_10:
         description: "Android 12 - 5.10"
@@ -51,10 +55,10 @@ on:
         description: "Android 16 - 6.12"
         type: boolean
         default: true
-      test_build:
-        description: "Test Build"
+      build_lts:
+        description: "Build All LTS Kernels"
         type: boolean
-        default: true
+        default: false
 
 jobs:
   build-a12-5-10:
@@ -64,6 +68,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a13-5-10:
     if: inputs.build_a13_5_10
@@ -72,6 +77,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a13-5-15:
     if: inputs.build_a13_5_15
@@ -80,6 +86,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a14-5-15:
     if: inputs.build_a14_5_15
@@ -88,6 +95,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a14-6-1:
     if: inputs.build_a14_6_1
@@ -96,6 +104,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a15-6-6:
     if: inputs.build_a15_6_6
@@ -104,6 +113,7 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
   build-a16-6-12:
     if: inputs.build_a16_6_12
@@ -112,283 +122,328 @@ jobs:
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
 
-  test-build:
-    if: inputs.test_build
-    uses: ./.github/workflows/test-build.yml
+  build-lts:
+    if: inputs.build_lts
+    uses: ./.github/workflows/kernel-lts.yml
     secrets: inherit
     with:
       ksu_variant: ${{ inputs.ksu_variant }}
       ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
+
+  rej:
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+    - build-a12-5-10
+    - build-a13-5-10
+    - build-a13-5-15
+    - build-a14-5-15
+    - build-a14-6-1
+    - build-a15-6-6
+    - build-a16-6-12
+    - build-lts
+    steps:
+    - name: Download Misc Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts
+        pattern: '*-Normal-Misc'
+
+    - name: Process Reject Artifacts
+      run: |
+        mkdir -p aio-rejects
+        
+        for dir in ./downloaded-artifacts/*-Normal-Misc; do
+            [ -d "$dir" ] || continue
+            
+            dirname=$(basename "$dir")
+            echo "Processing $dirname..."
+            
+            if [ -d "$dir/patch-rejects" ]; then
+                echo "Found patch-rejects in $dirname"
+                
+                original_name=${dirname%-Misc}
+                
+                mv "$dir/patch-rejects" "aio-rejects/$original_name"
+            else
+                echo "No patch-rejects found in $dirname"
+            fi
+        done
+        
+        if [ "$(ls -A aio-rejects)" ]; then
+            echo "Creating AIO-REJ.zip..."
+            cd aio-rejects
+            zip -r -q -9 ../AIO-REJ.zip .
+            cd ..
+        else
+            echo "No rejects found to upload."
+        fi
+
+    - name: Upload AIO-REJ Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AIO-REJ
+        path: AIO-REJ.zip
+        if-no-files-found: ignore
 
   release:
     runs-on: ubuntu-latest
     if: inputs.release_type != 'Actions'
     needs:
-      - build-a12-5-10
-      - build-a13-5-10
-      - build-a13-5-15
-      - build-a14-5-15
-      - build-a14-6-1
-      - build-a15-6-6
-      - build-a16-6-12
+    - build-a12-5-10
+    - build-a13-5-10
+    - build-a13-5-15
+    - build-a14-5-15
+    - build-a14-6-1
+    - build-a15-6-6
+    - build-a16-6-12
+    - build-lts
 
     env:
-      GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0"
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      RELEASE_NAME: "!!TESTING!! GKI Kernels With ${{ inputs.ksu_variant }} !!TESTING!!"
       RELEASE_BODY: ""
-      
+      TARGET_REPO: NerestKernels/GKI_KernelSU_SUSFS
+
     steps:
-      - name: Download Apache Arrow's util_free_space.sh
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -L -o util_free_space.sh https://raw.githubusercontent.com/apache/arrow/main/ci/scripts/util_free_space.sh
-          chmod +x util_free_space.sh
-          ./util_free_space.sh
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get commit hashes and generate commit URLs
-        shell: bash
-        run: |
-          set -euo pipefail
-          GITLAB_OWNER="simonpunk"
-          GITLAB_REPO="susfs4ksu"
+    - name: Get commit hashes and generate commit URLs
+      shell: bash
+      run: |
+        set -euo pipefail
+        GITLAB_OWNER="simonpunk"
+        GITLAB_REPO="susfs4ksu"
+        
+        declare -A BRANCH_MAP=(
+          ["gki_android12_5_10"]="gki-android12-5.10"
+          ["gki_android13_5_10"]="gki-android13-5.10"
+          ["gki_android13_5_15"]="gki-android13-5.15"
+          ["gki_android14_5_15"]="gki-android14-5.15"
+          ["gki_android14_6_1"]="gki-android14-6.1"
+          ["gki_android15_6_6"]="gki-android15-6.6"
+        )
+        
+        for var_name in "${!BRANCH_MAP[@]}"; do
+          branch_name="${BRANCH_MAP[$var_name]}"
+          COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
           
-          declare -A BRANCH_MAP=(
-            ["gki_android12_5_10"]="gki-android12-5.10"
-            ["gki_android13_5_10"]="gki-android13-5.10"
-            ["gki_android13_5_15"]="gki-android13-5.15"
-            ["gki_android14_5_15"]="gki-android14-5.15"
-            ["gki_android14_6_1"]="gki-android14-6.1"
-            ["gki_android15_6_6"]="gki-android15-6.6"
-          )
-          
-          for var_name in "${!BRANCH_MAP[@]}"; do
-            branch_name="${BRANCH_MAP[$var_name]}"
-            COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
+          if [[ -n "$COMMIT_HASH" ]]; then
+            COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
+            echo "$branch_name Commit: $COMMIT_HASH"
+            echo "$branch_name Commit URL: $COMMIT_URL"
             
-            if [[ -n "$COMMIT_HASH" ]]; then
-              COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
-              echo "$branch_name Commit: $COMMIT_HASH"
-              echo "$branch_name Commit URL: $COMMIT_URL"
-              
-              echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
-              echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
-            fi
-          done
+            echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
+            echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
+          fi
+        done
 
-      - name: Get KernelSU variant refs and links
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          case "${{ inputs.ksu_variant }}" in
-            "WKSU")
-              KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
-              KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
-              ;;
-            "Next")
-              KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/dev | awk '{print $1}')
-              KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
-              ;;
-            "MKSU")
-              KSU_REF=$(git ls-remote "https://github.com/5ec1cff/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/5ec1cff/KernelSU/commit/$KSU_REF"
-              ;;
-            "KSU")
-              KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
-              ;;
-            "SukiSU")
-              KSU_REF=$(git ls-remote "https://github.com/SukiSU-Ultra/SukiSU-Ultra.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra/commit/$KSU_REF"
-              ;;
-            "KowXU")
-              KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
-              KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"
-              ;;
-            *)
-              echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
-              exit 1
-              ;;
-          esac
-          
-          # Verify that KSU_REF is not empty
-          if [[ -z "$KSU_REF" ]]; then
-            echo "ERROR: Failed to get KSU_REF for variant ${{ inputs.ksu_variant }}"
+    - name: Get KernelSU variant refs and links
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        case "${{ inputs.ksu_variant }}" in
+          "WKSU")
+            KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
+            KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
+            ;;
+          "Next")
+            KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/dev | awk '{print $1}')
+            KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
+            ;;
+          "MKSU")
+            KSU_REF=$(git ls-remote "https://github.com/MollySophia/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/MollySophia/KernelSU/commit/$KSU_REF"
+            ;;
+          "KSU")
+            KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
+            ;;
+          "RKSU")
+            KSU_REF=$(git ls-remote "https://github.com/rsuntk/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/rsuntk/KernelSU/commit/$KSU_REF"             
+            ;;
+          "KowXU")
+            KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
+            KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"           
+            ;;
+          "Sukisu")
+            KSU_REF=$(git ls-remote "https://github.com/Ylarod/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/Ylarod/KernelSU/commit/$KSU_REF"
+            ;;
+          *)
+            echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
             exit 1
-          fi
-          
-          echo "KSU Variant: ${{ inputs.ksu_variant }}"
-          echo "KSU_REF: $KSU_REF"
-          echo "KSU_URL: $KSU_URL"
-          
-          echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
-          echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
-          
-          # Get Baseband-guard refs
-          BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
-          BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
-          
-          if [[ -z "$BBG_REF" ]]; then
-            echo "ERROR: Failed to get BBG_REF"
-            exit 1
-          fi
-          
-          echo "BBG_REF: $BBG_REF"
-          echo "BBG_URL: $BBG_URL"
-          
-          echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
-          echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
+            ;;
+        esac
+        
+        if [[ -z "$KSU_REF" ]]; then
+          echo "ERROR: Failed to get KSU_REF for variant ${{ inputs.ksu_variant }}"
+          exit 1
+        fi
+        
+        echo "KSU Variant: ${{ inputs.ksu_variant }}"
+        echo "KSU_REF: $KSU_REF"
+        echo "KSU_URL: $KSU_URL"
+        
+        echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
+        echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
+        
+        BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
+        BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
+        
+        if [[ -z "$BBG_REF" ]]; then
+          echo "ERROR: Failed to get BBG_REF"
+          exit 1
+        fi
+        
+        echo "BBG_REF: $BBG_REF"
+        echo "BBG_URL: $BBG_URL"
+        
+        echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
+        echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
 
-      - name: Generate New Tag
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}      
-        if: inputs.release_type != 'Actions'
-        run: |
-          set -euo pipefail
-          LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-          
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+    - name: Generate New Tag
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      if: inputs.release_type != 'Actions'
+      run: |
+        set -euo pipefail
+        LATEST_TAG=\( (gh api repos/ \){{ env.TARGET_REPO }}/tags --jq '.[0].name' 2>/dev/null || echo "")
+        NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
+        
+        echo "New tag: $NEW_TAG"
+        echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-      - name: Set release body
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat << 'EOF' > release_body.md
-          
-          **IMPORTANT DISCLAIMER**
-          This software is provided for testing and educational purposes only. Use at your own risk.
-          The developers are not responsible for any damage, data loss, or issues that may occur.
-          Please ensure you have proper backups before installation.
-          
-          🔹 Normal 
-          - Default kernel configuration 
-          - Standard kernel module loading behavior 
-          - Recommended for most users 
-          
-          🔹 Bypass 
-          - Includes module check bypass modifications 
-          - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
-          - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
-          - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
-          
-          Features:
-          -> ${{ inputs.ksu_variant }} KSU
-          -> Manual Root Hooks
-          -> Ptrace Patch Support for Older Kernels (<5.16)
-          -> IPSet Support for Advanced Network Filtering
-          -> Wireguard Support
-          -> BBR v1 Support
-          -> Added BBG support to prevent unauthorised writes to certain partitions: https://github.com/vc-teahouse/Baseband-guard
-          
-          🔹 BBG (Baseband-guard)
-          - A lightweight LSM (Linux Security Module) for Android kernel
-          - Blocks unauthorized writes to critical partitions/device nodes
-          - Prevents malicious tampering with baseband and boot chain
-          - Kernel-level protection via LSM hooks
-          - Reduces risk of soft-brick/hard-brick issues
-          
-          Notes:
-          -> SUS SU Mode 2 will show as disabled or not compatible due to non-kprobe hooks and is not needed anymore!
-          -> **boot.img files**: Available as CI artifacts only - download from the Actions tab in the "Misc" Artifact
-          -> **Warning**: boot.img files may not boot on some devices
-          -> **Note:** For detailed commit information and component versions, please check the build summary in the "Misc" Artifact
-          
-          Module: 
-          -> https://github.com/backslashxx/mountify
+    - name: Set release body
+      run: |
+        cat << 'EOF' > release_body.md
 
-          Kernel Flasher:
-          -> https://github.com/fatalcoder524/KernelFlasher/
-          
-          Managers:
-          -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
-          -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
-          -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
-          -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
-          -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
-          -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
-          
-          Commit Hashes (at the time of release):
-          -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
-          
-          -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
-          EOF
+        !!THIS RELEASE IS A TESTING RELEASE!!
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.NEW_TAG }}
-          repository: NerestKernels/GKI_KernelSU_SUSFS
-          token: ${{ secrets.RELEASE_TOKEN }}         
-          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
-          files: ""
-          name: ${{ env.RELEASE_NAME }}
-          body_path: release_body.md
+        **IMPORTANT DISCLAIMER**
+        This software is provided for testing and educational purposes only. Use at your own risk.
+        The developers are not responsible for any damage, data loss, or issues that may occur.
+        Please ensure you have proper backups before installation.
 
-      - name: Download Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./downloaded-artifacts
-          pattern: '*-AK3'
+        🔹 Normal 
+        - Default kernel configuration 
+        - Standard kernel module loading behavior 
+        - Recommended for most users 
 
-      - name: Upload Release Assets
-        shell: bash
-        env:
-         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          anykernel_dirs=(./downloaded-artifacts/*-AK3/)
+        🔹 Bypass 
+        - Includes module check bypass modifications 
+        - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
+        - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
+        - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
+
+        Features:
+        -> ${{ inputs.ksu_variant }} KSU
+        -> Krobes Root Hooks
+        -> Ptrace Patch Support for Older Kernels (<5.16)
+        -> IPSet Support for Advanced Network Filtering
+        -> Wireguard Support
+        -> BBR v1 Support
+        -> BBG: https://github.com/vc-teahouse/Baseband-guard
+
+        🔹 BBG (Baseband-guard)
+        - A lightweight LSM (Linux Security Module) for Android kernel
+        - Blocks unauthorized writes to critical partitions/device nodes
+        - Prevents malicious tampering with baseband and boot chain
+        - Kernel-level protection via LSM hooks
+        - Reduces risk of soft-brick/hard-brick issues
+
+        Kernel Flasher:
+        -> https://github.com/fatalcoder524/KernelFlasher/
+
+        Managers:
+        -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
+        -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
+        -> MKSU: [Github](https://github.com/MollySophia/KernelSU) [Telegram](https://t.me/mksu_ci)
+        -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
+        -> RKSU: [Github](https://github.com/rsuntk/KernelSU) [Telegram](https://t.me/rsuntk)
+        -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
+        -> Sukisu: [Github](https://github.com/Ylarod/KernelSU) [Telegram](https://t.me/Sukiksu)
+
+        Commit Hashes (at the time of release):
+        -> \( {{ inputs.ksu_variant }}: [ \){{ env.KSU_REF }}](${{ env.KSU_URL }})
+        
+        -> Baseband-guard: [\( {{ env.BBG_REF }}]( \){{ env.BBG_URL }})          
+
+        Module: 
+        -> https://github.com/sidex15/ksu_module_susfs
+
+        !!THIS RELEASE IS A TESTING RELEASE!!
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.NEW_TAG }}
+        repository: ${{ env.TARGET_REPO }}
+        token: ${{ secrets.RELEASE_TOKEN }}
+        prerelease: ${{ inputs.release_type == 'Pre-Release' }}
+        files: ""
+        name: ${{ env.RELEASE_NAME }}
+        body_path: release_body.md
+
+    - name: Download Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts
+        pattern: '*-AK3'
+
+    - name: Upload Release Assets
+      run: |+
+        shopt -s nullglob
+        anykernel_dirs=(./downloaded-artifacts/*-AnyKernel3/)
+
+        if [ ${#anykernel_dirs[@]} -eq 0 ]; then
+          echo "No AnyKernel3 artifact directories found; skipping upload."
+          exit 0
+        fi
+
+        echo "Found ${#anykernel_dirs[@]} artifacts to process"
+
+        # Create all ZIPs in parallel
+        for dir in "${anykernel_dirs[@]}"; do
+          artifact_name=$(basename "$dir")
+          echo "Creating ZIP for $artifact_name..."
+          (cd "$dir" && zip -r -q -9 "\( GITHUB_WORKSPACE/ \){artifact_name}.zip" ./*) &
+        done
+        wait
+
+        # Upload all ZIPs
+        for dir in "${anykernel_dirs[@]}"; do
+          artifact_name=$(basename "$dir")
+          echo "Uploading ${artifact_name}.zip..."
+          gh release upload "${{ env.NEW_TAG }}" "\( GITHUB_WORKSPACE/ \){artifact_name}.zip" --clobber --repo ${{ env.TARGET_REPO }}
+        done
           
-          if [ ${#anykernel_dirs[@]} -eq 0 ]; then
-            echo "No AK3 artifact directories found; skipping upload."
-            exit 0
-          fi
-          
-          echo "Found ${#anykernel_dirs[@]} artifacts to process"
-          
-          # Create all ZIPs in parallel
-          for dir in "${anykernel_dirs[@]}"; do
-            artifact_name=$(basename "$dir")
-            echo "Creating ZIP for $artifact_name..."
-            (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
-          done
-          wait
-          
-          # Upload all ZIPs
-          for dir in "${anykernel_dirs[@]}"; do
-            artifact_name=$(basename "$dir")
-            echo "Uploading ${artifact_name}.zip..."
-            gh release upload "${{ env.NEW_TAG }}" "${artifact_name}.zip" \
-              --repo NerestKernels/GKI_KernelSU_SUSFS \
-              --clobber
-          done
-          
-      - name: Send Telegram Notification
-        if: inputs.release_type != 'Actions'
-        shell: bash
-        run: |
-          set -euo pipefail
-          RELEASE_TYPE_TEXT=""
-          if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
-            RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
-          else
-            RELEASE_TYPE_TEXT="🚀 *Release*"
-          fi
-          
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
-            -F parse_mode="Markdown" \
-            -F text="🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*
-          🛑 *Variant:* ${{ inputs.ksu_variant }}
-          📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)
-          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-          [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})"
+    - name: Send Telegram Notification
+      if: inputs.release_type != 'Actions'
+      shell: bash
+      run: |
+        set -euo pipefail
+        RELEASE_TYPE_TEXT=""
+        if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
+          RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
+        else
+          RELEASE_TYPE_TEXT="🚀 *Release*"
+        fi
+        
+        curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
+          -F parse_mode="Markdown" \
+          -F text="🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*
+        🛑 *Variant:* ${{ inputs.ksu_variant }}
+        📦 *Repository:* [\( {{ env.TARGET_REPO }}](https://github.com/ \){{ env.TARGET_REPO }})
+        ✏️ *Commit:* [\( {{ github.sha }}](https://github.com/ \){{ github.repository }}/commit/${{ github.sha }})
+        [🔗 View GitHub Release](https://github.com/\( {{ env.TARGET_REPO }}/releases/tag/ \){{ env.NEW_TAG }})"
