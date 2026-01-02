@@ -734,6 +734,7 @@ jobs:
         
         # Remove Dirty Flag
         sed -i 's/-dirty//' ./scripts/setlocalversion
+        sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
         
         # Remove Abi Exports
         rm -rf ./android/abi_gki_protected_exports_* || true
