@@ -8,7 +8,7 @@ on:
   workflow_call:
     inputs:
       ksu_variant:
-        required: false
+        required: true
         type: string
       ksu_commit:
         required: false
