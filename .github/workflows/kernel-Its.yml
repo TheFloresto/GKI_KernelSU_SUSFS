@@ -19,7 +19,12 @@ on:
 
 jobs:
   build-kernels-lts:
-    name: "LTS-${{ matrix.android_version }}-${{ matrix.kernel_version }}"
+    name: >-
+      LTS-\( {{ matrix.android_version }}- \){{ matrix.kernel_version }}${{ 
+        matrix.sub_level != 'X' && matrix.sub_level != '' ? '-' + matrix.sub_level : ''
+      }}${{ 
+        matrix.variant != '' ? '-' + matrix.variant : ''
+      }}
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +48,7 @@ jobs:
           - android_version: "android14"
             kernel_version: "6.1"
             sub_level: "X"
+            os_patch_level: "lts"
           - android_version: "android14"
             kernel_version: "6.1"
             sub_level: "118"                  
