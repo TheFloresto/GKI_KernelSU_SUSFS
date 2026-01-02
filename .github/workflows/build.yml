@@ -27,6 +27,9 @@ on:
       build_bypass:
         required: true
         type: boolean
+      variant:
+        required: false
+        type: string
 
 jobs:
   build-gki:
