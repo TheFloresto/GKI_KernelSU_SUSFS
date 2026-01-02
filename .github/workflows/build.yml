@@ -755,7 +755,7 @@ jobs:
         
         : > .scmversion
         
-        export COMMIT_TIMESTAMP=$(date -u)
+        export COMMIT_TIMESTAMP=$(date +%s)
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
         export KBUILD_BUILD_TIMESTAMP="${{ env.BUILD_TIMESTAMP }}"
         export KBUILD_BUILD_USER="${{ env.BUILD_USER }}"
