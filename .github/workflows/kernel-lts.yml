@@ -1,0 +1,142 @@
+name: Kernel Config - LTS AIO
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_call:
+    inputs:
+      ksu_variant:
+        required: true
+        type: string
+      ksu_commit:
+        required: false
+        type: string
+      build_bypass:
+        required: true
+        type: boolean
+
+jobs:
+  build-kernels-lts:
+    name: "TEST-${{ matrix.kernel_version }}.${{ matrix.sub_level }}-${{ matrix.android_version }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Android 12 - 5.10 oldest (OLD)
+          - android_version: "android12"
+            kernel_version: "5.10"
+            sub_level: "43"
+            os_patch_level: "2021-08"
+
+
+          # Android 12 - 5.10 oldest (OLD)
+          - android_version: "android12"
+            kernel_version: "5.10"
+            sub_level: "209"
+            os_patch_level: "2024-05"
+          
+          # Android 12 - 5.10 LTS (NEW)
+          - android_version: "android12"
+            kernel_version: "5.10"
+            sub_level: "X"
+            os_patch_level: "lts"
+          
+          # Android 13 - 5.10 oldest (OLD)
+          - android_version: "android13"
+            kernel_version: "5.10"
+            sub_level: "107"
+            os_patch_level: "2022-04"
+          
+          # Android 13 - 5.10 LTS (NEW)
+          - android_version: "android13"
+            kernel_version: "5.10"
+            sub_level: "X"
+            os_patch_level: "lts"
+          
+          # Android 13 - 5.15 oldest (OLD)
+          - android_version: "android13"
+            kernel_version: "5.15"
+            sub_level: "41"
+            os_patch_level: "2022-06"
+          
+          # Android 13 - 5.15 LTS (NEW)
+          - android_version: "android13"
+            kernel_version: "5.15"
+            sub_level: "X"
+            os_patch_level: "lts"
+          
+          # Android 14 - 5.15 oldest (OLD)
+          - android_version: "android14"
+            kernel_version: "5.15"
+            sub_level: "110"
+            os_patch_level: "2023-06"
+          
+          # Android 14 - 5.15 LTS (NEW)
+          - android_version: "android14"
+            kernel_version: "5.15"
+            sub_level: "X"
+            os_patch_level: "lts"
+          
+          # Android 14 - 6.1 oldest (OLD)
+          - android_version: "android14"
+            kernel_version: "6.1"
+            sub_level: "25"
+            os_patch_level: "2023-06"
+          
+          # Android 14 - 6.1 LTS (NEW)
+          - android_version: "android14"
+            kernel_version: "6.1"
+            sub_level: "X"
+            os_patch_level: "lts"
+          
+          # Android 14 - 6.1 specific sublevel (OLD)
+          - android_version: "android14"
+            kernel_version: "6.1"
+            sub_level: "134"
+            os_patch_level: "2025-05"
+
+           # Android 14 - 6.1 specific sublevel (OLD)
+          - android_version: "android14"
+            kernel_version: "6.1"
+            sub_level: "118"
+            os_patch_level: "2025-01"       
+          
+          # Android 15 - 6.6 oldest (NEW)
+          - android_version: "android15"
+            kernel_version: "6.6"
+            sub_level: "30"
+            os_patch_level: "2024-07"
+          
+          # Android 15 - 6.6 LTS (OLD)
+          - android_version: "android15"
+            kernel_version: "6.6"
+            sub_level: "X"
+            os_patch_level: "lts"
+
+          # Android 16 - 6.12 oldest (NEW)
+          - android_version: "android16"
+            kernel_version: "6.12"
+            sub_level: "30"
+            os_patch_level: "2025-07"
+            variant: "A16-612"
+          
+          # Android 16 - 6.12 LTS (OLD)
+          - android_version: "android16"
+            kernel_version: "6.12"
+            sub_level: "X"
+            os_patch_level: "lts"
+            variant: "A16-612"
+
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      android_version: ${{ matrix.android_version }}
+      kernel_version: ${{ matrix.kernel_version }}
+      sub_level: ${{ matrix.sub_level }}
+      os_patch_level: ${{ matrix.os_patch_level }}
+      variant: ${{ matrix.variant }}
+      ksu_variant: ${{ inputs.ksu_variant }}
+      ksu_commit: ${{ inputs.ksu_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
