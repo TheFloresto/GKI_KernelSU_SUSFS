@@ -895,7 +895,7 @@ jobs:
           fi
 
           unzip -q gki-kernel.zip && rm gki-kernel.zip
-          \( UNPACK_BOOTIMG --boot_img=" \)(pwd)/boot-5.10.img"
+          \( {UNPACK_BOOTIMG} --boot_img=" \)(pwd)/boot-5.10.img"
           RAMDISK_ARGS="--ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level ${{ inputs.os_patch_level }}"
         fi
 
@@ -907,9 +907,9 @@ jobs:
             output="boot${suffix//./-}.img"
           fi
 
-          $MKBOOTIMG --header_version 4 --kernel "$kernel" --output "$output" $RAMDISK_ARGS
+          ${MKBOOTIMG} --header_version 4 --kernel "$kernel" --output "$output" $RAMDISK_ARGS
 
-          $AVBTOOL add_hash_footer \
+          ${AVBTOOL} add_hash_footer \
             --partition_name boot \
             --partition_size $((64 * 1024 * 1024)) \
             --image "$output" \
