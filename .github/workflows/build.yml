@@ -333,17 +333,11 @@ jobs:
             ;;
           Next)
             echo "Adding KernelSU Next..."
-            if [ "${{ inputs.ksu_commit }}" == "wild" ]; then
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/KernelSU-Next/wild/kernel/setup.sh" | bash -s wild
-            elif [ "${{ inputs.ksu_commit }}" == "pershoot" ]; then
-              curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
-              cd KernelSU-Next
-              git restore --source=5aad87b3c6319330d6991ba4c937e44e50fe16f5^ -- kernel/Kbuild
-            elif [ -n "${{ inputs.ksu_commit }}" ]; then
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/stable/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
+            if [ -n "${{ inputs.ksu_commit }}" ]; then
+               curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -
-            fi
+              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+            fi           
             ;;
           SukiSU)
             echo "Adding KernelSU SukiSU..."
