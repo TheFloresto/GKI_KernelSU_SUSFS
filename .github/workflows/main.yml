@@ -439,24 +439,25 @@ jobs:
           
     - name: Send Telegram Notification
       if: inputs.release_type != 'Actions'
+      shell: bash
       run: |
+        set -euo pipefail
         RELEASE_TYPE_TEXT=""
         if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
           RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
         else
           RELEASE_TYPE_TEXT="🚀 *Release*"
         fi
-
+        
         curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
           -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
-          -F text="
-          🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*
-          🛑 *Variant:* ${{ inputs.ksu_variant }}
-          📦 *Repository:* [\( {{ env.TARGET_REPO }}](https://github.com/ \){{ env.TARGET_REPO }})
-          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-          [🔗 View GitHub Release](https://github.com/\( {{ env.TARGET_REPO }}/releases/tag/ \){{ env.NEW_TAG }})"
-          -F parse_mode="Markdown"
+          -F parse_mode="Markdown" \
+          -F text="🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*
+        🛑 *Variant:* ${{ inputs.ksu_variant }}
+        📦 *Repository:* [\( {{ env.TARGET_REPO }}](https://github.com/ \){{ env.TARGET_REPO }})
+        ✏️ *Commit:* [\( {{ github.sha }}](https://github.com/ \){{ github.repository }}/commit/${{ github.sha }})
+        [🔗 View GitHub Release](https://github.com/\( {{ env.TARGET_REPO }}/releases/tag/ \){{ env.NEW_TAG }})"
 
   notify-actions:
     runs-on: ubuntu-latest
@@ -467,10 +468,9 @@ jobs:
         curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
           -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
-          -F text="
-          🌽 *New Kernel Actions Build Finished*
+          -F parse_mode="Markdown" \
+          -F text="🌽 *New Kernel Actions Build Finished*
           🛑 *Variant:* ${{ inputs.ksu_variant }}
           📦 *Repository:* [\( {{ env.TARGET_REPO }}](https://github.com/ \){{ env.TARGET_REPO }})
-          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-          [🔗 View GitHub Release](https://github.com/\( {{ env.TARGET_REPO }}/releases/tag/ \){{ env.NEW_TAG }})"
-          -F parse_mode="Markdown"
+          ✏️ *Commit:* [\( {{ github.sha }}](https://github.com/ \){{ github.repository }}/commit/${{ github.sha }})
+          [🔗 View GitHub Release](https://github.com/\( {{ env.TARGET_REPO }}/releases/tag/ \){{ env.NEW_TAG }})"          
