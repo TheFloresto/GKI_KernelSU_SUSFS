@@ -145,6 +145,22 @@ jobs:
     - build-a16-6-12
     - build-lts
     steps:
+    - name: Free Disk Space
+      if: true
+      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
+      with:
+        remove_android: true
+        remove_dotnet: true
+        remove_haskell: true
+        remove_tool_cache: true
+        remove_swap: true
+        remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+        remove_packages_one_command: true
+        remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
+        testing: false
+        
     - name: Download Misc Artifacts
       uses: actions/download-artifact@v5
       with:
@@ -199,15 +215,29 @@ jobs:
     - build-a14-6-1
     - build-a15-6-6
     - build-a16-6-12
-    - build-lts
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       RELEASE_NAME: "!!TESTING!! GKI Kernels With ${{ inputs.ksu_variant }} !!TESTING!!"
       RELEASE_BODY: ""
       TARGET_REPO: NerestKernels/GKI_KernelSU_SUSFS
-
     steps:
+    - name: Free Disk Space
+      if: true
+      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
+      with:
+        remove_android: true
+        remove_dotnet: true
+        remove_haskell: true
+        remove_tool_cache: true
+        remove_swap: true
+        remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+        remove_packages_one_command: true
+        remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
+        testing: false
+        
     - name: Checkout code
       uses: actions/checkout@v4
 
@@ -399,30 +429,36 @@ jobs:
         pattern: '*-AK3'
 
     - name: Upload Release Assets
-      run: |+
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      run: |
+        set -euo pipefail
         shopt -s nullglob
-        anykernel_dirs=(./downloaded-artifacts/*-AnyKernel3/)
-
+        anykernel_dirs=(./downloaded-artifacts/*-AK3/)
+          
         if [ ${#anykernel_dirs[@]} -eq 0 ]; then
-          echo "No AnyKernel3 artifact directories found; skipping upload."
+          echo "No AK3 artifact directories found; skipping upload."
           exit 0
         fi
-
+          
         echo "Found ${#anykernel_dirs[@]} artifacts to process"
-
+          
         # Create all ZIPs in parallel
         for dir in "${anykernel_dirs[@]}"; do
           artifact_name=$(basename "$dir")
           echo "Creating ZIP for $artifact_name..."
-          (cd "$dir" && zip -r -q -9 "\( GITHUB_WORKSPACE/ \){artifact_name}.zip" ./*) &
-        done
+          (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
+        done          
         wait
-
+          
         # Upload all ZIPs
         for dir in "${anykernel_dirs[@]}"; do
           artifact_name=$(basename "$dir")
           echo "Uploading ${artifact_name}.zip..."
-          gh release upload "${{ env.NEW_TAG }}" "\( GITHUB_WORKSPACE/ \){artifact_name}.zip" --clobber --repo ${{ env.TARGET_REPO }}
+          gh release upload "${{ env.NEW_TAG }}" "${artifact_name}.zip" \
+            --repo ${{ env.TARGET_REPO }} \
+            --clobber
         done
           
     - name: Send Telegram Notification
