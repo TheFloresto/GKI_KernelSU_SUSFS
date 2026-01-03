@@ -379,6 +379,7 @@ jobs:
             else
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
             fi
+            ;;
           MKSU)
             echo "Adding KernelSU MKSU..."
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
