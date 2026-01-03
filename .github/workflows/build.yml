@@ -791,13 +791,6 @@ jobs:
         CUSTOM_LOCALVERSION="-@NoFloresto"
         echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
         
-        # Change kernel name based on version
-        if [[ "${{ inputs.kernel_version }}" == "5."* ]] || [[ "${{ inputs.kernel_version }}" == "6.1" ]]; then
-          perl -i -0777 -pe 's/(.*)echo "\$res"/$1echo "\$res-@NoFloresto"/s' ./scripts/setlocalversion
-        else
-          perl -i -0777 -pe 's/(.*)echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"/$1echo "\${KERNELVERSION}\${file_localversion}\${config_localversion}\${LOCALVERSION}-@NoFloresto\${scm_version}"/s' ./scripts/setlocalversion
-        fi
-        
         # Remove Dirty Flag
         sed -i 's/-dirty//' ./scripts/setlocalversion
         sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
