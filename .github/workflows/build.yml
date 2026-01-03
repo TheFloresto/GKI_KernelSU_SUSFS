@@ -190,17 +190,18 @@ jobs:
         fi
 
         repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle
-
+        
+     
     - name: Extract Sublevel and Set File Name
       shell: bash
       run: |
         set -euo pipefail
         ACTUAL_SUBLEVEL="${{ inputs.sub_level }}"
-        if [ -f "$KERNEL_ROOT/common/Makefile" ]; then
+        if [[ -f "$KERNEL_ROOT/common/Makefile" ]]; then
           EXTRACTED=$(grep '^SUBLEVEL = ' "$KERNEL_ROOT/common/Makefile" | awk '{print $3}')
-          [ -n "$EXTRACTED" ] && ACTUAL_SUBLEVEL="$EXTRACTED"
+          [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
         fi
-        
+
         echo "ACTUAL_SUBLEVEL=$ACTUAL_SUBLEVEL" >> $GITHUB_ENV
 
     - name: Detect Clang
@@ -300,6 +301,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+        # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
         if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 186 ]] || 
            [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 119 ]] || 
            [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 110 ]] || 
@@ -330,12 +332,12 @@ jobs:
         fi
 
     - name: Apply ptrace patch for older kernels
-      if: fromJSON(inputs.kernel_version) < 5.16
+      if: fromJSON(inputs.kernel_version) < 5.16 && false
       shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}/common
       run: |
-        set -euo pipefail
-        patch -p1 -F 3 < "$KERNEL_PATCHES/gki_ptrace.patch"
+        set -euo pipefail      
+        patch -p1 -F 3 < "$KERNEL_PATCHES/gki_ptrace.patch"        
 
     - name: Add KernelSU
       shell: bash
@@ -345,7 +347,7 @@ jobs:
         case "${{ inputs.ksu_variant }}" in
           WKSU)
             echo "Adding WKSU..."
-            if [ -n "${{ inputs.ksu_commit }}" ]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
               curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild
@@ -353,7 +355,7 @@ jobs:
             ;;
           KSU)
             echo "Adding KernelSU Official..."
-            if [ -n "${{ inputs.ksu_commit }}" ]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
@@ -361,7 +363,7 @@ jobs:
             ;;
           Next)
             echo "Adding KernelSU Next..."
-            if [ -n "${{ inputs.ksu_commit }}" ]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
                curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
               curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
@@ -369,7 +371,7 @@ jobs:
             ;;
           SukiSU)
             echo "Adding KernelSU SukiSU..."
-            if [ -n "${{ inputs.ksu_commit }}" ]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
               curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
@@ -377,14 +379,14 @@ jobs:
             ;;
           MKSU)
             echo "Adding KernelSU MKSU..."
-            if [ -n "${{ inputs.ksu_commit }}" ]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s main
             fi
             ;;
           RKSU)
-            if [ -n "${{ inputs.ksu_commit }}" ]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
@@ -392,7 +394,7 @@ jobs:
             ;;
           KowXU)
             echo "Adding KowXU..."
-            if [ -n "${{ inputs.ksu_commit }}" ]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
               curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s master
@@ -554,6 +556,41 @@ jobs:
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true          
             ;;
         esac
+
+    - name: Apply Hooks Patches
+      if: false
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      run: |
+        cp "$KERNEL_PATCHES/wild/hooks/scope_min_manual_hooks_v1.4.patch" ./
+        patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
+
+    - name: Apply Performance Patches
+      if: false
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      run: |
+        MIN_VERSION="5.16"
+        cp "$KERNEL_PATCHES/common/optimized_mem_operations.patch" ./
+        patch -p1 --forward < optimized_mem_operations.patch
+        cp "$KERNEL_PATCHES/common/file_struct_8bytes_align.patch" ./
+        patch -p1 --forward < file_struct_8bytes_align.patch
+        cp "$KERNEL_PATCHES/common/reduce_cache_pressure.patch" ./
+        patch -p1 --forward < reduce_cache_pressure.patch
+        if [[ "$(printf '%s\n' "${{ inputs.kernel_version }}" "$MIN_VERSION" | sort -V | head -n1)" = "${{ inputs.kernel_version }}" ]]; then
+          cp "$KERNEL_PATCHES/common/clear_page_16bytes_align.patch" ./
+          patch -p1 --forward < clear_page_16bytes_align.patch
+        else
+          cp "$KERNEL_PATCHES/common/clear_page_16bytes_align.patch" ./
+          sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' clear_page_16bytes_align.patch > clear_page_16bytes_align__pi.patch
+          patch -p1 -F3 --forward < clear_page_16bytes_align__pi.patch
+        fi
+
+    - name: Add BBG
+      if: false
+      working-directory: ${{ env.KERNEL_ROOT }}
+      run: |
+        curl -LSs https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+        echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
+        sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' common/security/Kconfig
 
     - name: Apply Module Check Bypass
       if: ${{ matrix.build_type == 'Bypass' }}
