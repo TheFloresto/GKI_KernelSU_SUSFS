@@ -113,6 +113,9 @@ jobs:
         ANYKERNEL3=$GITHUB_WORKSPACE/AnyKernel3
         REPO=$GITHUB_WORKSPACE/git-repo/repo
         EOF
+        
+        echo "PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin:$PATH" >> $GITHUB_ENV
+        mkdir -p "$KERNEL_ROOT"
 
         AOSP_MIRROR=https://android.googlesource.com
         BRANCH=main-kernel-2025
