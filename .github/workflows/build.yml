@@ -372,9 +372,9 @@ jobs:
           MKSU)
             echo "Adding KernelSU MKSU..."
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/dev/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
+              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/dev/kernel/setup.sh" | bash -s dev
+              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s main
             fi
             ;;
           RKSU)
