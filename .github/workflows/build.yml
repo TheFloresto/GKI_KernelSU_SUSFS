@@ -113,6 +113,12 @@ jobs:
         ANYKERNEL3=$GITHUB_WORKSPACE/AnyKernel3
         REPO=$GITHUB_WORKSPACE/git-repo/repo
         EOF
+
+        AOSP_MIRROR=https://android.googlesource.com
+        BRANCH=main-kernel-2025
+        git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
+        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg &
+        wait
         
         mkdir -p "$GITHUB_WORKSPACE/git-repo"
         curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
@@ -132,20 +138,6 @@ jobs:
         sudo apt-get clean
         echo "✅ Dependencies installed"
         echo "::endgroup::"
-
-    - name: Setup Build Environment
-      shell: bash
-      run: |
-        set -euo pipefail
-        AOSP_MIRROR=https://android.googlesource.com
-        BRANCH=main-kernel-2025
-        git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
-        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg &
-        wait
-          
-        mkdir -p ./git-repo
-        curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
-        chmod a+rx ./git-repo/repo
 
     - name: Set boot sign key
       shell: bash
