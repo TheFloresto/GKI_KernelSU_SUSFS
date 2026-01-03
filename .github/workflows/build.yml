@@ -117,17 +117,6 @@ jobs:
         echo "PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin:$PATH" >> $GITHUB_ENV
         mkdir -p "$KERNEL_ROOT"
 
-        AOSP_MIRROR=https://android.googlesource.com
-        BRANCH=main-kernel-2025
-        git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
-        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg &
-        wait
-        
-        mkdir -p "$GITHUB_WORKSPACE/git-repo"
-        curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
-        chmod 0755 "$GITHUB_WORKSPACE/git-repo/repo"
-        echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
-
     - name: Install Minimal Dependencies
       shell: bash
       run: |
@@ -141,6 +130,21 @@ jobs:
         sudo apt-get clean
         echo "✅ Dependencies installed"
         echo "::endgroup::"
+
+    - name: Setup Build Environment
+      shell: bash
+      run: |
+        set -euo pipefail
+        AOSP_MIRROR=https://android.googlesource.com
+        BRANCH=main-kernel-2026
+        git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
+        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg &
+        wait
+        
+        mkdir -p "$GITHUB_WORKSPACE/git-repo"
+        curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
+        chmod 0755 "$GITHUB_WORKSPACE/git-repo/repo"
+        echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
 
     - name: Set boot sign key
       shell: bash
@@ -943,31 +947,31 @@ jobs:
       run: |
         set -euo pipefail
         RAMDISK_ARGS=""
-
+          
         if [[ "${{ inputs.android_version }}" == "android12" ]]; then
           GKI_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-${{ inputs.os_patch_level }}_r1.zip"
           FALLBACK_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip"
-
+            
           if curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null | grep -q 200; then
             curl -Lo gki-kernel.zip "$GKI_URL"
           else
             curl -Lo gki-kernel.zip "$FALLBACK_URL"
           fi
-
+            
           unzip -q gki-kernel.zip && rm gki-kernel.zip
-          \( UNPACK_BOOTIMG --boot_img=" \)(pwd)/boot-5.10.img"
+          $UNPACK_BOOTIMG --boot_img="$(pwd)/boot-5.10.img"
           RAMDISK_ARGS="--ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level ${{ inputs.os_patch_level }}"
         fi
-
+          
         for suffix in "" ".gz" ".lz4"; do
           kernel="Image${suffix}"
           output="boot${suffix//./-}.img"
           [ -z "$suffix" ] && output="boot.img"
-
+            
           $MKBOOTIMG --header_version 4 --kernel "$kernel" --output "$output" $RAMDISK_ARGS
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) \
             --image "$output" --algorithm SHA256_RSA2048 --key "$BOOT_SIGN_KEY_PATH"
-          cp "./$output" "\( GITHUB_WORKSPACE/ \){{ env.FILE_NAME }}-$output"
+          cp "./$output" "$GITHUB_WORKSPACE/${{ env.FILE_NAME }}-$output"
         done
 
     - name: Collect Build Stats / Validate Image
