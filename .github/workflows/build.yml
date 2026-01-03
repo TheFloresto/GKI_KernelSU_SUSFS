@@ -153,7 +153,7 @@ jobs:
       run: |
         set -euo pipefail
         if [ ! -z "$BOOT_SIGN_KEY" ]; then
-          echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
+          echo "$BOOT_SIGN_KEY" > "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem"
         fi
 
     - name: 🏷️ Set Build Identity
