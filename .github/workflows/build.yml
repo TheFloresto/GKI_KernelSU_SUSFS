@@ -967,45 +967,58 @@ jobs:
           cp "./$output" "\( GITHUB_WORKSPACE/ \){{ env.FILE_NAME }}-$output"
         done
 
-    - name: Collect Build Stats
+    - name: Collect Build Stats / Validate Image
       id: collect_stats
       shell: bash
+      working-directory: ${{ env.KERNEL_ROOT }}
       run: |
         set -euo pipefail
-        IMG="$KERNEL_ROOT/common/out/arch/arm64/boot/Image"
+        
+        COMMON="$KERNEL_ROOT/common"
+        OUT="$COMMON/out"
+        IMG="$OUT/arch/arm64/boot/Image"
+        
+        if [ -f "$COMMON/build.log" ]; then
+          WARNINGS_COUNT="$(grep -ciE '\bwarning:' "$COMMON/build.log" || true)"
+          [ -n "$WARNINGS_COUNT" ] || WARNINGS_COUNT="0"
+        else
+          WARNINGS_COUNT="0"
+        fi
         
         if [ ! -f "$IMG" ]; then
-          echo "::error::Kernel Image not found"
+          echo "::error::Kernel Image not found at: $IMG"
           exit 1
         fi
         
         if ! file "$IMG" | grep -qi 'ARM64'; then
           echo "::error::Image is not ARM64 format"
+          file "$IMG"
           exit 1
         fi
         
         IMG_SIZE=$(stat -c %s "$IMG")
         MIN_SIZE=6102400
         if [ "$IMG_SIZE" -lt "$MIN_SIZE" ]; then
-          echo "::error::Image size too small"
+          echo "::error::Image size too small: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
           exit 1
         fi
         
         IMG_SHA256=$(sha256sum "$IMG" | awk '{print $1}')
+        BUILD_TIME="${BUILD_TIME:-0}"
         
-        WARNINGS_COUNT="0"
-        if [ -f "$KERNEL_ROOT/common/build.log" ]; then
-          WARNINGS_COUNT="$(grep -ciE '\bwarning:' "$KERNEL_ROOT/common/build.log" || true)"
-        fi
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1)
+        echo "Kernel Uname: $KERNEL_UNAME"
+        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
         
-        echo "warnings_count=$WARNINGS_COUNT" >> "$GITHUB_OUTPUT"
-        echo "image_sha256=$IMG_SHA256" >> "$GITHUB_OUTPUT"
-        echo "build_time=${BUILD_TIME:-0}" >> "$GITHUB_OUTPUT"
+        printf 'warnings_count=%s\n' "$WARNINGS_COUNT" >> "$GITHUB_OUTPUT"
+        printf 'image_sha256=%s\n' "$IMG_SHA256" >> "$GITHUB_OUTPUT"
+        printf 'build_time=%s\n' "$BUILD_TIME" >> "$GITHUB_OUTPUT"
         
         echo "✅ Validation passed:"
         echo "   - Warnings: $WARNINGS_COUNT"
         echo "   - Image size: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
         echo "   - SHA256: $IMG_SHA256"
+        echo "   - Build time: ${BUILD_TIME}s"
 
     - name: Scan and collect patch rejects
       if: ${{ always() }}
