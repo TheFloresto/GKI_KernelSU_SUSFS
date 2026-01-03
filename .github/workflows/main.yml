@@ -55,10 +55,6 @@ on:
         description: "Android 16 - 6.12"
         type: boolean
         default: false
-      build_custom:
-        description: "Custom Builds"
-        type: boolean
-        default: true
       build_lts:
         description: "Build All LTS Kernels"
         type: boolean
