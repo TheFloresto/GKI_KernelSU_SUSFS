@@ -96,6 +96,22 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+        AOSP_MIRROR=https://android.googlesource.com
+        BRANCH=main-kernel-2026
+        git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
+        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg &
+        git clone $AOSP_MIRROR/platform/external/avb -b $BRANCH --depth 1 avb &
+        wait
+        
+        mkdir -p "$GITHUB_WORKSPACE/git-repo"
+        curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
+        chmod 0755 "$GITHUB_WORKSPACE/git-repo/repo"
+        echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
+
+    - name: Setup Build Environment Variables
+      shell: bash
+      run: |
+        set -euo pipefail
         CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
         KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
         mkdir -p "$KERNEL_ROOT"
@@ -106,16 +122,27 @@ jobs:
         KERNEL_ROOT=$KERNEL_ROOT
         SUSFS4KSU=$GITHUB_WORKSPACE/susfs4ksu
         KERNEL_PATCHES=$GITHUB_WORKSPACE/kernel_patches     
-        AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool
+        AVBTOOL=$GITHUB_WORKSPACE/avb/avbtool.py
         MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py
         UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py
-        BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem      
+        BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/avb/test/data/testkey_rsa2048.pem      
         ANYKERNEL3=$GITHUB_WORKSPACE/AnyKernel3
         REPO=$GITHUB_WORKSPACE/git-repo/repo
         EOF
         
         echo "PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin:$PATH" >> $GITHUB_ENV
         mkdir -p "$KERNEL_ROOT"
+
+    - name: Set boot sign key
+      shell: bash
+      env:
+        BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
+      run: |
+        set -euo pipefail
+        if [ ! -z "$BOOT_SIGN_KEY" ]; then
+          mkdir -p "$(dirname "$BOOT_SIGN_KEY_PATH")"
+          echo "$BOOT_SIGN_KEY" > "$BOOT_SIGN_KEY_PATH"
+        fi
 
     - name: Install Minimal Dependencies
       shell: bash
@@ -130,31 +157,6 @@ jobs:
         sudo apt-get clean
         echo "✅ Dependencies installed"
         echo "::endgroup::"
-
-    - name: Setup Build Environment
-      shell: bash
-      run: |
-        set -euo pipefail
-        AOSP_MIRROR=https://android.googlesource.com
-        BRANCH=main-kernel-2026
-        git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools &
-        git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg &
-        wait
-        
-        mkdir -p "$GITHUB_WORKSPACE/git-repo"
-        curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
-        chmod 0755 "$GITHUB_WORKSPACE/git-repo/repo"
-        echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
-
-    - name: Set boot sign key
-      shell: bash
-      env:
-        BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
-      run: |
-        set -euo pipefail
-        if [ ! -z "$BOOT_SIGN_KEY" ]; then
-          echo "$BOOT_SIGN_KEY" > "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem"
-        fi
 
     - name: 🏷️ Set Build Identity
       shell: bash
