@@ -344,24 +344,10 @@ jobs:
             ;;
           Next)
             echo "Adding KernelSU Next..."
-            if [[ "${{ inputs.ksu_commit }}" == "wild" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/KernelSU-Next/wild/kernel/setup.sh" | bash -s wild
-            elif [[ "${{ inputs.ksu_commit }}" == "pershoot" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
-              cd KernelSU-Next
-              COMMIT_HASH=$(git log --grep="kernel: Allow building when KSU_SUSFS is unset" -n 1 --format=%H)
-              if [[ -n "$COMMIT_HASH" ]]; then
-                echo "Found commit $COMMIT_HASH, restoring kernel/Kbuild..."
-                git restore --source="${COMMIT_HASH}^" -- kernel/Kbuild
-              else
-                echo "Commit not found"
-                exit 1
-              fi
-              sed -i 's|^\(KSU_NEXT_MANAGER_LIST :=.*\)$|\1,0x381:52d52d8c8bfbe53dc2b6ff1c613184e2c03013e090fe8905d8e3d5dc2658c2e4|' kernel/Kbuild
-            elif [[ -n "${{ inputs.ksu_commit }}" ]]; then
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/stable/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -
+              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
             fi
             ;;
           KSU)
