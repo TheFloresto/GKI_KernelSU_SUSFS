@@ -497,9 +497,8 @@ jobs:
         echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
 
     - name: Clone & Apply SUSFS Patches for KernelSU Variants
-      shell: bash
       run: |
-        set -e pipefail
+        set -euo pipefail
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
         cd susfs4ksu
