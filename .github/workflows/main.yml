@@ -353,9 +353,8 @@ jobs:
           - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
           
           Features:
-          -> KernelSU-Next dev-susfs patched by pershoot (Warning from pershoot: This version is not recommended for production use. It is only intended for testing and development purposes.)
-          -> SUSFS ඞ v2.0.0
-          -> Hybrid Root Hooks
+          -> ${{ inputs.ksu_variant }} KSU
+          -> Krobes Root Hooks
           -> Ptrace Patch Support for Older Kernels (<5.16)
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
