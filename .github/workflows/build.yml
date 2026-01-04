@@ -696,11 +696,6 @@ jobs:
               fi
             fi
             ;;
-          KSU)
-            SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"
-            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-            patch -p1 < 10_enable_susfs_for_ksu.patch
            KSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
