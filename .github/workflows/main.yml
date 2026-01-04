@@ -354,7 +354,8 @@ jobs:
           
           Features:
           -> ${{ inputs.ksu_variant }} KSU
-          -> Krobes Root Hooks
+          -> SUSFS ඞ v2.0.0
+          -> Hybrid Root Hooks
           -> Ptrace Patch Support for Older Kernels (<5.16)
           -> IPSet Support for Advanced Network Filtering
           -> Wireguard Support
