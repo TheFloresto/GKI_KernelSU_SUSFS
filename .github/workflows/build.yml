@@ -499,7 +499,7 @@ jobs:
     - name: Clone & Apply SUSFS Patches for KernelSU Variants
       shell: bash
       run: |
-        set -euo pipefail
+        set -eu pipefail
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
         cd susfs4ksu
@@ -748,10 +748,7 @@ jobs:
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
             cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-            patch -p1 < 10_enable_susfs_for_ksu.patch
-            
-            cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true 
+            patch -p1 < 10_enable_susfs_for_ksu.patch 
             ;;
           KowXU)
             SUSFS_VERSION="2.0.0"
