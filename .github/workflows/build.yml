@@ -732,7 +732,12 @@ jobs:
           SukiSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"  
-            # Your KSU-specific code goes here                     
+            # Your KSU-specific code goes here 
+            cd "$KERNEL_ROOT/common"
+            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
+            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
+            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
+            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true           
             ;;
         esac
 
