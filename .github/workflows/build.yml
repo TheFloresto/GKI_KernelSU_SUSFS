@@ -387,7 +387,7 @@ jobs:
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
             fi            
             ;;
         esac
@@ -732,7 +732,7 @@ jobs:
           SukiSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"  
-            # Your KSU-specific code goes here 
+            echo "patching kernel"
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
