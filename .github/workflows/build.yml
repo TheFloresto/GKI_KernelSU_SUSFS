@@ -731,13 +731,7 @@ jobs:
             ;;
           SukiSU)
             SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"  
-            echo "patching kernel"
-            cd "$KERNEL_ROOT/common"
-            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
-            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
-            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true           
+            cd "$KERNEL_ROOT/KernelSU"         
             ;;
         esac
 
@@ -899,6 +893,16 @@ jobs:
         CONFIG_TRACEPOINTS=y        
         EOF
 
+        echo "Checking if configs were applied..."
+        if grep -q "CONFIG_KSU=y" "${{ env.DEFCONFIG }}" && grep -q "CONFIG_KSU_SUSFS=y" "${{ env.DEFCONFIG }}" && grep -q "CONFIG_KPROBES=y" "${{ env.DEFCONFIG }}"; then
+          echo "SUCCESS: KSU, SUSFS, and KPROBES configs verified in ${{ env.DEFCONFIG }}"
+        else
+          echo "FAILED: KSU, SUSFS, or KPROBES configs missing in ${{ env.DEFCONFIG }}"
+          # print last 50 lines to see what happened
+          tail -n 50 "${{ env.DEFCONFIG }}"
+          exit 1
+        fi
+        
         # Remove check_defconfig
         if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
