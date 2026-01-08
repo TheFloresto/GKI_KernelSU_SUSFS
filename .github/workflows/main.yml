@@ -411,7 +411,7 @@ jobs:
       - name: Upload Release Assets
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -429,7 +429,7 @@ jobs:
             artifact_name=$(basename "$dir")
             echo "Creating ZIP for $artifact_name..."
             (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
-          done          
+          done
           wait
           
           # Upload all ZIPs
@@ -437,7 +437,7 @@ jobs:
             artifact_name=$(basename "$dir")
             echo "Uploading ${artifact_name}.zip..."
             gh release upload "${{ env.NEW_TAG }}" "${artifact_name}.zip" \
-              --repo ${{ env.TARGET_REPO }} \
+              --repo NerestKernels/GKI_KernelSU_SUSFS \
               --clobber
           done
           
