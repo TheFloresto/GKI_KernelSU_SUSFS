@@ -150,46 +150,51 @@ jobs:
       uses: actions/download-artifact@v5
       with:
         path: ./downloaded-artifacts
-        pattern: '*-Normal-Misc'
+        pattern: '*-Boots'
+
+    - name: Download Misc Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts
+        pattern: '*-Rejects'
 
     - name: Process Reject Artifacts
-      shell: bash
       run: |
-        set -euo pipefail
         mkdir -p aio-rejects
         
-        # Iterate over Misc artifacts in downloaded-artifacts
-        for dir in ./downloaded-artifacts/*-Normal-Misc; do
-          # Ensure it is a directory
-          [ -d "$dir" ] || continue
-          
-          dirname=$(basename "$dir")
-          echo "Processing $dirname..."
-          
-          # Check for patch-rejects folder
-          if [ -d "$dir/patch-rejects" ]; then
-            echo "Found patch-rejects in $dirname"
+        # Iterate over Rejects artifacts in downloaded-artifacts
+        for dir in ./downloaded-artifacts/*-Rejects; do
+            # Ensure it is a directory
+            [ -d "$dir" ] || continue
             
-            # Get original name (remove -Misc suffix)
-            original_name=${dirname%-Misc}
+            dirname=$(basename "$dir")
+            echo "Processing $dirname..."
             
-            # Move and rename patch-rejects to aio-rejects/original_name
-            mv "$dir/patch-rejects" "aio-rejects/$original_name"
-          else
-            echo "No patch-rejects found in $dirname"
-          fi
+            # Get original name (remove -Rejects suffix)
+            original_name=${dirname%-Rejects}
+            
+            mkdir -p "aio-rejects/$original_name"
+            
+            # Check for patch-rejects folder (legacy structure) or direct contents
+            if [ -d "$dir/patch-rejects" ]; then
+                echo "Found patch-rejects subdir in $dirname"
+                cp -r "$dir/patch-rejects/." "aio-rejects/$original_name/"
+            else
+                echo "Copying contents from $dirname"
+                cp -r "$dir/." "aio-rejects/$original_name/"
+            fi
         done
         
         # Zip and upload if we found anything
         if [ "$(ls -A aio-rejects)" ]; then
-          echo "Creating AIO-REJ.zip..."
-          cd aio-rejects
-          zip -r -q -9 ../AIO-REJ.zip .
-          cd ..
+            echo "Creating AIO-REJ.zip..."
+            cd aio-rejects
+            zip -r -q -9 ../AIO-REJ.zip .
+            cd ..
         else
-          echo "No rejects found to upload."
+            echo "No rejects found to upload."
         fi
-
+        
     - name: Upload AIO-REJ Artifact
       uses: actions/upload-artifact@v4
       with:
