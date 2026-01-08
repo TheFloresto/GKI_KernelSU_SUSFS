@@ -823,9 +823,9 @@ jobs:
         set -euo pipefail
         cat >> "${{ env.DEFCONFIG }}" << 'EOF'
         # Kprobes (required for KernelSU)
-        CONFIG_KPROBES=y
-        CONFIG_HAVE_KPROBES=y
-        CONFIG_KPROBE_EVENTS=y
+        #CONFIG_KPROBES=y
+        #CONFIG_HAVE_KPROBES=y
+        #CONFIG_KPROBE_EVENTS=y
 
         CONFIG_KSU_SUSFS=y
         CONFIG_KSU_SUSFS_SUS_PATH=y
