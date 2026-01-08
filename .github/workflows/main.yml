@@ -15,7 +15,7 @@ on:
       ksu_variant:
         description: "KernelSU Variant"
         type: choice
-        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, Sukisu]
+        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, Sukisu ]
         default: WKSU
       ksu_commit:
         description: "KSU Commit (optional)"
@@ -137,356 +137,400 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     needs:
-      - build-a12-5-10
-      - build-a13-5-10
-      - build-a13-5-15
-      - build-a14-5-15
-      - build-a14-6-1
-      - build-a15-6-6
-      - build-a16-6-12
-      - build-lts
+    - build-a12-5-10
+    - build-a13-5-10
+    - build-a13-5-15
+    - build-a14-5-15
+    - build-a14-6-1
+    - build-a15-6-6
+    - build-a16-6-12
+    - build-lts
     steps:
-      - name: Download Misc Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./downloaded-artifacts
-          pattern: '*-Normal-Misc'
+    - name: Download Misc Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts
+        pattern: '*-Normal-Misc'
 
-      - name: Process Reject Artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p aio-rejects
+    - name: Process Reject Artifacts
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p aio-rejects
+        
+        # Iterate over Misc artifacts in downloaded-artifacts
+        for dir in ./downloaded-artifacts/*-Normal-Misc; do
+          # Ensure it is a directory
+          [ -d "$dir" ] || continue
           
-          # Iterate over Misc artifacts in downloaded-artifacts
-          for dir in ./downloaded-artifacts/*-Normal-Misc; do
-            # Ensure it is a directory
-            [ -d "$dir" ] || continue
-            
-            dirname=$(basename "$dir")
-            echo "Processing $dirname..."
-            
-            # Check for patch-rejects folder
-            if [ -d "$dir/patch-rejects" ]; then
-              echo "Found patch-rejects in $dirname"
-              
-              # Get original name (remove -Misc suffix)
-              original_name=${dirname%-Misc}
-              
-              # Move and rename patch-rejects to aio-rejects/original_name
-              mv "$dir/patch-rejects" "aio-rejects/$original_name"
-            else
-              echo "No patch-rejects found in $dirname"
-            fi
-          done
+          dirname=$(basename "$dir")
+          echo "Processing $dirname..."
           
-          # Zip and upload if we found anything
-          if [ "$(ls -A aio-rejects)" ]; then
-            echo "Creating AIO-REJ.zip..."
-            cd aio-rejects
-            zip -r -q -9 ../AIO-REJ.zip .
-            cd ..
+          # Check for patch-rejects folder
+          if [ -d "$dir/patch-rejects" ]; then
+            echo "Found patch-rejects in $dirname"
+            
+            # Get original name (remove -Misc suffix)
+            original_name=${dirname%-Misc}
+            
+            # Move and rename patch-rejects to aio-rejects/original_name
+            mv "$dir/patch-rejects" "aio-rejects/$original_name"
           else
-            echo "No rejects found to upload."
+            echo "No patch-rejects found in $dirname"
           fi
+        done
+        
+        # Zip and upload if we found anything
+        if [ "$(ls -A aio-rejects)" ]; then
+          echo "Creating AIO-REJ.zip..."
+          cd aio-rejects
+          zip -r -q -9 ../AIO-REJ.zip .
+          cd ..
+        else
+          echo "No rejects found to upload."
+        fi
 
-      - name: Upload AIO-REJ Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AIO-REJ
-          path: AIO-REJ.zip
-          if-no-files-found: ignore
+    - name: Upload AIO-REJ Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AIO-REJ
+        path: AIO-REJ.zip
+        if-no-files-found: ignore
 
   release:
     runs-on: ubuntu-latest
     if: inputs.release_type != 'Actions'
+    permissions:
+      contents: write
     needs:
-      - build-a12-5-10
-      - build-a13-5-10
-      - build-a13-5-15
-      - build-a14-5-15
-      - build-a14-6-1
-      - build-a15-6-6
-      - build-a16-6-12
+    - build-a12-5-10
+    - build-a13-5-10
+    - build-a13-5-15
+    - build-a14-5-15
+    - build-a14-6-1
+    - build-a15-6-6
+    - build-a16-6-12
+    - build-lts
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       RELEASE_NAME: "!!TESTING!! GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0 !!TESTING!!"
       RELEASE_BODY: ""
-      TARGET_REPO: NerestKernels/GKI_KernelSU_SUSFS
-      
+    outputs:
+      new_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Free Disk Space
+      if: true
+      uses: endersonmenezes/free-disk-space@v3
+      with:
+        remove_android: true
+        remove_dotnet: true
+        remove_haskell: true
+        remove_tool_cache: true
+        remove_swap: true
+        remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+        remove_packages_one_command: true
+        remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+        rm_cmd: "rmz"
+        rmz_version: "3.1.1"
+        testing: false
 
-      - name: Get commit hashes and generate commit URLs
-        shell: bash
-        run: |
-          set -euo pipefail
-          GITLAB_OWNER="simonpunk"
-          GITLAB_REPO="susfs4ksu"
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        repository: NerestKernels/GKI_KernelSU_SUSFS
+        token: ${{ secrets.RELEASE_TOKEN }}
+
+    - name: Get commit hashes and generate commit URLs
+      shell: bash
+      run: |
+        set -euo pipefail
+        GITLAB_OWNER="simonpunk"
+        GITLAB_REPO="susfs4ksu"
+        
+        declare -A BRANCH_MAP=(
+          ["gki_android12_5_10"]="gki-android12-5.10"
+          ["gki_android13_5_10"]="gki-android13-5.10"
+          ["gki_android13_5_15"]="gki-android13-5.15"
+          ["gki_android14_5_15"]="gki-android14-5.15"
+          ["gki_android14_6_1"]="gki-android14-6.1"
+          ["gki_android15_6_6"]="gki-android15-6.6"
+        )
+        
+        for var_name in "${!BRANCH_MAP[@]}"; do
+          branch_name="${BRANCH_MAP[$var_name]}"
+          COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
           
-          declare -A BRANCH_MAP=(
-            ["gki_android12_5_10"]="gki-android12-5.10"
-            ["gki_android13_5_10"]="gki-android13-5.10"
-            ["gki_android13_5_15"]="gki-android13-5.15"
-            ["gki_android14_5_15"]="gki-android14-5.15"
-            ["gki_android14_6_1"]="gki-android14-6.1"
-            ["gki_android15_6_6"]="gki-android15-6.6"
-          )
-          
-          for var_name in "${!BRANCH_MAP[@]}"; do
-            branch_name="${BRANCH_MAP[$var_name]}"
-            COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
+          if [[ -n "$COMMIT_HASH" ]]; then
+            COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
+            echo "$branch_name Commit: $COMMIT_HASH"
+            echo "$branch_name Commit URL: $COMMIT_URL"
             
-            if [[ -n "$COMMIT_HASH" ]]; then
-              COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
-              echo "$branch_name Commit: $COMMIT_HASH"
-              echo "$branch_name Commit URL: $COMMIT_URL"
-              
-              echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
-              echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
-            fi
-          done
+            echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
+            echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
+          fi
+        done
 
-      - name: Get KernelSU variant refs and links
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          case "${{ inputs.ksu_variant }}" in
-            "WKSU")
-              KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
-              KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
-              ;;
-            "Next")
-              KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/dev | awk '{print $1}')
-              KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
-              ;;
-            "MKSU")
-              KSU_REF=$(git ls-remote "https://github.com/MollySophia/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/MollySophia/KernelSU/commit/$KSU_REF"
-              ;;
-            "KSU")
-              KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
-              ;;
-            "RKSU")
-              KSU_REF=$(git ls-remote "https://github.com/rsuntk/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/rsuntk/KernelSU/commit/$KSU_REF"             
-              ;;
-            "KowXU")
-              KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
-              KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"           
-              ;;
-            "Sukisu")
-              KSU_REF=$(git ls-remote "https://github.com/Ylarod/KernelSU.git" refs/heads/main | awk '{print $1}')
-              KSU_URL="https://github.com/Ylarod/KernelSU/commit/$KSU_REF"
-              ;;
-            *)
-              echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
-              exit 1
-              ;;
-          esac
-          
-          if [[ -z "$KSU_REF" ]]; then
-            echo "ERROR: Failed to get KSU_REF for variant ${{ inputs.ksu_variant }}"
+    - name: Get KernelSU variant refs and links
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        case "${{ inputs.ksu_variant }}" in
+          "WKSU")
+            KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/wild | awk '{print $1}')
+            KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
+            ;;
+          "Next")
+            KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/dev | awk '{print $1}')
+            KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
+            ;;
+          "MKSU")
+            KSU_REF=$(git ls-remote "https://github.com/MollySophia/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/MollySophia/KernelSU/commit/$KSU_REF"
+            ;;
+          "KSU")
+            KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
+            ;;
+          "RKSU")
+            KSU_REF=$(git ls-remote "https://github.com/rsuntk/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/rsuntk/KernelSU/commit/$KSU_REF"             
+            ;;
+          "KowXU")
+            KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
+            KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"           
+            ;;
+          "Sukisu")
+            KSU_REF=$(git ls-remote "https://github.com/Ylarod/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/Ylarod/KernelSU/commit/$KSU_REF"
+            ;;
+          *)
+            echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
             exit 1
-          fi
-          
-          echo "KSU Variant: ${{ inputs.ksu_variant }}"
-          echo "KSU_REF: $KSU_REF"
-          echo "KSU_URL: $KSU_URL"
-          
-          echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
-          echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
-          
-          BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
-          BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
-          
-          if [[ -z "$BBG_REF" ]]; then
-            echo "ERROR: Failed to get BBG_REF"
-            exit 1
-          fi
-          
-          echo "BBG_REF: $BBG_REF"
-          echo "BBG_URL: $BBG_URL"
-          
-          echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
-          echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
+            ;;
+        esac
+        
+        if [[ -z "$KSU_REF" ]]; then
+          echo "ERROR: Failed to get KSU_REF for variant ${{ inputs.ksu_variant }}"
+          exit 1
+        fi
+        
+        echo "KSU Variant: ${{ inputs.ksu_variant }}"
+        echo "KSU_REF: $KSU_REF"
+        echo "KSU_URL: $KSU_URL"
+        
+        echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
+        echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
+        
+        BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
+        BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
+        
+        if [[ -z "$BBG_REF" ]]; then
+          echo "ERROR: Failed to get BBG_REF"
+          exit 1
+        fi
+        
+        echo "BBG_REF: $BBG_REF"
+        echo "BBG_URL: $BBG_URL"
+        
+        echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
+        echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
 
-      - name: Generate New Tag
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        if: inputs.release_type != 'Actions'
-        run: |
-          set -euo pipefail
-          LATEST_TAG=$(gh api repos/${{ env.TARGET_REPO }}/tags --jq '.[0].name' 2>/dev/null || echo "")
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
-          
-          echo "New tag: $NEW_TAG"
-          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+    - name: Generate New Tag
+      if: inputs.release_type != 'Actions'
+      run: |
+        LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
+        if [[ "$LATEST_TAG" =~ ^(.*)-r([0-9]+)$ ]]; then
+          VERSION="${BASH_REMATCH[1]}"
+          REV="${BASH_REMATCH[2]}"
+          NEW_REV=$((REV + 1))
+          NEW_TAG="${VERSION}-r${NEW_REV}"
+        else
+          NEW_TAG="${LATEST_TAG}-r1"
+        fi
+        
+        echo "New tag: $NEW_TAG"
+        echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-      - name: Set release body
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat << 'EOF' > release_body.md
-          
-          !!THIS RELEASE IS A TESTING RELEASE!!
-          
-          **IMPORTANT DISCLAIMER**
-          This software is provided for testing and educational purposes only. Use at your own risk.
-          The developers are not responsible for any damage, data loss, or issues that may occur.
-          Please ensure you have proper backups before installation.
-          
-          🔹 Normal 
-          - Default kernel configuration 
-          - Standard kernel module loading behavior 
-          - Recommended for most users 
-          
-          🔹 Bypass 
-          - Includes module check bypass modifications 
-          - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
-          - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
-          - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
-          
-          Features:
-          -> ${{ inputs.ksu_variant }} KSU
-          -> SUSFS ඞ v2.0.0
-          -> Hybrid Root Hooks
-          -> Ptrace Patch Support for Older Kernels (<5.16)
-          -> IPSet Support for Advanced Network Filtering
-          -> Wireguard Support
-          -> BBR v1 Support
-          -> BBG: https://github.com/vc-teahouse/Baseband-guard
-          
-          🔹 BBG (Baseband-guard)
-          - A lightweight LSM (Linux Security Module) for Android kernel
-          - Blocks unauthorized writes to critical partitions/device nodes
-          - Prevents malicious tampering with baseband and boot chain
-          - Kernel-level protection via LSM hooks
-          - Reduces risk of soft-brick/hard-brick issues
-          
-          Kernel Flasher:
-          -> https://github.com/fatalcoder524/KernelFlasher/
-          
-          Managers:
-          -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
-          -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
-          -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
-          -> MKSU: [Github](https://github.com/MollySophia/KernelSU) [Telegram](https://t.me/mksu_ci)
-          -> RKSU: [Github](https://github.com/rsuntk/KernelSU) [Telegram](https://t.me/rsuntk)
-          -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
-          -> Sukisu: [Github](https://github.com/Ylarod/KernelSU) [Telegram](https://t.me/Sukiksu)
-          
-          Commit Hashes (at the time of release):
-          -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
-          
-          -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
-          
-          Module: 
-          -> https://github.com/sidex15/ksu_module_susfs
-          
-          !!THIS RELEASE IS A TESTING RELEASE!!
-          EOF
+    - name: Set release body
+      run: |
+        cat << 'EOF' > release_body.md
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.NEW_TAG }}
-          repository: ${{ env.TARGET_REPO }}
-          token: ${{ secrets.RELEASE_TOKEN }}
-          prerelease: ${{ inputs.release_type == 'Pre-Release' }}
-          files: ""
-          name: ${{ env.RELEASE_NAME }}
-          body_path: release_body.md
+        !!THIS RELEASE IS A TESTING RELEASE!!
 
-      - name: Download Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./downloaded-artifacts
-          pattern: '*-AK3'
+        **IMPORTANT DISCLAIMER**
+        This software is provided for testing and educational purposes only. Use at your own risk.
+        The developers are not responsible for any damage, data loss, or issues that may occur.
+        Please ensure you have proper backups before installation.
 
-      - name: Upload Release Assets
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          anykernel_dirs=(./downloaded-artifacts/*-AK3/)
-          
-          if [ ${#anykernel_dirs[@]} -eq 0 ]; then
-            echo "No AK3 artifact directories found; skipping upload."
-            exit 0
-          fi
-          
-          echo "Found ${#anykernel_dirs[@]} artifacts to process"
-          
-          # Create all ZIPs in parallel
-          for dir in "${anykernel_dirs[@]}"; do
-            artifact_name=$(basename "$dir")
-            echo "Creating ZIP for $artifact_name..."
-            (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
-          done          
-          wait
-          
-          # Upload all ZIPs
-          for dir in "${anykernel_dirs[@]}"; do
-            artifact_name=$(basename "$dir")
-            echo "Uploading ${artifact_name}.zip..."
-            gh release upload "${{ env.NEW_TAG }}" "${artifact_name}.zip" \
-              --repo ${{ env.TARGET_REPO }} \
-              --clobber
-          done
-          
-      - name: Send Telegram Notification
-        if: inputs.release_type != 'Actions'
-        shell: bash
-        run: |
-          set -euo pipefail
-          RELEASE_TYPE_TEXT=""
-          if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
-            RELEASE_TYPE_TEXT="🧪 Pre-Release"
-          else
-            RELEASE_TYPE_TEXT="🚀 Release"
-          fi
-          
-          MESSAGE="🌽 *New Kernel ${RELEASE_TYPE_TEXT} Uploaded*
-          
-          🛑 *Variant:* \`${{ inputs.ksu_variant }}\`
-          📦 *Repository:* [NerestKernels/GKI\_KernelSU\_SUSFS](https://github.com/${{ env.TARGET_REPO }})
-          ✏️ *Commit:* [\`${GITHUB_SHA:0:7}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-          🔗 [View GitHub Release](https://github.com/${{ env.TARGET_REPO }}/releases/tag/${{ env.NEW_TAG }})"
-          
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
-            -d parse_mode="Markdown" \
-            -d text="$MESSAGE"
+        🔹 Normal 
+        - Default kernel configuration 
+        - Standard kernel module loading behavior 
+        - Recommended for most users 
+
+        🔹 Bypass 
+        - Includes module check bypass modifications 
+        - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
+        - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
+        - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
+
+        Features:
+        -> Multiple KernelSU Variant Support
+        -> SUSFS ඞ v2.0.0
+        -> SUSFS Inline Hooks
+        -> Ptrace Patch Support for Older Kernels (<5.16)
+        -> IPSet Support for Advanced Network Filtering
+        -> Wireguard Support
+        -> BBR v1 Support
+        -> BBG: https://github.com/vc-teahouse/Baseband-guard
+
+        🔹 BBG (Baseband-guard)
+        - A lightweight LSM (Linux Security Module) for Android kernel
+        - Blocks unauthorized writes to critical partitions/device nodes
+        - Prevents malicious tampering with baseband and boot chain
+        - Kernel-level protection via LSM hooks
+        - Reduces risk of soft-brick/hard-brick issues
+
+        Kernel Flasher:
+        -> https://github.com/fatalcoder524/KernelFlasher/
+
+        Managers:
+        -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
+        -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
+        -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
+        -> MKSU: [Github](https://github.com/MollySophia/KernelSU) [Telegram](https://t.me/mksu_ci)
+        -> RKSU: [Github](https://github.com/rsuntk/KernelSU) [Telegram](https://t.me/rsuntk)
+        -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
+        -> Sukisu: [Github](https://github.com/Ylarod/KernelSU) [Telegram](https://t.me/Sukiksu)
+
+        Commit Hashes (at the time of release):
+        -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
+        -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
+
+        Module: 
+        -> https://github.com/sidex15/ksu_module_susfs
+
+        !!THIS RELEASE IS A TESTING RELEASE!!
+        EOF
+
+    - name: Create GitHub Release
+      run: |
+        PRERELEASE_FLAG=""
+        if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
+          PRERELEASE_FLAG="--prerelease"
+        fi
+
+        echo "Creating release ${{ env.NEW_TAG }}..."
+        gh release create "${{ env.NEW_TAG }}" \
+          --repo NerestKernels/GKI_KernelSU_SUSFS \
+          --title "${{ env.RELEASE_NAME }}" \
+          --notes-file release_body.md \
+          --target "${{ github.sha }}" \
+          $PRERELEASE_FLAG
+
+    - name: Download Artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: ./downloaded-artifacts
+        pattern: '*-AK3'
+
+    - name: Upload Release Assets
+      run: |+
+        shopt -s nullglob
+        mapfile -t anykernel_dirs < <(find ./downloaded-artifacts -maxdepth 2 -type d -name '*-AK3' -print)
+
+        for dir in "${anykernel_dirs[@]}"; do
+          artifact_name=$(basename "$dir")
+          echo "Creating ZIP for $artifact_name..."
+          (cd "$dir" && zip -r -q -9 "$GITHUB_WORKSPACE/${artifact_name}.zip" ./*) &
+        done
+        wait
+
+        for dir in "${anykernel_dirs[@]}"; do
+          artifact_name=$(basename "$dir")
+          echo "Uploading ${artifact_name}.zip..."
+          gh release upload "${{ env.NEW_TAG }}" "$GITHUB_WORKSPACE/${artifact_name}.zip" \
+            --repo NerestKernels/GKI_KernelSU_SUSFS \
+            --clobber
+        done
 
   notify-actions:
     runs-on: ubuntu-latest
-    if: inputs.release_type == 'Actions'
+    needs: [release]
+    if: always()
     env:
-      TARGET_REPO: NerestKernels/GKI_KernelSU_SUSFS
+      NEW_TAG: ${{ needs.release.outputs.new_tag }}
     steps:
-      - name: Send Telegram Notification
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          MESSAGE="🌽 *New Kernel Actions Build Finished*
-          
-          🛑 *Variant:* \`${{ inputs.ksu_variant }}\`
-          📦 *Repository:* [NerestKernels/GKI\_KernelSU\_SUSFS](https://github.com/${{ env.TARGET_REPO }})
-          ✏️ *Commit:* [\`${GITHUB_SHA:0:7}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-          🔗 [View Actions](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
-            -d parse_mode="Markdown" \
-            -d text="$MESSAGE"
+    - name: Free Disk Space
+      if: true
+      uses: endersonmenezes/free-disk-space@v3
+      with:
+        remove_android: true
+        remove_dotnet: true
+        remove_haskell: true
+        remove_tool_cache: true
+        remove_swap: true
+        remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+        remove_packages_one_command: true
+        remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+        rm_cmd: "rmz"
+        rmz_version: "3.1.1"
+        testing: false
+
+    - name: Send Telegram Notification
+      if: inputs.release_type == 'Actions'
+      run: |
+        curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
+          -F text="
+          🌽 *New Kernel Actions Build Finished*
+          📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)
+          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+          [🔗 View Action Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+          -F parse_mode="Markdown"
+
+    - name: Send Telegram Notification
+      if: inputs.release_type != 'Actions' && needs.release.result == 'success'
+      run: |
+        RELEASE_TYPE_TEXT=""
+        if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
+          RELEASE_TYPE_TEXT="🧪 *Pre-Release*"
+        else
+          RELEASE_TYPE_TEXT="🚀 *Release*"
+        fi
+
+        curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -F message_thread_id="${{ secrets.TELEGRAM_TOPIC_ID_GKI }}" \
+          -F text="
+          🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
+          📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)
+          ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+          [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ env.NEW_TAG }})" \
+          -F parse_mode="Markdown"
+
+    - name: DM Artifacts
+      if: always()
+      run: |
+        shopt -s nullglob
+        files=("$GITHUB_WORKSPACE"/*.zip)
+
+        if [ ${#files[@]} -eq 0 ]; then
+            echo "No ZIP files found for DM."
+            exit 0
+        fi
+
+        if [ -z "${{ secrets.TELEGRAM_USER_ID }}" ]; then
+            echo "Error: TELEGRAM_USER_ID secret is not set."
+            exit 1
+        fi
+
+        for file in "${files[@]}"; do
+            echo "Sending $(basename "$file") to Telegram DM..."
+            curl -v -F chat_id="${{ secrets.TELEGRAM_USER_ID }}" \
+                -F document=@"$file" \
+                -F caption="📦 Build: $(basename "$file")" \
+                https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
+        done
