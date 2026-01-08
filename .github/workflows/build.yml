@@ -980,6 +980,8 @@ jobs:
         cat >> "${{ env.DEFCONFIG }}" << 'EOF'
         # SukiSU Support
         CONFIG_KSU_SUSFS_SUS_KSTAT_USE_INLINE_HOOK=y
+        CONFIG_KSU_MANUAL_SU=y
+        CONFIG_KPM=n
         EOF
 
     - name: Configure Next
