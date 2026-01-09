@@ -686,57 +686,22 @@ jobs:
         echo "Contents of ${{ env.DEFCONFIG }}:"
         cat "${{ env.DEFCONFIG }}"
 
-    - name: Configure KSU
-      if: ${{ inputs.ksu_variant == 'KSU' }}
+    - name: Configure WKSU
+      if: ${{ inputs.ksu_variant == 'WKSU' }}
       shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
         set -euo pipefail
         cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-        # KSU Support
+        # WKSU Support
         CONFIG_KSU_KPROBES_HOOK=n
         CONFIG_KSU_ALLOWLIST_WORKAROUND=n
         CONFIG_KSU_LSM_SECURITY_HOOKS=y
         EOF
-
-    - name: Configure MKSU
-      if: ${{ inputs.ksu_variant == 'MKSU' }}
-      shell: bash
-      working-directory: ${{ env.KERNEL_ROOT }}
-      run: |
-        set -euo pipefail
-        cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-        # MKSU Support
-        CONFIG_KSU_KPROBES_HOOK=n
-        CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-        CONFIG_KSU_LSM_SECURITY_HOOKS=y
-        EOF
-
-    - name: Configure KowXU
-      if: ${{ inputs.ksu_variant == 'KowXU' }}
-      shell: bash
-      working-directory: ${{ env.KERNEL_ROOT }}
-      run: |
-        set -euo pipefail
-        cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-        # KowXU Support
-        CONFIG_KSU_KPROBES_HOOK=n
-        CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-        CONFIG_KSU_LSM_SECURITY_HOOKS=y
-        EOF
-
-    - name: Configure SukiSU
-      if: ${{ inputs.ksu_variant == 'SukiSU' }}
-      shell: bash
-      working-directory: ${{ env.KERNEL_ROOT }}
-      run: |
-        set -euo pipefail
-        cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-        # SukiSU Support
-        CONFIG_KSU_KPROBES_HOOK=n
-        CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-        CONFIG_KSU_LSM_SECURITY_HOOKS=y
-        EOF
+        
+        echo "✅ WKSU configuration applied"
+        echo "Contents of defconfig (last 20 lines):"
+        tail -n 20 "${{ env.DEFCONFIG }}"
 
     - name: Configure Next
       if: ${{ inputs.ksu_variant == 'Next' }}
@@ -750,6 +715,44 @@ jobs:
         CONFIG_KSU_ALLOWLIST_WORKAROUND=n
         CONFIG_KSU_LSM_SECURITY_HOOKS=y
         EOF
+        
+        echo "✅ Next configuration applied"
+        echo "Contents of defconfig (last 20 lines):"
+        tail -n 20 "${{ env.DEFCONFIG }}"
+
+    - name: Configure KSU
+      if: ${{ inputs.ksu_variant == 'KSU' }}
+      shell: bash
+      working-directory: ${{ env.KERNEL_ROOT }}
+      run: |
+        set -euo pipefail
+        cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+        # KSU Support
+        CONFIG_KSU_KPROBES_HOOK=n
+        CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+        CONFIG_KSU_LSM_SECURITY_HOOKS=y
+        EOF
+        
+        echo "✅ KSU configuration applied"
+        echo "Contents of defconfig (last 20 lines):"
+        tail -n 20 "${{ env.DEFCONFIG }}"
+
+    - name: Configure MKSU
+      if: ${{ inputs.ksu_variant == 'MKSU' }}
+      shell: bash
+      working-directory: ${{ env.KERNEL_ROOT }}
+      run: |
+        set -euo pipefail
+        cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+        # MKSU Support
+        CONFIG_KSU_KPROBES_HOOK=n
+        CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+        CONFIG_KSU_LSM_SECURITY_HOOKS=y
+        EOF
+        
+        echo "✅ MKSU configuration applied"
+        echo "Contents of defconfig (last 20 lines):"
+        tail -n 20 "${{ env.DEFCONFIG }}"
 
     - name: Configure RKSU
       if: ${{ inputs.ksu_variant == 'RKSU' }}
@@ -758,11 +761,50 @@ jobs:
       run: |
         set -euo pipefail
         cat >> "${{ env.DEFCONFIG }}" << 'EOF'
-        # Next Support
+        # RKSU Support
         CONFIG_KSU_KPROBES_HOOK=n
         CONFIG_KSU_ALLOWLIST_WORKAROUND=n
         CONFIG_KSU_LSM_SECURITY_HOOKS=y
-        EOF        
+        EOF
+        
+        echo "✅ RKSU configuration applied"
+        echo "Contents of defconfig (last 20 lines):"
+        tail -n 20 "${{ env.DEFCONFIG }}"
+
+    - name: Configure KowXU
+      if: ${{ inputs.ksu_variant == 'KowXU' }}
+      shell: bash
+      working-directory: ${{ env.KERNEL_ROOT }}
+      run: |
+        set -euo pipefail
+        cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+        # KowXU Support
+        CONFIG_KSU_KPROBES_HOOK=n
+        CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+        CONFIG_KSU_LSM_SECURITY_HOOKS=y
+        EOF
+        
+        echo "✅ KowXU configuration applied"
+        echo "Contents of defconfig (last 20 lines):"
+        tail -n 20 "${{ env.DEFCONFIG }}"
+
+    - name: Configure SukiSU
+      if: ${{ inputs.ksu_variant == 'SukiSU' }}
+      shell: bash
+      working-directory: ${{ env.KERNEL_ROOT }}
+      run: |
+        set -euo pipefail
+        cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+        # SukiSU Support
+        CONFIG_KSU_KPROBES_HOOK=n
+        CONFIG_KSU_ALLOWLIST_WORKAROUND=n
+        CONFIG_KSU_LSM_SECURITY_HOOKS=y
+        CONFIG_KPM=n
+        EOF
+        
+        echo "✅ SukiSU configuration applied"
+        echo "Contents of defconfig (last 20 lines):"
+        tail -n 20 "${{ env.DEFCONFIG }}"        
 
     - name: Append ashmem exports if missing
       if: ${{ inputs.android_version == 'android16' && inputs.kernel_version == '6.12' }}
