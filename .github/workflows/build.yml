@@ -155,8 +155,7 @@ jobs:
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
         rm -rf AnyKernel3/.git
-        git clone https://github.com/TheFloresto/kernel_patches.git              
-        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+        git clone https://github.com/TheFloresto/kernel_patches.git
 
     - name: Initialize and Sync Kernel Source
       shell: bash
@@ -476,11 +475,13 @@ jobs:
         echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
         echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
         
-    - name: Apply SUSFS Patches for KernelSU Variants
+    - name: Clone & Apply SUSFS Patches for KernelSU Variants
       shell: bash
-      working-directory: ${{ env.KERNEL_ROOT }}
       run: |
-        set -eo pipefail
+        set -euo pipefail
+        SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+        cd susfs4ksu
               
         # Set SUSFS version
         SUSFS_VERSION="2.0.0"
@@ -695,7 +696,7 @@ jobs:
           patch -p1 --forward < clear_page_16bytes_align.patch
         else
           cp "$KERNEL_PATCHES/common/clear_page_16bytes_align.patch" ./
-          sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' clear_page_16byts_align.patch > clear_page_16bytes_align__pi.patch
+          sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' clear_page_16bytes_align.patch > clear_page_16bytes_align__pi.patch
           patch -p1 -F3 --forward < clear_page_16bytes_align__pi.patch
         fi
 
