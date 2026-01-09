@@ -495,11 +495,9 @@ jobs:
             cd "$KERNEL_ROOT/KernelSU-Next"
             echo "Patching KernelSU-Next for SUSFS..."
             cp $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
-            
+            patch -p1 < 10_enable_susfs_for_ksu.patch || true        
             echo "Applying SUSFS fix patches..."
-            cp "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
-            
+            cp "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./       
             echo "fixing Makefile/kbuild"
             patch -p1 < fix_Makefile.patch
             echo "fixing allowlist.c"
