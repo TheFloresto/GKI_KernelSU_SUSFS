@@ -152,9 +152,11 @@ jobs:
       run: |
         set -euo pipefail
         ANYKERNEL_BRANCH="gki-2.0"
+        SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
         rm -rf AnyKernel3/.git
-        git clone https://github.com/TheFloresto/kernel_patches.git
+        git clone https://github.com/TheFloresto/kernel_patches.git              
+        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
     - name: Initialize and Sync Kernel Source
       shell: bash
@@ -475,13 +477,10 @@ jobs:
         echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
         
     - name: Apply SUSFS Patches for KernelSU Variants
-      if: ${{ inputs.ksu_variant != 'SukiSU' }}
       shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
         set -eo pipefail
-        SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
               
         # Set SUSFS version
         SUSFS_VERSION="2.0.0"
@@ -491,7 +490,7 @@ jobs:
 
         # Apply core SUSFS patches
         cd "$KERNEL_ROOT/common"
-        cp -v "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" ./
+        cp -v $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
         case "${{ inputs.ksu_variant }}" in
@@ -569,9 +568,9 @@ jobs:
             cp -v "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true              
             ;;
-          *)
-            echo "Unknown KSU variant: ${{ inputs.ksu_variant }}"
-            exit 1
+          SukiSU)
+            cd "$KERNEL_ROOT/KernelSU"  
+            # Your KSU-specific code goes here
             ;;
         esac
 
@@ -670,24 +669,13 @@ jobs:
             cp -v $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
             patch -p1 < fix_open.c.patch || true
             ;;
-          *)
-            echo "Unknown variant for compatibility fixes"
+           SukiSU)
+            cd "$KERNEL_ROOT/KernelSU"  
+            # Your KSU-specific code goes here
             ;;
         esac
         
         echo "✅ SUSFS patches applied successfully for ${{ inputs.ksu_variant }}"
-
-    - name: SukiSU Notice
-      if: ${{ inputs.ksu_variant == 'SukiSU' }}
-      shell: bash
-      run: |
-        echo "================================================"
-        echo "ℹ️  SukiSU Build Notice"
-        echo "================================================"
-        echo "SukiSU has built-in SUSFS support"
-        echo "External SUSFS patches are NOT applied"
-        echo "Using SukiSU's native SUSFS implementation"
-        echo "================================================"
 
     - name: Apply Performance Patches
       if: true
@@ -707,7 +695,7 @@ jobs:
           patch -p1 --forward < clear_page_16bytes_align.patch
         else
           cp "$KERNEL_PATCHES/common/clear_page_16bytes_align.patch" ./
-          sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' clear_page_16bytes_align.patch > clear_page_16bytes_align__pi.patch
+          sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' clear_page_16byts_align.patch > clear_page_16bytes_align__pi.patch
           patch -p1 -F3 --forward < clear_page_16bytes_align__pi.patch
         fi
 
