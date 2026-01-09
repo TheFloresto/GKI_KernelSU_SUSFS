@@ -508,29 +508,29 @@ jobs:
             echo "Applying SUSFS fix patches..."
             cp "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/"*.patch ./
             
-            echo "Fixing Makefile/kbuild"
+            echo "fixing Makefile/kbuild"
             patch -p1 < fix_Makefile.patch
-            echo "Fixing allowlist.c"
+            echo "fixing allowlist.c"
             patch -p1 < fix_allowlist.c.patch
-            echo "Fixing apk_sign.c"
+            echo "fixing apk_sign.c"
             patch -p1 < fix_apk_sign.c.patch
-            echo "Fixing kernel_umount.c"
+            echo "fixing kernel_umount.c"
             patch -p1 < fix_kernel_umount.c.patch
-            echo "Fixing ksu.c"
+            echo "fixing ksu.c"
             patch -p1 < fix_ksu.c.patch
-            echo "Fixing ksud.c"
+            echo "fixing ksud.c"
             patch -p1 < fix_ksud.c.patch
-            echo "Fixing selinux.c"
+            echo "fixing selinux.c"
             patch -p1 < fix_selinux.c.patch
-            echo "Fixing setuid_hook.c"
+            echo "fixing setuid_hook.c"
             patch -p1 < fix_setuid_hook.c.patch
-            echo "Fixing sucompat.c"
+            echo "fixing sucompat.c"
             patch -p1 < fix_sucompat.c.patch
-            echo "Fixing supercalls.c"
+            echo "fixing supercalls.c"
             patch -p1 < fix_supercalls.c.patch
-            echo "Overwriting hook mode"
+            echo "overwriting hook mode"
             patch -p1 < overwrite_hook_mode.patch
-            echo "Patching ksu_toolkit"
+            echo "patching ksu_toolkit"
             patch -p1 < ksu_toolkit.patch
             ;;
           KSU)
