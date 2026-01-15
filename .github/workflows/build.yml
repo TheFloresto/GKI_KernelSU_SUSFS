@@ -390,7 +390,7 @@ jobs:
           WKSU)
             echo "Getting WKSU version..."
             KSU_DIR="./Wild_KSU"
-            BASE_VERSION=30000
+            BASE_VERSION=30012
              ;;
           Next)
             echo "Getting Next version..."
