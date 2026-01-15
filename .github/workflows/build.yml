@@ -143,7 +143,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        echo "BUILD_USER=TheFloresto" >> "$GITHUB_ENV"
+        echo "BUILD_USER=TheFloresto-labs" >> "$GITHUB_ENV"
         echo "BUILD_HOST=ubuntu-build" >> "$GITHUB_ENV"
         echo "BUILD_TIMESTAMP=Sun Jun 15 14:56:02 UTC 2025" >> "$GITHUB_ENV"
 
@@ -152,7 +152,6 @@ jobs:
       run: |
         set -euo pipefail
         ANYKERNEL_BRANCH="gki-2.0"
-        SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
         rm -rf AnyKernel3/.git
         git clone https://github.com/TheFloresto/kernel_patches.git
@@ -283,7 +282,6 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
         if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 186 ]] || 
            [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 119 ]] || 
            [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 110 ]] || 
@@ -391,7 +389,6 @@ jobs:
       run: |
         set -euo pipefail
         
-        # Determine KSU directory and base version based on variant
         case "${{ inputs.ksu_variant }}" in
           WKSU)
             echo "Getting WKSU version..."
@@ -423,7 +420,7 @@ jobs:
             KSU_DIR="./KernelSU"
             BASE_VERSION=30000
             ;;
-          Sukisu)
+          SukiSU)
             echo "Getting SukiSU version..."
             git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
             KSU_DIR="./SukiSU-Ultra"
@@ -435,7 +432,6 @@ jobs:
             ;;
         esac
         
-        # Verify directory exists
         if [ ! -d "$KSU_DIR" ]; then
           echo "ERROR: KSU directory not found: $KSU_DIR"
           echo "Available directories:"
@@ -443,28 +439,23 @@ jobs:
           exit 1
         fi
         
-        # Change to KSU directory
         cd "$KSU_DIR"
         
-        # Verify it's a git repository
         if [ ! -d ".git" ]; then
           echo "ERROR: Not a git repository: $KSU_DIR"
           exit 1
         fi
         
-        # Get commit count and calculate version
         COMMIT_COUNT=$(git rev-list --count HEAD)
         echo "Commits: $COMMIT_COUNT"
         KSU_VERSION=$(expr $COMMIT_COUNT + $BASE_VERSION)
         echo "KSUVER=$KSU_VERSION"
         echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
         
-        # Get commit SHA
         KSU_COMMIT_SHA=$(git rev-parse HEAD)
         echo "KSU_COMMIT_SHA=$KSU_COMMIT_SHA" >> $GITHUB_ENV
         echo "KSU commit: ${KSU_COMMIT_SHA:0:8}"
         
-        # Return to parent directory
         cd ..
 
     - name: Set file name
@@ -483,7 +474,6 @@ jobs:
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
         cd susfs4ksu
               
-        # Set SUSFS version
         SUSFS_VERSION="2.0.0"
 
         case "${{ inputs.ksu_variant }}" in
@@ -560,15 +550,14 @@ jobs:
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true              
             ;;
           SukiSU)
-            cd "$KERNEL_ROOT/KernelSU"  
-            # Your KSU-specific code goes here
+            cd "$KERNEL_ROOT/KernelSU"
+            echo "SukiSU: patching skipped (built-in SUSFS support)"
             ;;
         esac
 
         cd "$KERNEL_ROOT/common"
         echo "Applying post-SUSFS compatibility fixes..."
         
-        # Post-SUSFS sed safeguards for task_mmu.c 'goto show_pad' handling
         case "${{ inputs.ksu_variant }}" in
           WKSU|Next)
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
@@ -662,7 +651,6 @@ jobs:
               sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
             fi
 
-            # Apply additional SUSFS patches for compatibility
             cp -v $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_fdinfo.c.patch ./
             patch -p1 < fix_fdinfo.c.patch || true
             cp -v $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_namespace.c.patch ./
@@ -670,12 +658,11 @@ jobs:
             cp -v $KERNEL_PATCHES/ksu/susfs_fix_patches/v${SUSFS_VERSION}/fix_open.c.patch ./
             patch -p1 < fix_open.c.patch || true
             ;;
-           SukiSU)
+          SukiSU)
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
             cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true           
-            # Your KSU-specific code goes here
             ;;
         esac
         
@@ -727,7 +714,6 @@ jobs:
         echo "Applying bypass to $TARGET_FILE"
         sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
 
-        # Verify the bypass
         if grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
           echo "SUCCESS: Module check bypass verified in $TARGET_FILE"
         else
@@ -845,12 +831,10 @@ jobs:
           echo "SUCCESS: KSU, SUSFS, and KPROBES configs verified in ${{ env.DEFCONFIG }}"
         else
           echo "FAILED: KSU, SUSFS, or KPROBES configs missing in ${{ env.DEFCONFIG }}"
-          # print last 50 lines to see what happened
           tail -n 50 "${{ env.DEFCONFIG }}"
           exit 1
         fi
         
-        # Remove check_defconfig
         if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
           awk '/name = "kernel_aarch64"/,/^\)/ {if(/check_defconfig = "disabled"/) found=1} END{if(found) print "SUCCESS: check_defconfig = \"disabled\" is in the kernel_aarch64 block"; else print "FAILED: NOT in the kernel_aarch64 block"}' common/BUILD.bazel
@@ -1028,11 +1012,9 @@ jobs:
         CUSTOM_LOCALVERSION="-@NoFloresto"
         echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
         
-        # Remove Dirty Flag
         sed -i 's/-dirty//' ./scripts/setlocalversion
         sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
         
-        # Remove Abi Exports
         rm -rf ./android/abi_gki_protected_exports_* || true
         perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//' ./BUILD.bazel || true
         
@@ -1267,19 +1249,19 @@ jobs:
         CONFIG_DIR="$KERNEL_ROOT"
         REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
         mkdir -p "$REJECTS_DIR"
-        # Find all .rej files under the configuration directory
+        
         mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
         REJ_COUNT=${#REJS[@]}
         echo "Found $REJ_COUNT .rej files under $CONFIG_DIR"
         echo "REJ_COUNT=$REJ_COUNT" >> $GITHUB_ENV
+        
         if [ "$REJ_COUNT" -gt 0 ]; then
           for REJ in "${REJS[@]}"; do
-            # Relative path from $CONFIG
             REL="${REJ#"$CONFIG_DIR"/}"
             DEST="$REJECTS_DIR/$REL"
             mkdir -p "$(dirname "$DEST")"
             cp "$REJ" "$DEST"
-            # Copy the associated original file alongside the .rej
+            
             ORIG="${REJ%.rej}"
             if [ -f "$ORIG" ]; then
               ORIG_DEST="$REJECTS_DIR/${REL%.rej}"
@@ -1329,4 +1311,4 @@ jobs:
         compression-level: 9
         retention-days: 7
 
-     # End of workflow
+# End of workflow
