@@ -328,7 +328,7 @@ jobs:
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild
+              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild-dev
             fi
             ;;
           Next)
@@ -390,7 +390,7 @@ jobs:
           WKSU)
             echo "Getting WKSU version..."
             KSU_DIR="./Wild_KSU"
-            BASE_VERSION=30012
+            BASE_VERSION=30000
              ;;
           Next)
             echo "Getting Next version..."
