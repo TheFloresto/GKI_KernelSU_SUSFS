@@ -15,7 +15,7 @@ on:
       ksu_variant:
         description: "KernelSU Variant"
         type: choice
-        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, Sukisu ]
+        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, SukiSU ]
         default: WKSU
       ksu_commit:
         description: "KSU Commit (optional)"
