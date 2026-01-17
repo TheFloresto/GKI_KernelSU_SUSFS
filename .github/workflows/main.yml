@@ -194,7 +194,7 @@ jobs:
         else
             echo "No rejects found to upload."
         fi
-        
+
     - name: Upload AIO-REJ Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -204,7 +204,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: inputs.release_type != 'Actions'
+    if: ${{ always() && inputs.release_type != 'Actions' }}
     permissions:
       contents: write
     needs:
@@ -224,9 +224,40 @@ jobs:
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
+    - name: Validate Selected Builds
+      run: |
+        set -euo pipefail
+
+        failed=0
+
+        check_selected() {
+          local selected="$1"
+          local job_name="$2"
+          local result="$3"
+          if [[ "$selected" == "true" ]]; then
+            if [[ "$result" != "success" ]]; then
+              echo "Selected job $job_name did not succeed (result: $result)"
+              failed=1
+            fi
+          fi
+        }
+
+        check_selected "${{ inputs.build_a12_5_10 }}" "build-a12-5-10" "${{ needs.build-a12-5-10.result }}"
+        check_selected "${{ inputs.build_a13_5_10 }}" "build-a13-5-10" "${{ needs.build-a13-5-10.result }}"
+        check_selected "${{ inputs.build_a13_5_15 }}" "build-a13-5-15" "${{ needs.build-a13-5-15.result }}"
+        check_selected "${{ inputs.build_a14_5_15 }}" "build-a14-5-15" "${{ needs.build-a14-5-15.result }}"
+        check_selected "${{ inputs.build_a14_6_1 }}" "build-a14-6-1" "${{ needs.build-a14-6-1.result }}"
+        check_selected "${{ inputs.build_a15_6_6 }}" "build-a15-6-6" "${{ needs.build-a15-6-6.result }}"
+        check_selected "${{ inputs.build_a16_6_12 }}" "build-a16-6-12" "${{ needs.build-a16-6-12.result }}"
+        check_selected "${{ inputs.build_lts }}" "build-lts" "${{ needs.build-lts.result }}"
+
+        if [[ "$failed" -ne 0 ]]; then
+          exit 1
+        fi
+
     - name: Free Disk Space
       if: true
-      uses: endersonmenezes/free-disk-space@v3
+      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
       with:
         remove_android: true
         remove_dotnet: true
@@ -236,8 +267,8 @@ jobs:
         remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
         remove_packages_one_command: true
         remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-        rm_cmd: "rmz"
-        rmz_version: "3.1.1"
+        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
         testing: false
 
     - name: Checkout code
@@ -306,7 +337,7 @@ jobs:
             KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
             KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"           
             ;;
-          "Sukisu")
+          "SukiSU")
             KSU_REF=$(git ls-remote "https://github.com/Ylarod/KernelSU.git" refs/heads/main | awk '{print $1}')
             KSU_URL="https://github.com/Ylarod/KernelSU/commit/$KSU_REF"
             ;;
@@ -343,6 +374,7 @@ jobs:
         echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
 
     - name: Generate New Tag
+      id: tag
       if: inputs.release_type != 'Actions'
       run: |
         LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "")
@@ -357,6 +389,7 @@ jobs:
         
         echo "New tag: $NEW_TAG"
         echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT        
 
     - name: Set release body
       run: |
@@ -381,7 +414,7 @@ jobs:
         - The Solution: This version changes one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
 
         Features:
-        -> Multiple KernelSU Variant Support
+        -> Wild KSU Manager Support, Also Compatible with KernelSU-Next Manager
         -> SUSFS ඞ v2.0.0
         -> SUSFS Inline Hooks
         -> Ptrace Patch Support for Older Kernels (<5.16)
@@ -407,7 +440,7 @@ jobs:
         -> MKSU: [Github](https://github.com/MollySophia/KernelSU) [Telegram](https://t.me/mksu_ci)
         -> RKSU: [Github](https://github.com/rsuntk/KernelSU) [Telegram](https://t.me/rsuntk)
         -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
-        -> Sukisu: [Github](https://github.com/Ylarod/KernelSU) [Telegram](https://t.me/Sukiksu)
+        -> SukiSU: [Github](https://github.com/Ylarod/KernelSU) [Telegram](https://t.me/Sukiksu)
 
         Commit Hashes (at the time of release):
         -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
@@ -454,22 +487,22 @@ jobs:
 
         for dir in "${anykernel_dirs[@]}"; do
           artifact_name=$(basename "$dir")
-          echo "Uploading ${artifact_name}.zip..."
-          gh release upload "${{ env.NEW_TAG }}" "$GITHUB_WORKSPACE/${artifact_name}.zip" \
+          echo "Uploading 2 ${artifact_name}.zip..."
+          gh release upload "${{ env.NEW_TAG }}" "$GITHUB_WORKSPACE/${artifact_name}.zip"
             --repo NerestKernels/GKI_KernelSU_SUSFS \
-            --clobber
+            --clobber        
         done
 
   notify-actions:
     runs-on: ubuntu-latest
     needs: [release]
-    if: always()
+    if: ${{ always() && (inputs.release_type == 'Actions' || needs.release.result == 'success') }}
     env:
       NEW_TAG: ${{ needs.release.outputs.new_tag }}
     steps:
     - name: Free Disk Space
       if: true
-      uses: endersonmenezes/free-disk-space@v3
+      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
       with:
         remove_android: true
         remove_dotnet: true
@@ -479,8 +512,8 @@ jobs:
         remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
         remove_packages_one_command: true
         remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-        rm_cmd: "rmz"
-        rmz_version: "3.1.1"
+        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
         testing: false
 
     - name: Send Telegram Notification
