@@ -440,7 +440,7 @@ jobs:
         -> MKSU: [Github](https://github.com/MollySophia/KernelSU) [Telegram](https://t.me/mksu_ci)
         -> RKSU: [Github](https://github.com/rsuntk/KernelSU) [Telegram](https://t.me/rsuntk)
         -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
-        -> SukiSU: [Github](https://github.com/Ylarod/KernelSU) [Telegram](https://t.me/Sukiksu)
+        -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
 
         Commit Hashes (at the time of release):
         -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
