@@ -444,13 +444,22 @@ jobs:
 
         Commit Hashes (at the time of release):
         -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
-        -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})
+        -> Baseband-guard: [${{ env.BBG_REF }}](${{ env.BBG_URL }})        
 
-        Module: 
-        -> https://github.com/sidex15/ksu_module_susfs
+        -> SUSFS4KSU: 
+          -> gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
+          -> gki-android13-5.10: [${{ env.COMMIT_HASH_gki_android13_5_10 }}](${{ env.COMMIT_URL_gki_android13_5_10 }})
+          -> gki-android13-5.15: [${{ env.COMMIT_HASH_gki_android13_5_15 }}](${{ env.COMMIT_URL_gki_android13_5_15 }})
+          -> gki-android14-5.15: [${{ env.COMMIT_HASH_gki_android14_5_15 }}](${{ env.COMMIT_URL_gki_android14_5_15 }})
+          -> gki-android14-6.1: [${{ env.COMMIT_HASH_gki_android14_6_1 }}](${{ env.COMMIT_URL_gki_android14_6_1 }})
+          -> gki-android15-6.6: [${{ env.COMMIT_HASH_gki_android15_6_6 }}](${{ env.COMMIT_URL_gki_android15_6_6 }})
 
-        !!THIS RELEASE IS A TESTING RELEASE!!
-        EOF
+         Module: 
+          -> https://github.com/sidex15/ksu_module_susfs         
+          
+          !!THIS RELEASE IS A TESTING RELEASE!!
+          EOF
+
 
     - name: Create GitHub Release
       run: |
