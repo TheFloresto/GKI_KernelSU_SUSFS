@@ -114,7 +114,7 @@ jobs:
         curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
         chmod 0755 "$GITHUB_WORKSPACE/git-repo/repo"
         echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
-
+        
     - name: Set boot sign key
       shell: bash
       env:
@@ -143,7 +143,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        echo "BUILD_USER=TheFloresto" >> "$GITHUB_ENV"
+        echo "BUILD_USER=TheFloresto-labs" >> "$GITHUB_ENV"
         echo "BUILD_HOST=ubuntu-build" >> "$GITHUB_ENV"
         echo "BUILD_TIMESTAMP=Sun Jun 15 14:56:02 UTC 2025" >> "$GITHUB_ENV"
 
@@ -157,8 +157,8 @@ jobs:
         git clone https://github.com/TheFloresto/kernel_patches.git
 
     - name: Initialize and Sync Kernel Source
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
+      shell: bash
       run: |
         set -euo pipefail
         FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
@@ -193,7 +193,6 @@ jobs:
         
         CLANG_FOUND=false
         
-        # Search for prebuilt clang
         for base in "$KERNEL_ROOT/prebuilts" "$KERNEL_ROOT/prebuilts-master"; do
           [ -d "$base/clang/host/linux-x86" ] || continue
           latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
@@ -204,7 +203,6 @@ jobs:
           fi
         done
         
-        # Fallback to system clang
         if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
           CLANG_BIN="$(dirname "$(command -v clang)")"
           CLANG_FOUND=true
@@ -282,7 +280,6 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
         if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 186 ]] || 
            [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 119 ]] || 
            [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 110 ]] || 
@@ -300,12 +297,12 @@ jobs:
               sed -i 's/for (int i = 0; subcommands\[i\]; i++)/for (i = 0; subcommands[i]; i++)/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
             fi
           fi
-        fi
+        fi 
 
     - name: Fix Less Than 6.6.50 Builds
       if: inputs.android_version == 'android15' && inputs.kernel_version == '6.6'
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
       run: |
         set -euo pipefail
         if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
@@ -313,16 +310,16 @@ jobs:
         fi
 
     - name: Apply ptrace patch for older kernels
-      if: fromJSON(inputs.kernel_version) < 5.16
-      shell: bash
+      if: false && fromJSON(inputs.kernel_version) < 5.16
       working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
       run: |
         set -euo pipefail
         patch -p1 -F 3 < "$KERNEL_PATCHES/gki_ptrace.patch"
 
     - name: Add KernelSU Variant
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
+      shell: bash
       run: |
         set -euo pipefail
         case "${{ inputs.ksu_variant }}" in
@@ -331,7 +328,7 @@ jobs:
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild
+              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild-dev
             fi
             ;;
           Next)
@@ -349,15 +346,7 @@ jobs:
             else
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
             fi
-            ;;
-          RKSU)
-            echo "Adding KernelSU RKSU..."
-            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
-            else
-              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
-            fi
-            ;;
+            ;;            
           MKSU)
             echo "Adding KernelSU MKSU..."
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
@@ -365,6 +354,13 @@ jobs:
             else
               curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s main
             fi
+            ;;
+          RKSU)
+            if [[ -n "${{ inputs.ksu_commit }}" ]]; then
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
+            else
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+            fi            
             ;;
           KowXU)
             echo "Adding KowXU..."
@@ -390,12 +386,11 @@ jobs:
       run: |
         set -euo pipefail
         
-        # Determine KSU directory and base version based on variant
         case "${{ inputs.ksu_variant }}" in
           WKSU)
             echo "Getting WKSU version..."
             KSU_DIR="./Wild_KSU"
-            BASE_VERSION=10200
+            BASE_VERSION=30000
              ;;
           Next)
             echo "Getting Next version..."
@@ -422,7 +417,7 @@ jobs:
             KSU_DIR="./KernelSU"
             BASE_VERSION=30000
             ;;
-          Sukisu)
+          SukiSU)
             echo "Getting SukiSU version..."
             git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
             KSU_DIR="./SukiSU-Ultra"
@@ -434,7 +429,6 @@ jobs:
             ;;
         esac
         
-        # Verify directory exists
         if [ ! -d "$KSU_DIR" ]; then
           echo "ERROR: KSU directory not found: $KSU_DIR"
           echo "Available directories:"
@@ -442,28 +436,23 @@ jobs:
           exit 1
         fi
         
-        # Change to KSU directory
         cd "$KSU_DIR"
         
-        # Verify it's a git repository
         if [ ! -d ".git" ]; then
           echo "ERROR: Not a git repository: $KSU_DIR"
           exit 1
         fi
         
-        # Get commit count and calculate version
         COMMIT_COUNT=$(git rev-list --count HEAD)
         echo "Commits: $COMMIT_COUNT"
         KSU_VERSION=$(expr $COMMIT_COUNT + $BASE_VERSION)
         echo "KSUVER=$KSU_VERSION"
         echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
         
-        # Get commit SHA
         KSU_COMMIT_SHA=$(git rev-parse HEAD)
         echo "KSU_COMMIT_SHA=$KSU_COMMIT_SHA" >> $GITHUB_ENV
         echo "KSU commit: ${KSU_COMMIT_SHA:0:8}"
         
-        # Return to parent directory
         cd ..
 
     - name: Set file name
@@ -473,65 +462,58 @@ jobs:
         ARTIFACT_BASE="${{ inputs.ksu_variant }}-${{ env.KSUVER }}-${{ inputs.kernel_version }}.$ACTUAL_SUBLEVEL-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ matrix.build_type }}"      
         echo "ARTIFACT_BASE=$ARTIFACT_BASE" >> $GITHUB_ENV
         echo "FILE_NAME=$ARTIFACT_BASE" >> $GITHUB_ENV
-        
+
     - name: Clone & Apply SUSFS Patches for KernelSU Variants
       shell: bash
       run: |
         set -euo pipefail
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-        cd susfs4ksu
-        TARGET="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-        COMMIT=""
-        case "${{ inputs.ksu_variant }}" in
-            KSU|SukiSU|MKSU|RKSU|KowXU|Next|WKSU)
-            SUSFS_VERSION="2.0.0"
-            ;;
-        esac
 
         case "${{ inputs.ksu_variant }}" in
           WKSU)
             SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU-Next"
-            echo "Nothing to fix for WKSU"
+            cd "$KERNEL_ROOT/Wild_KSU"
             ;;
           Next)
             SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU-Next"
+            cd "$KERNEL_ROOT/KernelSU-Next" 
             ;;
           KSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
             cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true            
             ;;
           MKSU)
             SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"         
+            cd "$KERNEL_ROOT/KernelSU"
             cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true            
             ;;
           RKSU)
             SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU" 
+            cd "$KERNEL_ROOT/KernelSU"
+            cp -v "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true            
             ;;
           KowXU)
             SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"        
+            cd "$KERNEL_ROOT/KernelSU"
             cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true            
             ;;
           SukiSU)
             SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"  
-            # Your KSU-specific code goes here          
+            cd "$KERNEL_ROOT/KernelSU"
+            echo "SukiSU: patching skipped (built-in SUSFS support)"
             ;;
         esac
 
     - name: Apply Performance Patches
-      if: true
-      shell: bash
+      if: false
       working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
       run: |
         set -euo pipefail
         MIN_VERSION="5.16"
@@ -552,14 +534,14 @@ jobs:
 
     - name: Add BBG
       if: true
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
+      shell: bash
       run: |
         set -euo pipefail
         curl -LSs https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
         echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
-        sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' common/security/Kconfig
-
+        sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' common/security/Kconfig
+        
     - name: Apply Module Check Bypass
       if: ${{ matrix.build_type == 'Bypass' }}
       shell: bash
@@ -574,7 +556,6 @@ jobs:
         echo "Applying bypass to $TARGET_FILE"
         sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
 
-        # Verify the bypass
         if grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
           echo "SUCCESS: Module check bypass verified in $TARGET_FILE"
         else
@@ -585,8 +566,8 @@ jobs:
 
     - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
       if: ${{ ( inputs.kernel_version == '6.6' ) }}
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
       run: |
         set -euo pipefail
         SYMBOL_LIST=android/abi_gki_aarch64_galaxy
@@ -604,27 +585,27 @@ jobs:
 
     - name: Fix WiFi and Bluetooth on Xiaomi 6.6 GKI devices
       if: ${{ ( inputs.kernel_version == '6.6' ) }}
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
       run: |
         set -euo pipefail
         SYMBOL_LIST=android/abi_gki_aarch64_xiaomi
         echo "device_find_any_child" >> $SYMBOL_LIST
 
     - name: Configure Kernel Options
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
+      shell: bash
       run: |
         set -euo pipefail
         cat >> "${{ env.DEFCONFIG }}" << 'EOF'
+        # KernelSU Configuration
+        CONFIG_KSU=y
+        CONFIG_KSU_DEBUG=n
+
         # Kprobes (required for KernelSU)
         CONFIG_KPROBES=y
         CONFIG_HAVE_KPROBES=y
         CONFIG_KPROBE_EVENTS=y
-        
-        # KernelSU Configuration
-        CONFIG_KSU=y
-        CONFIG_KSU_DEBUG=n
 
         # Mountify Support
         CONFIG_TMPFS_XATTR=y
@@ -672,10 +653,19 @@ jobs:
         CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=n
         CONFIG_OPTIMIZE_INLINING=y
         CONFIG_FRAME_WARN=0
-        CONFIG_TRACEPOINTS=y        
+        CONFIG_TRACEPOINTS=y
+        
         EOF
 
-        # Remove check_defconfig
+        echo "Checking if configs were applied..."
+        if grep -q "CONFIG_KSU=y" "${{ env.DEFCONFIG }}" && grep -q "CONFIG_KPROBES=y" "${{ env.DEFCONFIG }}"; then
+          echo "SUCCESS: KSU, and KPROBES configs verified in ${{ env.DEFCONFIG }}"
+        else
+          echo "FAILED: KSU, or KPROBES configs missing in ${{ env.DEFCONFIG }}"
+          tail -n 50 "${{ env.DEFCONFIG }}"
+          exit 1
+        fi
+
         if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
           awk '/name = "kernel_aarch64"/,/^\)/ {if(/check_defconfig = "disabled"/) found=1} END{if(found) print "SUCCESS: check_defconfig = \"disabled\" is in the kernel_aarch64 block"; else print "FAILED: NOT in the kernel_aarch64 block"}' common/BUILD.bazel
@@ -799,17 +789,16 @@ jobs:
         CONFIG_KSU_KPROBES_HOOK=n
         CONFIG_KSU_ALLOWLIST_WORKAROUND=n
         CONFIG_KSU_LSM_SECURITY_HOOKS=y
-        CONFIG_KPM=n
         EOF
         
         echo "✅ SukiSU configuration applied"
         echo "Contents of defconfig (last 20 lines):"
-        tail -n 20 "${{ env.DEFCONFIG }}"        
+        tail -n 20 "${{ env.DEFCONFIG }}"
 
     - name: Append ashmem exports if missing
       if: ${{ inputs.android_version == 'android16' && inputs.kernel_version == '6.12' }}
-      shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
+      shell: bash
       run: |
         set -euo pipefail
         FILE=common/drivers/staging/android/ashmem.c
@@ -829,20 +818,14 @@ jobs:
         if [ -f common/drivers/android/binder/Makefile ]; then
           perl -i -0777 -pe 's/\$\(\s*CONFIG_ANDROID_BINDER_IPC_RUST\s*\)/m/' common/drivers/android/binder/Makefile
           perl -i -pe 's/^rust_binder-\$\([^)]+\)\s*:=/rust_binder-y :=/' common/drivers/android/binder/Makefile
-          
-          echo "Contents of common/drivers/android/Makefile:"
           cat common/drivers/android/Makefile
-          echo "Contents of common/drivers/android/binder/Makefile:"
           cat common/drivers/android/binder/Makefile
-          
           rustup set profile minimal
           rustup update nightly
           rustup default nightly
           rustup target add aarch64-unknown-none
         else
           perl -i -0777 -pe 's/\$\(\s*CONFIG_ANDROID_BINDER_IPC_RUST\s*\)/m/' common/drivers/android/Makefile
-          
-          echo "Contents of common/drivers/android/Makefile:"
           cat common/drivers/android/Makefile
         fi
 
@@ -854,11 +837,9 @@ jobs:
         CUSTOM_LOCALVERSION="-@NoFloresto"
         echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
         
-        # Remove Dirty Flag
         sed -i 's/-dirty//' ./scripts/setlocalversion
         sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
         
-        # Remove Abi Exports
         rm -rf ./android/abi_gki_protected_exports_* || true
         perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//' ./BUILD.bazel || true
         
@@ -923,15 +904,12 @@ jobs:
         
         make O="$OUT" gki_defconfig
         
-        # Set LOCALVERSION
         scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
         scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO
         
-        # Force O2 optimization
         scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
         scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
         
-        # Enable LTO thin
         scripts/config --file "$OUT/.config" -e LTO_CLANG
         scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
         scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
@@ -955,7 +933,7 @@ jobs:
         IMG="$OUT/arch/arm64/boot/Image"
         if [ ! -f "$IMG" ]; then
           echo "::error::Kernel Image missing"
-          tail -n 100 build.log || true
+          tail -n 422 build.log || true
           exit 1
         fi
         
@@ -1089,23 +1067,20 @@ jobs:
       if: ${{ always() }}
       shell: bash
       run: |
-        set -e
+        set -euo pipefail
         CONFIG_DIR="$KERNEL_ROOT"
         REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
         mkdir -p "$REJECTS_DIR"
-        # Find all .rej files under the configuration directory
         mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
         REJ_COUNT=${#REJS[@]}
         echo "Found $REJ_COUNT .rej files under $CONFIG_DIR"
         echo "REJ_COUNT=$REJ_COUNT" >> $GITHUB_ENV
         if [ "$REJ_COUNT" -gt 0 ]; then
           for REJ in "${REJS[@]}"; do
-            # Relative path from $CONFIG
             REL="${REJ#"$CONFIG_DIR"/}"
             DEST="$REJECTS_DIR/$REL"
             mkdir -p "$(dirname "$DEST")"
             cp "$REJ" "$DEST"
-            # Copy the associated original file alongside the .rej
             ORIG="${REJ%.rej}"
             if [ -f "$ORIG" ]; then
               ORIG_DEST="$REJECTS_DIR/${REL%.rej}"
@@ -1124,14 +1099,22 @@ jobs:
         if-no-files-found: ignore
         compression-level: 9
 
-    - name: Upload Misc Files
+    - name: Upload Boots Files
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.FILE_NAME }}-Misc
+        name: ${{ env.FILE_NAME }}-Boots
         path: |
           ${{ env.FILE_NAME }}-*
-          patch-rejects/**
+        if-no-files-found: ignore
+        compression-level: 9        
+
+    - name: Upload Rejects
+      if: ${{ always() && matrix.build_type != 'Bypass' && env.REJ_COUNT > 0 }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.FILE_NAME }}-Rejects
+        path: patch-rejects/
         if-no-files-found: ignore
         compression-level: 9
 
@@ -1146,5 +1129,3 @@ jobs:
         if-no-files-found: ignore
         compression-level: 9
         retention-days: 7
-
-     # End of workflow
