@@ -735,8 +735,7 @@ jobs:
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
             
             cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true
-            
+            patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true           
             ;;
           SukiSU)
             SUSFS_VERSION="2.0.0"
