@@ -689,6 +689,14 @@ jobs:
             cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true     
 
+            # Apply KowXU SUSFS fixes
+            cp -v "$KERNEL_PATCHES/ksu/fix_missing_declarations.patch" ./
+            patch -p1 --forward < fix_missing_declarations.patch || true
+            
+            # Add Support KowSU
+            cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
+            patch -p1 --forward < 0001-add-only-KOWSU.patch || true
+            
             cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true            
             ;;
