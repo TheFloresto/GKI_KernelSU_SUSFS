@@ -196,7 +196,7 @@ jobs:
         fi
 
     - name: Upload AIO-REJ Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: AIO-REJ
         path: AIO-REJ.zip
