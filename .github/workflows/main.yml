@@ -389,7 +389,20 @@ jobs:
         
         echo "New tag: $NEW_TAG"
         echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT        
+        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT  
+        
+    - name: Create and Push Tag
+      if: inputs.release_type != 'Actions'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Получаем последний коммит из уже checkout-нутого репозитория
+        COMMIT_SHA=$(git rev-parse HEAD)
+        echo "Creating tag ${{ env.NEW_TAG }} at commit $COMMIT_SHA"
+        
+        git tag "${{ env.NEW_TAG }}" "$COMMIT_SHA"
+        git push origin "${{ env.NEW_TAG }}"
 
     - name: Set release body
       run: |
@@ -460,7 +473,6 @@ jobs:
           !!THIS RELEASE IS A TESTING RELEASE!!
           EOF
 
-
     - name: Create GitHub Release
       run: |
         PRERELEASE_FLAG=""
@@ -473,7 +485,6 @@ jobs:
           --repo NerestKernels/GKI_KernelSU_SUSFS \
           --title "${{ env.RELEASE_NAME }}" \
           --notes-file release_body.md \
-          --target "${{ github.sha }}" \
           $PRERELEASE_FLAG
 
     - name: Download Artifacts
