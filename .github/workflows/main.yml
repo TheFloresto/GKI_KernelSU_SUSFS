@@ -507,10 +507,11 @@ jobs:
 
         for dir in "${anykernel_dirs[@]}"; do
           artifact_name=$(basename "$dir")
-          echo "Uploading 2 ${artifact_name}.zip..."
-          gh release upload "${{ env.NEW_TAG }}" "$GITHUB_WORKSPACE/${artifact_name}.zip"
+          echo "Uploading ${artifact_name}.zip..."
+          gh release upload "${{ env.NEW_TAG }}" \
+            "$GITHUB_WORKSPACE/${artifact_name}.zip" \
             --repo NerestKernels/GKI_KernelSU_SUSFS \
-            --clobber        
+            --clobber
         done
 
   notify-actions:
