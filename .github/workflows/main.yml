@@ -150,12 +150,6 @@ jobs:
       uses: actions/download-artifact@v5
       with:
         path: ./downloaded-artifacts
-        pattern: '*-Boots'
-
-    - name: Download Misc Artifacts
-      uses: actions/download-artifact@v5
-      with:
-        path: ./downloaded-artifacts
         pattern: '*-Rejects'
 
     - name: Process Reject Artifacts
