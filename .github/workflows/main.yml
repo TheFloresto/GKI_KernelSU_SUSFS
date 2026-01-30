@@ -15,7 +15,7 @@ on:
       ksu_variant:
         description: "KernelSU Variant"
         type: choice
-        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, SukiSU ]
+        options: [ KSU, WKSU, Next, MKSU, RKSU, KowXU, ReSukiSU ]
         default: WKSU
       ksu_commit:
         description: "KSU Commit (optional)"
@@ -331,9 +331,9 @@ jobs:
             KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
             KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"           
             ;;
-          "SukiSU")
-            KSU_REF=$(git ls-remote "https://github.com/Ylarod/KernelSU.git" refs/heads/main | awk '{print $1}')
-            KSU_URL="https://github.com/Ylarod/KernelSU/commit/$KSU_REF"
+          "ReSukiSU")
+            KSU_REF=$(git ls-remote "https://github.com/ReSukiSU/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/ReSukiSU/ReSukiSU/commit/$KSU_REF
             ;;
           *)
             echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
@@ -447,7 +447,7 @@ jobs:
         -> MKSU: [Github](https://github.com/MollySophia/KernelSU) [Telegram](https://t.me/mksu_ci)
         -> RKSU: [Github](https://github.com/rsuntk/KernelSU) [Telegram](https://t.me/rsuntk)
         -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
-        -> SukiSU: [Github](https://github.com/SukiSU-Ultra/SukiSU-Ultra) [Telegram](https://t.me/Sukiksu)
+        -> ReSukiSU: [Github](https://github.com/ReSukiSU/ReSukiSU) [Telegram](https://t.me/ReSukiSU)
 
         Commit Hashes (at the time of release):
         -> ${{ inputs.ksu_variant }}: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
