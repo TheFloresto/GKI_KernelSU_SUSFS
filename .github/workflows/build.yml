@@ -370,12 +370,12 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s master
             fi
             ;;
-          SukiSU)
-            echo "Adding SukiSU..."
+          ReSukiSU)
+            echo "Adding ReSukiSU..."
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
+              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s builtin
             fi            
             ;;
         esac
@@ -417,9 +417,9 @@ jobs:
             KSU_DIR="./KernelSU"
             BASE_VERSION=30000
             ;;
-          SukiSU)
-            echo "Getting SukiSU version..."
-            git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
+          ReSukiSU)
+            echo "Getting ReSukiSU version..."
+            git clone https://github.com/ReSukiSU/ReSukiSU.git -b main ReSukiSU
             KSU_DIR="./SukiSU-Ultra"
             BASE_VERSION=37185          
             ;;
@@ -745,7 +745,7 @@ jobs:
             cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
             patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true           
             ;;
-          SukiSU)
+          ReSukiSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
             cd "$KERNEL_ROOT/common"
@@ -1028,8 +1028,8 @@ jobs:
         echo "Contents of defconfig (last 20 lines):"
         tail -n 20 "${{ env.DEFCONFIG }}"
 
-    - name: Configure SukiSU
-      if: ${{ inputs.ksu_variant == 'SukiSU' }}
+    - name: Configure ReSukiSU
+      if: ${{ inputs.ksu_variant == 'ReSukiSU' }}
       shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
@@ -1042,7 +1042,7 @@ jobs:
         CONFIG_KSU_LSM_SECURITY_HOOKS=y        
         EOF
         
-        echo "✅ SukiSU configuration applied"
+        echo "✅ ReSukiSU configuration applied"
         echo "Contents of defconfig (last 20 lines):"
         tail -n 20 "${{ env.DEFCONFIG }}"
 
