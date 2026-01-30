@@ -373,9 +373,9 @@ jobs:
           ReSukiSU)
             echo "Adding ReSukiSU..."
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
+              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/new-manager/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s builtin
+              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/new-manager/kernel/setup.sh" | bash -s builtin
             fi            
             ;;
         esac
