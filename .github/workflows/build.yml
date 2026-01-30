@@ -1159,7 +1159,7 @@ jobs:
       run: |
         set -euo pipefail
         cd "$KERNEL_ROOT/common"
-        CUSTOM_LOCALVERSION="-@NoFloresto"
+        CUSTOM_LOCALVERSION="-TheFloresto"
         echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
         
         sed -i 's/-dirty//' ./scripts/setlocalversion
