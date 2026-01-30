@@ -421,7 +421,7 @@ jobs:
             echo "Getting ReSukiSU version..."
             git clone https://github.com/ReSukiSU/ReSukiSU.git -b main ReSukiSU
             KSU_DIR="./ReSukiSU"
-            BASE_VERSION=37185          
+            BASE_VERSION=30000 
             ;;
           *)
             echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
