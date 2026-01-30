@@ -420,7 +420,7 @@ jobs:
           ReSukiSU)
             echo "Getting ReSukiSU version..."
             KSU_DIR="./KernelSU"
-            BASE_VERSION=30000 
+            BASE_VERSION=33275 
             ;;
           *)
             echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
