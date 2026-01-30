@@ -419,8 +419,7 @@ jobs:
             ;;
           ReSukiSU)
             echo "Getting ReSukiSU version..."
-            git clone https://github.com/ReSukiSU/ReSukiSU.git -b main ReSukiSU
-            KSU_DIR="./ReSukiSU"
+            KSU_DIR="./KernelSU"
             BASE_VERSION=30000 
             ;;
           *)
