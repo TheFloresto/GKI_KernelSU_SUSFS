@@ -688,17 +688,13 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
             cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true     
-
-            # Apply KowXU SUSFS fixes
-            cp -v "$KERNEL_PATCHES/ksu/fix_missing_declarations.patch" ./
-            patch -p1 --forward < fix_missing_declarations.patch || true
             
             # Add Support KowSU
             cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
             patch -p1 --forward < 0001-add-only-KOWSU.patch || true
             
             cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true            
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true            
             ;;
           MKSU)
             SUSFS_VERSION="2.0.0"
@@ -713,7 +709,7 @@ jobs:
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
             cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true          
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch || true          
             ;;
           RKSU)
             SUSFS_VERSION="2.0.0"
@@ -728,7 +724,7 @@ jobs:
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
             cp -v "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true         
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch || true         
             ;;
           KowXU)
             SUSFS_VERSION="2.0.0"
@@ -743,7 +739,7 @@ jobs:
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
             
             cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
-            patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch || true           
+            patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch || true           
             ;;
           ReSukiSU)
             SUSFS_VERSION="2.0.0"
