@@ -692,7 +692,7 @@ jobs:
             cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
             patch -p1 --forward < 0001-add-only-KOWSU.patch || true
             
-            cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+            cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" ./
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true            
             ;;
           MKSU)
@@ -707,7 +707,7 @@ jobs:
             cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
-            cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+            cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch" ./
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch || true          
             ;;
           RKSU)
@@ -722,7 +722,7 @@ jobs:
             cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
-            cp -v "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+            cp -v "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch" ./
             patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch || true         
             ;;
           KowXU)
@@ -815,7 +815,7 @@ jobs:
               fi
             fi
             
-            cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning.patch" ./
+            cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch" ./
             patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch || true           
             ;;
           ReSukiSU)
