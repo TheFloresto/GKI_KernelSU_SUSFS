@@ -687,55 +687,6 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
             cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
             patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true     
-            
-            # Add Support KowSU
-            cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
-            patch -p1 --forward < 0001-add-only-KOWSU.patch || true
-            
-            cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true            
-            ;;
-          MKSU)
-            SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"
-            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-            patch -p1 < 10_enable_susfs_for_ksu.patch
-            
-            cd "$KERNEL_ROOT/common"
-            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
-            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
-            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
-
-            cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch || true          
-            ;;
-          RKSU)
-            SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"
-            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-            patch -p1 < 10_enable_susfs_for_ksu.patch
-
-            cd "$KERNEL_ROOT/common"
-            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
-            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
-            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
-
-            cp -v "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch || true         
-            ;;
-          KowXU)
-            SUSFS_VERSION="2.0.0"
-            cd "$KERNEL_ROOT/KernelSU"
-            cp $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true            
-            
-            cd "$KERNEL_ROOT/common"
-            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
-            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
-            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
             if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 209 ]]; then
@@ -814,6 +765,55 @@ jobs:
                 echo "Nothing to fix!"
               fi
             fi
+            
+            # Add Support KowSU
+            cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
+            patch -p1 --forward < 0001-add-only-KOWSU.patch || true
+            
+            cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" ./
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true            
+            ;;
+          MKSU)
+            SUSFS_VERSION="2.0.0"
+            cd "$KERNEL_ROOT/KernelSU"
+            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+            patch -p1 < 10_enable_susfs_for_ksu.patch
+            
+            cd "$KERNEL_ROOT/common"
+            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
+            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
+            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
+            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+
+            cp -v "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch" ./
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch || true          
+            ;;
+          RKSU)
+            SUSFS_VERSION="2.0.0"
+            cd "$KERNEL_ROOT/KernelSU"
+            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+            patch -p1 < 10_enable_susfs_for_ksu.patch
+
+            cd "$KERNEL_ROOT/common"
+            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
+            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
+            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
+            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+
+            cp -v "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch" ./
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch || true         
+            ;;
+          KowXU)
+            SUSFS_VERSION="2.0.0"
+            cd "$KERNEL_ROOT/KernelSU"
+            cp $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+            patch -p1 < 10_enable_susfs_for_ksu.patch || true            
+            
+            cd "$KERNEL_ROOT/common"
+            cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
+            cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
+            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
+            patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
             
             cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch" ./
             patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch || true           
