@@ -682,6 +682,13 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
             patch -p1 < 10_enable_susfs_for_ksu.patch
 
+            # Add Support KowSU
+            cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
+            patch -p1 --forward < 0001-add-only-KOWSU.patch || true
+            
+            cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" ./
+            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true
+
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
@@ -764,14 +771,7 @@ jobs:
               if [[ "$ACTUAL_SUBLEVEL" -le 9999 ]]; then
                 echo "Nothing to fix!"
               fi
-            fi
-            
-            # Add Support KowSU
-            cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
-            patch -p1 --forward < 0001-add-only-KOWSU.patch || true
-            
-            cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true            
+            fi            
             ;;
           MKSU)
             SUSFS_VERSION="2.0.0"
