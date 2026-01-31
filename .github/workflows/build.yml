@@ -571,18 +571,12 @@ jobs:
             patch -p1 < fix_Makefile.patch
             echo "fixing allowlist.c"
             patch -p1 < fix_allowlist.c.patch
-            echo "fixing apk_sign.c"
-            patch -p1 < fix_apk_sign.c.patch
             echo "fixing kernel_umount.c"
             patch -p1 < fix_kernel_umount.c.patch
             echo "fixing ksu.c"
             patch -p1 < fix_ksu.c.patch
             echo "fixing ksud.c"
             patch -p1 < fix_ksud.c.patch
-            echo "fixing selinux.c"
-            patch -p1 < fix_selinux.c.patch
-            echo "fixing setuid_hook.c"
-            patch -p1 < fix_setuid_hook.c.patch
             echo "fixing sucompat.c"
             patch -p1 < fix_sucompat.c.patch
             echo "fixing supercalls.c"
