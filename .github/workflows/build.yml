@@ -985,6 +985,15 @@ jobs:
         SYMBOL_LIST=android/abi_gki_aarch64_xiaomi
         echo "device_find_any_child" >> $SYMBOL_LIST
 
+    - name: Add HymoFS Support
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Adding HymoFS support..."
+        curl -LSs https://raw.githubusercontent.com/Anatdx/HymoFS/main/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
+        echo "✅ HymoFS support added successfully"
+
     - name: Configure Kernel Options
       working-directory: ${{ env.KERNEL_ROOT }}
       shell: bash
