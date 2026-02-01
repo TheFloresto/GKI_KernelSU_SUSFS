@@ -986,6 +986,7 @@ jobs:
         echo "device_find_any_child" >> $SYMBOL_LIST
 
     - name: Add HymoFS Support
+      if: false
       working-directory: ${{ env.KERNEL_ROOT }}/common
       shell: bash
       run: |
@@ -1008,6 +1009,10 @@ jobs:
         CONFIG_KPROBES=y
         CONFIG_HAVE_KPROBES=y
         CONFIG_KPROBE_EVENTS=y
+
+        # KPatch Next Support
+        CONFIG_KALLSYMS=y
+        CONFIG_KALLSYMS_ALL=y
 
         # Susfs Configuration
         CONFIG_KSU_SUSFS=y
