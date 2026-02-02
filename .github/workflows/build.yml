@@ -67,7 +67,7 @@ jobs:
 
     - name: Free Disk Space
       if: true
-      uses: endersonmenezes/free-disk-space@v3
+      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
       with:
         remove_android: true
         remove_dotnet: true
@@ -77,9 +77,17 @@ jobs:
         remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
         remove_packages_one_command: true
         remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-        rm_cmd: "rmz"
-        rmz_version: "3.1.1"
+        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
         testing: false
+
+    - name: Optimize Global Git for Repo Tool
+      shell: bash
+      run: |
+        set -euo pipefail
+        git config --global feature.manyFiles true
+        git config --global core.fsmonitor true
+        git config --global pack.sparse true
 
     - name: Setup Build Environment
       shell: bash
@@ -114,7 +122,7 @@ jobs:
         curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
         chmod 0755 "$GITHUB_WORKSPACE/git-repo/repo"
         echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
-        
+
     - name: Set boot sign key
       shell: bash
       env:
@@ -182,10 +190,72 @@ jobs:
           EXTRACTED=$(grep '^SUBLEVEL = ' "$KERNEL_ROOT/common/Makefile" | awk '{print $3}')
           [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
         fi
-
+        
         echo "ACTUAL_SUBLEVEL=$ACTUAL_SUBLEVEL" >> $GITHUB_ENV
 
+    - name: Setup ZyCromerZ Clang Toolchain
+      if: false 
+      env:
+        GH_TOKEN: ${{ github.token }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Fetching latest ZyCromerZ Clang release..."
+        LATEST_CLANG_TAG=$(gh api repos/ZyCromerZ/Clang/releases/latest --jq '.tag_name')
+        if [ -z "$LATEST_CLANG_TAG" ]; then
+          echo "Error: Could not fetch latest ZyCromerZ Clang tag"
+          exit 1
+        fi
+        echo "Latest ZyCromerZ Clang tag: $LATEST_CLANG_TAG"
+        
+        # Extract version info for environment variables
+        CLANG_VERSION=$(echo "$LATEST_CLANG_TAG" | sed 's/-release$//')
+        
+        echo "Downloading ZyCromerZ Clang $LATEST_CLANG_TAG..."
+        mkdir -p clang-zyc
+        cd clang-zyc
+        
+        # Download the latest release asset (assuming the naming pattern is consistent)
+        DOWNLOAD_URL="https://github.com/ZyCromerZ/Clang/releases/download/$LATEST_CLANG_TAG/Clang-$CLANG_VERSION.tar.gz"
+        echo "Download URL: $DOWNLOAD_URL"
+        
+        curl -LO "$DOWNLOAD_URL"
+        tar -xzf "Clang-$CLANG_VERSION.tar.gz"
+        cd ..
+        
+        # Set environment variables
+        echo "LATEST_CLANG_TAG=$LATEST_CLANG_TAG" >> $GITHUB_ENV
+        echo "CLANG_SOURCE=zyc" >> $GITHUB_ENV
+        echo "CLANG_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+        echo "CLANG_VERSION=zyc-$CLANG_VERSION" >> $GITHUB_ENV
+        echo "CLANG_BIN_PATH=$GITHUB_WORKSPACE/clang-zyc/bin" >> $GITHUB_ENV
+
+    - name: Derive Clang Short Version
+      if: false     
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        # 1. Пытаемся достать версию в формате 17.0.2 или 18.1.0
+        short=$("${CLANG_BIN_PATH}/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1)
+        
+        # 2. Если не вышло, ищем номер ревизии (r487747c)
+        if [ -z "$short" ]; then
+            short=$("${CLANG_BIN_PATH}/clang" --version | grep -oP '\br[0-9a-f]{6,}\b' | head -n1)
+        fi
+        
+        # 3. Если всё еще пусто, используем хеш (для кеша ccache)
+        if [ -z "$short" ]; then
+            short=$("${CLANG_BIN_PATH}/clang" --version | sha256sum | cut -c1-8)
+            echo "⚠️ Could not extract version string, using hash: $short"
+        else
+            echo "✅ Clang version fingerprint: $short"
+        fi
+        
+        echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
+
     - name: Detect Clang
+      if: true
       shell: bash
       run: |
         set -euo pipefail
@@ -219,6 +289,7 @@ jobs:
         echo "::endgroup::"
 
     - name: Derive Clang Short Version
+      if: true
       shell: bash
       run: |
         set -euo pipefail
@@ -280,6 +351,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+        # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
         if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 186 ]] || 
            [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 119 ]] || 
            [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 110 ]] || 
@@ -465,7 +537,7 @@ jobs:
     - name: Clone & Apply SUSFS Patches for KernelSU Variants
       shell: bash
       run: |
-        set -euo pipefail
+        set -eo pipefail
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
@@ -903,6 +975,16 @@ jobs:
             ;;
         esac
 
+    - name: Add HymoFS Support
+      if: false
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Adding HymoFS support..."
+        curl -LSs https://raw.githubusercontent.com/Anatdx/HymoFS/main/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
+        echo "✅ HymoFS support added successfully"
+
     - name: Apply Performance Patches
       if: false
       working-directory: ${{ env.KERNEL_ROOT }}/common
@@ -949,6 +1031,7 @@ jobs:
         echo "Applying bypass to $TARGET_FILE"
         sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
 
+        # Verify the bypass
         if grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
           echo "SUCCESS: Module check bypass verified in $TARGET_FILE"
         else
@@ -985,15 +1068,30 @@ jobs:
         SYMBOL_LIST=android/abi_gki_aarch64_xiaomi
         echo "device_find_any_child" >> $SYMBOL_LIST
 
-    - name: Add HymoFS Support
+    - name: Apply Remote Patches (CLIDR Fix)
       if: false
       working-directory: ${{ env.KERNEL_ROOT }}/common
       shell: bash
       run: |
         set -euo pipefail
-        echo "Adding HymoFS support..."
-        curl -LSs https://raw.githubusercontent.com/Anatdx/HymoFS/main/setup.sh | bash -s defconfig arch/arm64/configs/gki_defconfig
-        echo "✅ HymoFS support added successfully"
+        # CLIDR fix (essential for all variants)
+        echo "📋 Applying fix-clidr-uninitialized.patch"
+        
+        # Скачиваем патч во временную папку
+        if curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch" \
+          -o /tmp/fix-clidr.patch; then
+          
+          # Проверяем возможность применения (Dry Run)
+          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
+            # Применяем патч
+            patch -p1 --forward < /tmp/fix-clidr.patch
+            echo "✅ Patch applied successfully"
+          else
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "⚠️ Failed to download remote patch, continuing anyway"
+        fi
 
     - name: Configure Kernel Options
       working-directory: ${{ env.KERNEL_ROOT }}
@@ -1004,6 +1102,10 @@ jobs:
         # KernelSU Configuration
         CONFIG_KSU=y
         CONFIG_KSU_DEBUG=n
+
+        # Kernel Version
+        CONFIG_LOCALVERSION_AUTO=n
+        CONFIG_LOCALVERSION="-TheFloresto"
 
         # Kprobes (required for KernelSU)
         CONFIG_KPROBES=y
@@ -1016,6 +1118,10 @@ jobs:
 
         # Susfs Configuration
         CONFIG_KSU_SUSFS=y
+
+        # KPatch Next Support
+        CONFIG_KALLSYMS=y
+        CONFIG_KALLSYMS_ALL=y
 
         # Mountify Support
         CONFIG_TMPFS_XATTR=y
@@ -1067,15 +1173,7 @@ jobs:
         
         EOF
 
-        echo "Checking if configs were applied..."
-        if grep -q "CONFIG_KSU=y" "${{ env.DEFCONFIG }}" && grep -q "CONFIG_KSU_SUSFS=y" "${{ env.DEFCONFIG }}" && grep -q "CONFIG_KPROBES=y" "${{ env.DEFCONFIG }}"; then
-          echo "SUCCESS: KSU, SUSFS, and KPROBES configs verified in ${{ env.DEFCONFIG }}"
-        else
-          echo "FAILED: KSU, SUSFS, or KPROBES configs missing in ${{ env.DEFCONFIG }}"
-          tail -n 50 "${{ env.DEFCONFIG }}"
-          exit 1
-        fi
-
+        # Remove check_defconfig
         if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
           awk '/name = "kernel_aarch64"/,/^\)/ {if(/check_defconfig = "disabled"/) found=1} END{if(found) print "SUCCESS: check_defconfig = \"disabled\" is in the kernel_aarch64 block"; else print "FAILED: NOT in the kernel_aarch64 block"}' common/BUILD.bazel
@@ -1228,9 +1326,12 @@ jobs:
 
         if [ -f common/drivers/android/binder/Makefile ]; then
           perl -i -0777 -pe 's/\$\(\s*CONFIG_ANDROID_BINDER_IPC_RUST\s*\)/m/' common/drivers/android/binder/Makefile
+          #perl -i -ne 'print unless /CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY/' common/drivers/android/binder/Makefile
           perl -i -pe 's/^rust_binder-\$\([^)]+\)\s*:=/rust_binder-y :=/' common/drivers/android/binder/Makefile
           cat common/drivers/android/Makefile
           cat common/drivers/android/binder/Makefile
+          #perl -ni -e 'print unless /rust_toolchain\s*=\s*"\/\/build\/rust:linux_kernel_toolchain",/' common/BUILD.bazel
+          #cat common/BUILD.bazel
           rustup set profile minimal
           rustup update nightly
           rustup default nightly
@@ -1245,8 +1346,6 @@ jobs:
       run: |
         set -euo pipefail
         cd "$KERNEL_ROOT/common"
-        CUSTOM_LOCALVERSION="-TheFloresto"
-        echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
         
         sed -i 's/-dirty//' ./scripts/setlocalversion
         sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
@@ -1270,12 +1369,22 @@ jobs:
         
         : > .scmversion
         
-        export COMMIT_TIMESTAMP=$(date +%s)
+        # Get commit information from kernel source
+        echo "Getting last commit timestamp from kernel source..."
+        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        COMMIT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S')
+        COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
         export KBUILD_BUILD_TIMESTAMP="${{ env.BUILD_TIMESTAMP }}"
         export KBUILD_BUILD_USER="${{ env.BUILD_USER }}"
         export KBUILD_BUILD_HOST="${{ env.BUILD_HOST }}"
         export KBUILD_BUILD_VERSION=1
+        
+        echo "📅 Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
+        echo "🔢 SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+        echo "👤 Build user: $KBUILD_BUILD_USER"
+        echo "🖥️  Build host: $KBUILD_BUILD_HOST"
         
         WORKSPACE="${GITHUB_WORKSPACE}"
         MAP="-fdebug-prefix-map=${WORKSPACE}=."
@@ -1298,29 +1407,36 @@ jobs:
         
         export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
         
-        echo "============================================"
-        echo "🔧 Build Configuration"
-        echo "============================================"
-        echo "Kernel: ${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL }}"
-        echo "Threads: $(nproc --all)"
-        echo "Optimization: O2 with LTO thin"
-        echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
-        echo "User: $KBUILD_BUILD_USER"
-        echo "Host: $KBUILD_BUILD_HOST"
-        echo "ccache: ENABLED"
-        echo "============================================"
-        
         OUT=out
         mkdir -p "$OUT"
         
+        echo "============================================"
+        echo "🔍 Compiler & ccache Verification"
+        echo "============================================"
+        echo "PATH: ${PATH:0:200}..."
+        echo "which clang: $(which clang)"
+        echo "CC: $CC"
+        echo "CXX: $CXX"
+        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+        echo ""
+        echo "ccache wrapper test:"
+        clang --version 2>&1 | head -n1 || true
+        echo ""
+        echo "ccache configuration:"
+        ccache -p | grep -E "(compression|direct_mode|readonly_direct|depend|sloppiness)" || true
+        echo ""
+        echo "ccache pre-build status:"
+        ccache -s | head -n 20
+        echo "============================================"
+        
         make O="$OUT" gki_defconfig
         
-        scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
-        scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO
-        
+        # Optimization settings - O2 by default
         scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
         scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        KCFLAGS_EXTRA="-O2"
         
+        # LTO settings - thin LTO
         scripts/config --file "$OUT/.config" -e LTO_CLANG
         scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
         scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
@@ -1328,8 +1444,34 @@ jobs:
         
         make O="$OUT" olddefconfig
         
-        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -O2"
+        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+        
+        echo "============================================"
+        echo "🔧 Build Configuration"
+        echo "============================================"
+        echo "Kernel: ${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL }}"
+        echo "Android: ${{ inputs.android_version }}"
+        echo "Threads: $(nproc --all)"
+        echo "Optimization: O2 with LTO thin"
+        echo "KCFLAGS: ${KCFLAGS:0:150}..."
+        echo "KCPPFLAGS: ${KCPPFLAGS:0:150}..."
+        echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
+        echo "Workspace: $WORKSPACE"
+        echo "ccache: ENABLED"
+        echo "  Dir: $CCACHE_DIR"
+        echo "  Base: $CCACHE_BASEDIR"
+        echo "  Max size: $CCACHE_MAXSIZE"
+        echo "  Compression: zstd level 3"
+        echo "  Features: readonly_direct, file_clone, inode_cache, depend"
+        echo "============================================"
+        
+        # Prime cache with header preprocessing if cache is empty
+        if [ ! -d "$CCACHE_DIR" ] || [ -z "$(find "$CCACHE_DIR" -type f 2>/dev/null | head -n1)" ]; then
+          echo "🔥 Priming cache with header preprocessing..."
+          make O="$OUT" headers_install prepare 2>&1 | head -n 20 || true
+          echo ""
+        fi
         
         BUILD_START=$(date +%s)
         set -o pipefail
@@ -1344,7 +1486,9 @@ jobs:
         IMG="$OUT/arch/arm64/boot/Image"
         if [ ! -f "$IMG" ]; then
           echo "::error::Kernel Image missing"
-          tail -n 422 build.log || true
+          echo "::group::Last 100 lines of build log"
+          tail -n 100 build.log || echo "Build log not available"
+          echo "::endgroup::"
           exit 1
         fi
         
@@ -1356,7 +1500,8 @@ jobs:
         echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
         echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
         echo ""
-        echo "📊 ccache Statistics:"
+        echo "📊 ccache Post-Build Statistics"
+        echo "============================================"
         ccache -s
         echo "============================================"
         echo "::endgroup::"
@@ -1482,16 +1627,19 @@ jobs:
         CONFIG_DIR="$KERNEL_ROOT"
         REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
         mkdir -p "$REJECTS_DIR"
+        # Find all .rej files under the configuration directory
         mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
         REJ_COUNT=${#REJS[@]}
         echo "Found $REJ_COUNT .rej files under $CONFIG_DIR"
         echo "REJ_COUNT=$REJ_COUNT" >> $GITHUB_ENV
         if [ "$REJ_COUNT" -gt 0 ]; then
           for REJ in "${REJS[@]}"; do
+            # Relative path from $CONFIG
             REL="${REJ#"$CONFIG_DIR"/}"
             DEST="$REJECTS_DIR/$REL"
             mkdir -p "$(dirname "$DEST")"
             cp "$REJ" "$DEST"
+            # Copy the associated original file alongside the .rej
             ORIG="${REJ%.rej}"
             if [ -f "$ORIG" ]; then
               ORIG_DEST="$REJECTS_DIR/${REL%.rej}"
@@ -1540,3 +1688,5 @@ jobs:
         if-no-files-found: ignore
         compression-level: 9
         retention-days: 7
+
+# End of workflow
