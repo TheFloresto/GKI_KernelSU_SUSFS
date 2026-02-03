@@ -634,7 +634,9 @@ jobs:
           Next)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU-Next"
-            echo "Nothing to fix for Next"
+                        echo "patching kernel"
+            cp $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+            patch -p1 < 10_enable_susfs_for_ksu.patch || true
             
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
