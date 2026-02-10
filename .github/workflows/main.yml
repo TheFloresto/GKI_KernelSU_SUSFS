@@ -333,7 +333,7 @@ jobs:
             ;;
           "ReSukiSU")
             KSU_REF=$(git ls-remote "https://github.com/ReSukiSU/KernelSU.git" refs/heads/main | awk '{print $1}')
-            KSU_URL="https://github.com/ReSukiSU/ReSukiSU/commit/$KSU_REF
+            KSU_URL="https://github.com/ReSukiSU/ReSukiSU/commit/$KSU_REF"
             ;;
           *)
             echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
