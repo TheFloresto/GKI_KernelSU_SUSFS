@@ -1025,7 +1025,7 @@ jobs:
         fi
 
     - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
-      if: ${{ ( inputs.kernel_version == '6.6' ) }}
+      if: ${{ inputs.kernel_version == '6.6' }}
       working-directory: ${{ env.KERNEL_ROOT }}/common
       run: |
         SYMBOL_LIST=android/abi_gki_aarch64_galaxy
