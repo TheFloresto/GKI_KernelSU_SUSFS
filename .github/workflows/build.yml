@@ -731,15 +731,15 @@ jobs:
           KSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
-            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
-            patch -p1 < 10_enable_susfs_for_ksu.patch
-
             # Add Support KowSU
             cp -v "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" ./
-            patch -p1 --forward < 0001-add-only-KOWSU.patch || true
+            patch -p1 --forward -F 3 < 0001-add-only-KOWSU.patch || true
+       
+            cp "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .
+            patch -p1  < 10_enable_susfs_for_ksu.patch
             
-            cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" ./
-            patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true
+            #cp -v "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" ./
+            #patch -p1 --forward < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch || true
 
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
@@ -823,7 +823,7 @@ jobs:
               if [[ "$ACTUAL_SUBLEVEL" -le 9999 ]]; then
                 echo "Nothing to fix!"
               fi
-            fi            
+            fi
             ;;
           MKSU)
             SUSFS_VERSION="2.0.0"
@@ -955,8 +955,7 @@ jobs:
               if [[ "$ACTUAL_SUBLEVEL" -le 9999 ]]; then
                 echo "Nothing to fix!"
               fi
-            fi
-            
+            fi         
             echo "SukiSU: patching skipped (built-in SUSFS support)"
             ;;
         esac
@@ -1027,7 +1026,7 @@ jobs:
         fi
 
     - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
-      if: ${{ inputs.kernel_version == '6.6' }}
+      if: ${{ ( inputs.kernel_version == '6.6' ) }}
       working-directory: ${{ env.KERNEL_ROOT }}/common
       shell: bash
       run: |
@@ -1078,7 +1077,7 @@ jobs:
         else
           echo "⚠️ Failed to download remote patch, continuing anyway"
         fi
-
+        
     - name: Configure Kernel Options
       working-directory: ${{ env.KERNEL_ROOT }}
       shell: bash
@@ -1343,8 +1342,7 @@ jobs:
           cat common/drivers/android/Makefile
         fi
 
-    - name: Change Kernel Name
-      working-directory: ${{ env.KERNEL_ROOT }}
+    - name: Customize Kernel Branding
       shell: bash
       run: |
         set -euo pipefail
@@ -1352,20 +1350,17 @@ jobs:
         CUSTOM_LOCALVERSION="-TheFloresto"
         echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
         
-        #Remove Dirty Flag
         sed -i 's/-dirty//' ./scripts/setlocalversion
         sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
         
-        #Remove Abi Exports and Error
-        rm -rf ./common/android/abi_gki_protected_exports_*
-        perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
-
-        cd $KERNEL_ROOT/common
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        rm -rf ./android/abi_gki_protected_exports_* || true
+        perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//' ./BUILD.bazel || true
+        
+        git config --global user.name "deepongi"
+        git config --global user.email "zzitoz@gmail.com"
         git add .
         git commit -m "TheFloresto: Clean Dirty Flag"
-     
+
     - name: Build Kernel
       shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}/common
@@ -1395,7 +1390,6 @@ jobs:
         echo "🖥️  Build host: $KBUILD_BUILD_HOST"
         
         WORKSPACE="${GITHUB_WORKSPACE}"
-        COMMON="$KERNEL_ROOT/common"
         MAP="-fdebug-prefix-map=${WORKSPACE}=."
         MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
         FPMAP="-ffile-prefix-map=${WORKSPACE}=."
@@ -1489,7 +1483,7 @@ jobs:
         BUILD_START=$(date +%s)
         set -o pipefail
         
-        make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee "$COMMON/build.log"  
+        make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
         
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - BUILD_START))
