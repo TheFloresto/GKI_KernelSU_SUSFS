@@ -1395,6 +1395,7 @@ jobs:
         echo "🖥️  Build host: $KBUILD_BUILD_HOST"
         
         WORKSPACE="${GITHUB_WORKSPACE}"
+        COMMON="$KERNEL_ROOT/common"
         MAP="-fdebug-prefix-map=${WORKSPACE}=."
         MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
         FPMAP="-ffile-prefix-map=${WORKSPACE}=."
