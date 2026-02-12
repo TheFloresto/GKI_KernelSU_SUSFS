@@ -249,7 +249,7 @@ jobs:
         echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
 
     - name: Detect Clang
-      if: true
+      if: false
       shell: bash
       run: |
         set -euo pipefail
@@ -283,7 +283,7 @@ jobs:
         echo "::endgroup::"
 
     - name: Derive Clang Short Version
-      if: true
+      if: false
       shell: bash
       run: |
         set -euo pipefail
