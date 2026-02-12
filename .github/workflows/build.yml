@@ -1063,7 +1063,7 @@ jobs:
         echo "device_find_any_child" >> $SYMBOL_LIST
 
     - name: Apply Remote Patches (CLIDR Fix)
-      if: false
+      if: true
       working-directory: ${{ env.KERNEL_ROOT }}/common
       shell: bash
       run: |
