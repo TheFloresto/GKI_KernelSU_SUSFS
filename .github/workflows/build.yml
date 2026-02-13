@@ -67,7 +67,7 @@ jobs:
 
     - name: Free Disk Space
       if: true
-      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
+      uses: endersonmenezes/free-disk-space@v3
       with:
         remove_android: true
         remove_dotnet: true
@@ -77,8 +77,8 @@ jobs:
         remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
         remove_packages_one_command: true
         remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
-        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
+        rm_cmd: "rmz"
+        rmz_version: "3.1.1"
         testing: false
 
     - name: Optimize Global Git for Repo Tool
@@ -122,7 +122,7 @@ jobs:
         curl -L https://storage.googleapis.com/git-repo-downloads/repo -o "$GITHUB_WORKSPACE/git-repo/repo"
         chmod 0755 "$GITHUB_WORKSPACE/git-repo/repo"
         echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
-
+        
     - name: Set boot sign key
       shell: bash
       env:
@@ -190,7 +190,7 @@ jobs:
           EXTRACTED=$(grep '^SUBLEVEL = ' "$KERNEL_ROOT/common/Makefile" | awk '{print $3}')
           [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
         fi
-        
+
         echo "ACTUAL_SUBLEVEL=$ACTUAL_SUBLEVEL" >> $GITHUB_ENV
 
     - name: Setup Greenforce Clang Toolchain
@@ -248,56 +248,6 @@ jobs:
         
         echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
 
-    - name: Detect Clang
-      if: false
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "::group::Detect Clang"
-        
-        CLANG_FOUND=false
-        
-        for base in "$KERNEL_ROOT/prebuilts" "$KERNEL_ROOT/prebuilts-master"; do
-          [ -d "$base/clang/host/linux-x86" ] || continue
-          latest=$(ls -d "$base"/clang/host/linux-x86/clang-r*/ 2>/dev/null | sort -V | tail -n1 || true)
-          if [ -n "$latest" ] && [ -x "$latest/bin/clang" ]; then
-            CLANG_BIN="$latest/bin"
-            CLANG_FOUND=true
-            break
-          fi
-        done
-        
-        if ! $CLANG_FOUND && command -v clang >/dev/null 2>&1; then
-          CLANG_BIN="$(dirname "$(command -v clang)")"
-          CLANG_FOUND=true
-          echo "Using system clang."
-        fi
-        
-        $CLANG_FOUND || { echo "::error::No clang toolchain found"; exit 1; }
-        
-        echo "CLANG_BIN_PATH=$CLANG_BIN" >> "$GITHUB_ENV"
-        
-        CLANG_VERSION="$("$CLANG_BIN/clang" --version | head -n1)"
-        echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-        echo "✅ Detected Clang: $CLANG_VERSION"
-        echo "::endgroup::"
-
-    - name: Derive Clang Short Version
-      if: false
-      shell: bash
-      run: |
-        set -euo pipefail
-        short="$("${CLANG_BIN_PATH}/clang" --version | sed -n '1s/.*clang-r\([0-9.]\+\).*/\1/p')"
-        
-        if [ -z "$short" ]; then
-          short="$("${CLANG_BIN_PATH}/clang" --version | sha256sum | cut -c1-8)"
-          echo "⚠️ Could not extract clang-r version, using hash: $short"
-        else
-          echo "✅ Clang version fingerprint: $short"
-        fi
-        
-        echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
-
     - name: Set Cache Environment
       shell: bash
       run: |
@@ -345,7 +295,6 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        # Use ACTUAL_SUBLEVEL for LTS builds, otherwise use the input sub_level
         if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && $ACTUAL_SUBLEVEL -le 186 ]] || 
            [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 119 ]] || 
            [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "5.15" && $ACTUAL_SUBLEVEL -le 110 ]] || 
@@ -386,7 +335,7 @@ jobs:
             if [[ -n "${{ inputs.ksu_commit }}" ]]; then
               curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s "${{ inputs.ksu_commit }}"
             else
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild-dev
             fi
             ;;
           Next)
@@ -477,8 +426,9 @@ jobs:
             ;;
           ReSukiSU)
             echo "Getting ReSukiSU version..."
-            KSU_DIR="./KernelSU"
-            BASE_VERSION=33275 
+            git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git -b main SukiSU-Ultra
+            KSU_DIR="./SukiSU-Ultra"
+            BASE_VERSION=33275          
             ;;
           *)
             echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
@@ -1016,7 +966,6 @@ jobs:
         echo "Applying bypass to $TARGET_FILE"
         sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
 
-        # Verify the bypass
         if grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
           echo "SUCCESS: Module check bypass verified in $TARGET_FILE"
         else
@@ -1113,17 +1062,6 @@ jobs:
         CONFIG_HAVE_KPROBES=y
         CONFIG_KPROBE_EVENTS=y
 
-        # KPatch Next Support
-        CONFIG_KALLSYMS=y
-        CONFIG_KALLSYMS_ALL=y
-
-        # Susfs Configuration
-        CONFIG_KSU_SUSFS=y
-
-        # KPatch Next Support
-        CONFIG_KALLSYMS=y
-        CONFIG_KALLSYMS_ALL=y
-
         # Mountify Support
         CONFIG_TMPFS_XATTR=y
         CONFIG_TMPFS_POSIX_ACL=y
@@ -1174,7 +1112,15 @@ jobs:
         
         EOF
 
-        # Remove check_defconfig
+        echo "Checking if configs were applied..."
+        if grep -q "CONFIG_KSU=y" "${{ env.DEFCONFIG }}" && grep -q "CONFIG_KPROBES=y" "${{ env.DEFCONFIG }}"; then
+          echo "SUCCESS: KSU, and KPROBES configs verified in ${{ env.DEFCONFIG }}"
+        else
+          echo "FAILED: KSU, or KPROBES configs missing in ${{ env.DEFCONFIG }}"
+          tail -n 50 "${{ env.DEFCONFIG }}"
+          exit 1
+        fi
+
         if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
           awk '/name = "kernel_aarch64"/,/^\)/ {if(/check_defconfig = "disabled"/) found=1} END{if(found) print "SUCCESS: check_defconfig = \"disabled\" is in the kernel_aarch64 block"; else print "FAILED: NOT in the kernel_aarch64 block"}' common/BUILD.bazel
@@ -1287,8 +1233,8 @@ jobs:
         echo "Contents of defconfig (last 20 lines):"
         tail -n 20 "${{ env.DEFCONFIG }}"
 
-    - name: Configure ReSukiSU
-      if: ${{ inputs.ksu_variant == 'ReSukiSU' }}
+    - name: Configure SukiSU
+      if: ${{ inputs.ksu_variant == 'SukiSU' }}
       shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}
       run: |
@@ -1296,12 +1242,11 @@ jobs:
         cat >> "${{ env.DEFCONFIG }}" << 'EOF'
         # SukiSU Support
         CONFIG_KSU_KPROBES_HOOK=n
-        CONFIG_KSU_MANUAL_HOOK=y
         CONFIG_KSU_ALLOWLIST_WORKAROUND=n
-        CONFIG_KSU_LSM_SECURITY_HOOKS=y        
+        CONFIG_KSU_LSM_SECURITY_HOOKS=y
         EOF
         
-        echo "✅ ReSukiSU configuration applied"
+        echo "✅ SukiSU configuration applied"
         echo "Contents of defconfig (last 20 lines):"
         tail -n 20 "${{ env.DEFCONFIG }}"
 
@@ -1327,12 +1272,9 @@ jobs:
 
         if [ -f common/drivers/android/binder/Makefile ]; then
           perl -i -0777 -pe 's/\$\(\s*CONFIG_ANDROID_BINDER_IPC_RUST\s*\)/m/' common/drivers/android/binder/Makefile
-          #perl -i -ne 'print unless /CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY/' common/drivers/android/binder/Makefile
           perl -i -pe 's/^rust_binder-\$\([^)]+\)\s*:=/rust_binder-y :=/' common/drivers/android/binder/Makefile
           cat common/drivers/android/Makefile
           cat common/drivers/android/binder/Makefile
-          #perl -ni -e 'print unless /rust_toolchain\s*=\s*"\/\/build\/rust:linux_kernel_toolchain",/' common/BUILD.bazel
-          #cat common/BUILD.bazel
           rustup set profile minimal
           rustup update nightly
           rustup default nightly
@@ -1347,7 +1289,7 @@ jobs:
       run: |
         set -euo pipefail
         cd "$KERNEL_ROOT/common"
-        CUSTOM_LOCALVERSION="-TheFloresto"
+        CUSTOM_LOCALVERSION="-@NoFloresto"
         echo "CUSTOM_LOCALVERSION=$CUSTOM_LOCALVERSION" >> "$GITHUB_ENV"
         
         sed -i 's/-dirty//' ./scripts/setlocalversion
@@ -1372,22 +1314,12 @@ jobs:
         
         : > .scmversion
         
-        # Get commit information from kernel source
-        echo "Getting last commit timestamp from kernel source..."
-        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
-        COMMIT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S')
-        COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-        
+        export COMMIT_TIMESTAMP=$(date +%s)
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
         export KBUILD_BUILD_TIMESTAMP="${{ env.BUILD_TIMESTAMP }}"
         export KBUILD_BUILD_USER="${{ env.BUILD_USER }}"
         export KBUILD_BUILD_HOST="${{ env.BUILD_HOST }}"
         export KBUILD_BUILD_VERSION=1
-        
-        echo "📅 Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
-        echo "🔢 SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
-        echo "👤 Build user: $KBUILD_BUILD_USER"
-        echo "🖥️  Build host: $KBUILD_BUILD_HOST"
         
         WORKSPACE="${GITHUB_WORKSPACE}"
         MAP="-fdebug-prefix-map=${WORKSPACE}=."
@@ -1410,40 +1342,29 @@ jobs:
         
         export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
         
+        echo "============================================"
+        echo "🔧 Build Configuration"
+        echo "============================================"
+        echo "Kernel: ${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL }}"
+        echo "Threads: $(nproc --all)"
+        echo "Optimization: O2 with LTO thin"
+        echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
+        echo "User: $KBUILD_BUILD_USER"
+        echo "Host: $KBUILD_BUILD_HOST"
+        echo "ccache: ENABLED"
+        echo "============================================"
+        
         OUT=out
         mkdir -p "$OUT"
         
-        echo "============================================"
-        echo "🔍 Compiler & ccache Verification"
-        echo "============================================"
-        echo "PATH: ${PATH:0:200}..."
-        echo "which clang: $(which clang)"
-        echo "CC: $CC"
-        echo "CXX: $CXX"
-        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
-        echo ""
-        echo "ccache wrapper test:"
-        clang --version 2>&1 | head -n1 || true
-        echo ""
-        echo "ccache configuration:"
-        ccache -p | grep -E "(compression|direct_mode|readonly_direct|depend|sloppiness)" || true
-        echo ""
-        echo "ccache pre-build status:"
-        ccache -s | head -n 20
-        echo "============================================"
-        
         make O="$OUT" gki_defconfig
-
-        # Custom Nickname
+        
         scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${CUSTOM_LOCALVERSION}"
         scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO
         
-        # Optimization settings - O2 by default
         scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
         scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-        KCFLAGS_EXTRA="-O2"
         
-        # LTO settings - thin LTO
         scripts/config --file "$OUT/.config" -e LTO_CLANG
         scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
         scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
@@ -1451,34 +1372,8 @@ jobs:
         
         make O="$OUT" olddefconfig
         
-        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector ${KCFLAGS_EXTRA}"
+        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -O2"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
-        
-        echo "============================================"
-        echo "🔧 Build Configuration"
-        echo "============================================"
-        echo "Kernel: ${{ inputs.kernel_version }}.${{ env.ACTUAL_SUBLEVEL }}"
-        echo "Android: ${{ inputs.android_version }}"
-        echo "Threads: $(nproc --all)"
-        echo "Optimization: O2 with LTO thin"
-        echo "KCFLAGS: ${KCFLAGS:0:150}..."
-        echo "KCPPFLAGS: ${KCPPFLAGS:0:150}..."
-        echo "Timestamp: $KBUILD_BUILD_TIMESTAMP"
-        echo "Workspace: $WORKSPACE"
-        echo "ccache: ENABLED"
-        echo "  Dir: $CCACHE_DIR"
-        echo "  Base: $CCACHE_BASEDIR"
-        echo "  Max size: $CCACHE_MAXSIZE"
-        echo "  Compression: zstd level 3"
-        echo "  Features: readonly_direct, file_clone, inode_cache, depend"
-        echo "============================================"
-        
-        # Prime cache with header preprocessing if cache is empty
-        if [ ! -d "$CCACHE_DIR" ] || [ -z "$(find "$CCACHE_DIR" -type f 2>/dev/null | head -n1)" ]; then
-          echo "🔥 Priming cache with header preprocessing..."
-          make O="$OUT" headers_install prepare 2>&1 | head -n 20 || true
-          echo ""
-        fi
         
         BUILD_START=$(date +%s)
         set -o pipefail
@@ -1493,9 +1388,7 @@ jobs:
         IMG="$OUT/arch/arm64/boot/Image"
         if [ ! -f "$IMG" ]; then
           echo "::error::Kernel Image missing"
-          echo "::group::Last 100 lines of build log"
-          tail -n 100 build.log || echo "Build log not available"
-          echo "::endgroup::"
+          tail -n 422 build.log || true
           exit 1
         fi
         
@@ -1507,8 +1400,7 @@ jobs:
         echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
         echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
         echo ""
-        echo "📊 ccache Post-Build Statistics"
-        echo "============================================"
+        echo "📊 ccache Statistics:"
         ccache -s
         echo "============================================"
         echo "::endgroup::"
@@ -1612,16 +1504,9 @@ jobs:
         IMG_SHA256=$(sha256sum "$IMG" | awk '{print $1}')
         BUILD_TIME="${BUILD_TIME:-0}"
         
-        # Безопасное извлечение версии ядра с обработкой ошибок
-        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || echo "Version info not found")
-        
-        if [ "$KERNEL_UNAME" != "Version info not found" ]; then
-          echo "Kernel Uname: $KERNEL_UNAME"
-          echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
-        else
-          echo "::warning::Could not extract kernel version string from Image"
-          echo "KERNEL_UNAME=Unknown" >> "$GITHUB_ENV"
-        fi
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1)
+        echo "Kernel Uname: $KERNEL_UNAME"
+        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
         
         printf 'warnings_count=%s\n' "$WARNINGS_COUNT" >> "$GITHUB_OUTPUT"
         printf 'image_sha256=%s\n' "$IMG_SHA256" >> "$GITHUB_OUTPUT"
@@ -1632,7 +1517,7 @@ jobs:
         echo "   - Image size: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
         echo "   - SHA256: $IMG_SHA256"
         echo "   - Build time: ${BUILD_TIME}s"
-        
+
     - name: Scan and collect patch rejects
       if: ${{ always() }}
       shell: bash
@@ -1641,19 +1526,16 @@ jobs:
         CONFIG_DIR="$KERNEL_ROOT"
         REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
         mkdir -p "$REJECTS_DIR"
-        # Find all .rej files under the configuration directory
         mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
         REJ_COUNT=${#REJS[@]}
         echo "Found $REJ_COUNT .rej files under $CONFIG_DIR"
         echo "REJ_COUNT=$REJ_COUNT" >> $GITHUB_ENV
         if [ "$REJ_COUNT" -gt 0 ]; then
           for REJ in "${REJS[@]}"; do
-            # Relative path from $CONFIG
             REL="${REJ#"$CONFIG_DIR"/}"
             DEST="$REJECTS_DIR/$REL"
             mkdir -p "$(dirname "$DEST")"
             cp "$REJ" "$DEST"
-            # Copy the associated original file alongside the .rej
             ORIG="${REJ%.rej}"
             if [ -f "$ORIG" ]; then
               ORIG_DEST="$REJECTS_DIR/${REL%.rej}"
@@ -1702,5 +1584,3 @@ jobs:
         if-no-files-found: ignore
         compression-level: 9
         retention-days: 7
-
-# End of workflow
