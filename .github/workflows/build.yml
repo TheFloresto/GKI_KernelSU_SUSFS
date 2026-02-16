@@ -573,7 +573,7 @@ jobs:
         esac
 
     - name: Add HymoFS Support
-      if: false
+      if: true
       working-directory: ${{ env.KERNEL_ROOT }}/common
       shell: bash
       run: |
