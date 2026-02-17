@@ -524,10 +524,14 @@ jobs:
       shell: bash
       run: |
         set -eo pipefail
-        SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+        ANDROID_VER="${{ inputs.android_version }}"
+        KERNEL_VER="${{ inputs.kernel_version }}"
+        KSU_VARIANT="${{ inputs.ksu_variant }}"
+        OS_PATCH="${{ inputs.os_patch_level }}"
+        SUSFS_BRANCH="gki-${ANDROID_VER}-${KERNEL_VER}"
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
 
-        case "${{ inputs.ksu_variant }}" in
+        case "$KSU_VARIANT" in
           WKSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/Wild_KSU"
@@ -538,7 +542,7 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
 
             # Fix namespace.c for android15/6.6
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
               fi
@@ -546,26 +550,26 @@ jobs:
 
             # Fake kernel patch to fix failures
             fake_patched=0
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                 echo "nr_subpages Line not found. Fake Patching!"
                 sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
@@ -576,29 +580,29 @@ jobs:
               fi
             fi
 
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" || true
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
             # Revert Fake kernel patch
             if [ "$fake_patched" = 1 ]; then
-              if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+              if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
                 if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                   echo "nr_subpages Line found. Revert Fake Patching!"
                   sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+              if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+              if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -607,7 +611,7 @@ jobs:
             fi
 
             # Apply wild susfs fix patches
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch"
               fi
@@ -615,12 +619,12 @@ jobs:
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 107 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if [ "$ACTUAL_SUBLEVEL" -le 41 ]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch"
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/fdinfo.c.patch"
@@ -628,12 +632,12 @@ jobs:
                 sed -i 's|is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))|is_i_uid_not_allowed(inode->i_uid.val)))|g' fs/susfs.c
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -ge 145 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a14-6.1/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch"
               fi
@@ -664,7 +668,7 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
 
             # Fix namespace.c for android15/6.6
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
               fi
@@ -672,26 +676,26 @@ jobs:
 
             # Fake kernel patch to fix failures
             fake_patched=0
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                 echo "nr_subpages Line not found. Fake Patching!"
                 sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
@@ -702,29 +706,29 @@ jobs:
               fi
             fi
 
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" || true
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
             # Revert Fake kernel patch
             if [ "$fake_patched" = 1 ]; then
-              if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+              if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
                 if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                   echo "nr_subpages Line found. Revert Fake Patching!"
                   sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+              if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+              if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -733,7 +737,7 @@ jobs:
             fi
 
             # Apply wild susfs fix patches
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch"
               fi
@@ -741,12 +745,12 @@ jobs:
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 107 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if [ "$ACTUAL_SUBLEVEL" -le 41 ]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch"
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/fdinfo.c.patch"
@@ -754,12 +758,12 @@ jobs:
                 sed -i 's|is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))|is_i_uid_not_allowed(inode->i_uid.val)))|g' fs/susfs.c
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -ge 145 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a14-6.1/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch"
               fi
@@ -768,6 +772,18 @@ jobs:
               fi
             fi
             ;;
+        esac
+
+    - name: Apply SUSFS Patches for KernelSU Variants (KSU/MKSU/RKSU/KowXU/ReSukiSU)
+      shell: bash
+      run: |
+        set -eo pipefail
+        ANDROID_VER="${{ inputs.android_version }}"
+        KERNEL_VER="${{ inputs.kernel_version }}"
+        KSU_VARIANT="${{ inputs.ksu_variant }}"
+        OS_PATCH="${{ inputs.os_patch_level }}"
+
+        case "$KSU_VARIANT" in
           KSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
@@ -782,7 +798,7 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
 
             # Fix namespace.c for android15/6.6
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
               fi
@@ -790,26 +806,26 @@ jobs:
 
             # Fake kernel patch to fix failures
             fake_patched=0
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                 echo "nr_subpages Line not found. Fake Patching!"
                 sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
@@ -820,29 +836,29 @@ jobs:
               fi
             fi
 
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" || true
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
             # Revert Fake kernel patch
             if [ "$fake_patched" = 1 ]; then
-              if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+              if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
                 if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                   echo "nr_subpages Line found. Revert Fake Patching!"
                   sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+              if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+              if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -851,7 +867,7 @@ jobs:
             fi
 
             # Apply wild susfs fix patches
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch"
               fi
@@ -859,12 +875,12 @@ jobs:
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 107 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if [ "$ACTUAL_SUBLEVEL" -le 41 ]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch"
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/fdinfo.c.patch"
@@ -872,12 +888,12 @@ jobs:
                 sed -i 's|is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))|is_i_uid_not_allowed(inode->i_uid.val)))|g' fs/susfs.c
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -ge 145 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a14-6.1/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch"
               fi
@@ -894,7 +910,7 @@ jobs:
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" || true
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
             patch -p1 --forward < "$KERNEL_PATCHES/mksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-mksu.patch" || true
             ;;
@@ -906,7 +922,7 @@ jobs:
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" || true
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
             patch -p1 --forward < "$KERNEL_PATCHES/rksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-rksu.patch" || true
             ;;
@@ -918,7 +934,7 @@ jobs:
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" || true
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
             
             patch -p1 --forward < "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch" || true
             ;;
@@ -930,7 +946,7 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
 
             # Fix namespace.c for android15/6.6
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
               fi
@@ -938,26 +954,26 @@ jobs:
 
             # Fake kernel patch to fix failures
             fake_patched=0
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                 echo "nr_subpages Line not found. Fake Patching!"
                 sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
                 echo "vma_pages Line not found. Fake Patching!"
                 fake_patched=1
@@ -968,29 +984,29 @@ jobs:
               fi
             fi
 
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch" || true
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
             # Revert Fake kernel patch
             if [ "$fake_patched" = 1 ]; then
-              if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+              if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
                 if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
                   echo "nr_subpages Line found. Revert Fake Patching!"
                   sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+              if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+              if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                 fi
               fi
-              if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -999,7 +1015,7 @@ jobs:
             fi
 
             # Apply wild susfs fix patches
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch"
               fi
@@ -1007,12 +1023,12 @@ jobs:
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 107 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
               if [ "$ACTUAL_SUBLEVEL" -le 41 ]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch"
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/fdinfo.c.patch"
@@ -1020,12 +1036,12 @@ jobs:
                 sed -i 's|is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))|is_i_uid_not_allowed(inode->i_uid.val)))|g' fs/susfs.c
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -ge 145 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a14-6.1/base.c.patch"
               fi
             fi
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch"
               fi
@@ -1037,7 +1053,6 @@ jobs:
             echo "SukiSU: patching skipped (built-in SUSFS support)"
             ;;
         esac
-
     - name: Add HymoFS Support
       if: false
       working-directory: ${{ env.KERNEL_ROOT }}/common
@@ -1698,7 +1713,7 @@ jobs:
         KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1)
         echo "Kernel Uname: $KERNEL_UNAME"
         echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
-        й
+        
         printf 'warnings_count=%s\n' "$WARNINGS_COUNT" >> "$GITHUB_OUTPUT"
         printf 'image_sha256=%s\n' "$IMG_SHA256" >> "$GITHUB_OUTPUT"
         printf 'build_time=%s\n' "$BUILD_TIME" >> "$GITHUB_OUTPUT"
