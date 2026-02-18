@@ -342,6 +342,7 @@ jobs:
         } >> "$GITHUB_ENV"
 
     - name: Apply glibc 2.38 Compatibility Fix
+      if: false
       shell: bash
       run: |
         set -euo pipefail
