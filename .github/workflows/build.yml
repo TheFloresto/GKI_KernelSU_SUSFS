@@ -1177,10 +1177,6 @@ jobs:
         # Susfs Configuration
         CONFIG_KSU_SUSFS=y
 
-        # KPatch Next Support
-        CONFIG_KALLSYMS=y
-        CONFIG_KALLSYMS_ALL=y
-
         # Mountify Support
         CONFIG_TMPFS_XATTR=y
         CONFIG_TMPFS_POSIX_ACL=y
