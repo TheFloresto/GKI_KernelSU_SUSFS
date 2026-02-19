@@ -563,8 +563,8 @@ jobs:
           KowXU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"            
-            cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch" ./
-            patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch || true           
+            #cp -v "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch" ./
+            #patch -p1 < 20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch || true           
             ;;
           ReSukiSU)
             SUSFS_VERSION="2.0.0"
