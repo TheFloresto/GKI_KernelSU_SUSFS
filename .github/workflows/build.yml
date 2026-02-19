@@ -342,6 +342,7 @@ jobs:
         } >> "$GITHUB_ENV"
 
     - name: Apply glibc 2.38 Compatibility Fix
+      if: false
       shell: bash
       run: |
         set -euo pipefail
@@ -573,7 +574,7 @@ jobs:
         esac
 
     - name: Add HymoFS Support
-      if: true
+      if: false
       working-directory: ${{ env.KERNEL_ROOT }}/common
       shell: bash
       run: |
@@ -729,21 +730,17 @@ jobs:
         CONFIG_KALLSYMS=y
         CONFIG_KALLSYMS_ALL=y
 
-        # HymoFS Configuration
-        CONFIG_HYMOFS=y
-        CONFIG_HYMOFS_REVERSE_LOOKUP=y
-        CONFIG_HYMOFS_FORWARD_REDIRECT=y
-        CONFIG_HYMOFS_HIDE_ENTRIES=y
-        CONFIG_HYMOFS_INJECT_ENTRIES=y
-        CONFIG_HYMOFS_STAT_SPOOF=y
-        CONFIG_HYMOFS_XATTR_FILTER=y
-        CONFIG_HYMOFS_UNAME_SPOOF=y
-        CONFIG_HYMOFS_CMDLINE_SPOOF=y
-        CONFIG_HYMOFS_DEBUG=n
-
-        # KPatch Next Support
-        CONFIG_KALLSYMS=y
-        CONFIG_KALLSYMS_ALL=y
+        ## HymoFS Configuration
+        #CONFIG_HYMOFS=y
+        #CONFIG_HYMOFS_REVERSE_LOOKUP=y
+        #CONFIG_HYMOFS_FORWARD_REDIRECT=y
+        #CONFIG_HYMOFS_HIDE_ENTRIES=y
+        #CONFIG_HYMOFS_INJECT_ENTRIES=y
+        #CONFIG_HYMOFS_STAT_SPOOF=y
+        #CONFIG_HYMOFS_XATTR_FILTER=y
+        #CONFIG_HYMOFS_UNAME_SPOOF=y
+        #CONFIG_HYMOFS_CMDLINE_SPOOF=y
+        #CONFIG_HYMOFS_DEBUG=n
 
         # Mountify Support
         CONFIG_TMPFS_XATTR=y
