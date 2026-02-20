@@ -606,7 +606,7 @@ jobs:
         fi
 
     - name: Add BBG
-      if: true
+      if: false
       working-directory: ${{ env.KERNEL_ROOT }}
       shell: bash
       run: |
