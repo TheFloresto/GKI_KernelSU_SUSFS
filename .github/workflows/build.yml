@@ -997,7 +997,7 @@ jobs:
         export LLVM=1 LLVM_IAS=1
         export ARCH=arm64 SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
-        export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
+
         export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm 
         export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
         
@@ -1022,9 +1022,7 @@ jobs:
         export HOSTCC="ccache clang"
         export HOSTCXX="ccache clang++"
         
-        BASE_PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${GITHUB_WORKSPACE}/kernel-build-tools/linux-x86/bin/"
-        
-        export PATH="${BASE_PATH}:${PATH}"
+        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
         
         echo "🚀 ccache-accelerated build"     
         
