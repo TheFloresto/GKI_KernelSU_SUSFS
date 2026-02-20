@@ -1024,9 +1024,9 @@ jobs:
         
         BASE_PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${GITHUB_WORKSPACE}/kernel-build-tools/linux-x86/bin/"
         
-         export PATH="${BASE_PATH}:${PATH}"
+        export PATH="${BASE_PATH}:${PATH}"
         
-          echo "🚀 ccache-accelerated build"     
+        echo "🚀 ccache-accelerated build"     
         
         OUT=out
         mkdir -p "$OUT"
