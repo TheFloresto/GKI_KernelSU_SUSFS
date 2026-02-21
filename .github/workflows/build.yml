@@ -580,6 +580,12 @@ jobs:
                 sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
               fi
             fi
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
 
             patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
@@ -604,6 +610,12 @@ jobs:
                 fi
               fi
               if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
+                if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
+                  echo "vma_pages Line found. Revert Fake Patching!"
+                  sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+                fi
+              fi
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -670,6 +682,12 @@ jobs:
                 sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
               fi
             fi
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
 
             patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
@@ -694,6 +712,12 @@ jobs:
                 fi
               fi
               if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
+                if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
+                  echo "vma_pages Line found. Revert Fake Patching!"
+                  sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+                fi
+              fi
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -764,6 +788,12 @@ jobs:
                 sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
               fi
             fi
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
 
             patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
@@ -788,6 +818,12 @@ jobs:
                 fi
               fi
               if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
+                if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
+                  echo "vma_pages Line found. Revert Fake Patching!"
+                  sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+                fi
+              fi
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
@@ -876,6 +912,12 @@ jobs:
                 sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
               fi
             fi
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
 
             patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
@@ -900,6 +942,12 @@ jobs:
                 fi
               fi
               if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
+                if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
+                  echo "vma_pages Line found. Revert Fake Patching!"
+                  sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+                fi
+              fi
+              if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
                 if grep -qxF $'\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
                   echo "vma_pages Line found. Revert Fake Patching!"
                   sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
