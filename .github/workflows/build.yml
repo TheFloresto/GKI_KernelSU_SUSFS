@@ -162,7 +162,7 @@ jobs:
         ANYKERNEL_BRANCH="gki-2.0"
         git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
         rm -rf AnyKernel3/.git
-        git clone https://github.com/TheFloresto/kernel_patches.git
+        git clone https://github.com/TheWildJames/kernel_patches.git
 
     - name: Initialize and Sync Kernel Source
       working-directory: ${{ env.KERNEL_ROOT }}
