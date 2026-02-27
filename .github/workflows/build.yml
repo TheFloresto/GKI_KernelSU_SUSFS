@@ -597,9 +597,8 @@ jobs:
           Next)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU-Next"
-            echo "patching kernel"
             patch -p1 --forward < "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
-            echo "Applying KernelSU-Next fix patches for v${SUSFS_VERSION}..."
+            echo "Applying KSUN fix patches for v${SUSFS_VERSION}..."
             patch -p1 --forward < "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_Makefile.patch" || true
             patch -p1 --forward < "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_allowlist.c.patch" || true
             patch -p1 --forward < "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_umount.c.patch" || true
@@ -618,14 +617,9 @@ jobs:
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
 
-            # Fix namespace.c for android15/6.6
             if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
               if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
-              fi
-              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
-                echo "#include <linux/dma-buf.h> Line not found in base.c. Adding missing header"
-                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
               fi
             fi
 
@@ -637,6 +631,10 @@ jobs:
                 sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' \
                         -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
                 fake_patched=1
+              fi
+              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+                echo "#include <linux/dma-buf.h> Line not found. Adding missing header for android15/6.6"
+                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
               fi
             fi
             if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
@@ -664,7 +662,7 @@ jobs:
 
             patch -p1 --forward --fuzz=3 < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
 
-            # Revert Fake kernel patch (android15/6.6 only needs sed revert)
+            # Revert Fake kernel patch
             if [ "$fake_patched" = 1 ]; then
               if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
                 if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
@@ -688,6 +686,7 @@ jobs:
                 fi
               fi
             done
+            echo "✅ SUSFS patches applied"
             ;;
         esac
 
