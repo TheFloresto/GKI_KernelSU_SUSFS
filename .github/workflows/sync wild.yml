@@ -1,0 +1,25 @@
+name: Sync from WildKernels
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Dusfff
+        uses: actions/checkout@v4
+        with:
+          ref: Dusfff
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Sync from WildKernels main
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git remote add wild https://github.com/WildKernels/GKI_KernelSU_SUSFS.git
+          git fetch wild main
+          git reset --hard wild/main
+          git push origin Dusfff --force
