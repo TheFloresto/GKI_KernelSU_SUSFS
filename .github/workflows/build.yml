@@ -85,6 +85,20 @@ jobs:
         chmod +x "$GITHUB_WORKSPACE/git-repo/repo"
         echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
 
+    - name: Install Minimal Dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "::group::Install dependencies"
+        sudo apt-get -o Acquire::Retries=3 update -qq
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          git curl ca-certificates build-essential clang lld flex bison \
+          libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils llvm
+        sudo apt-get clean
+        echo "✅ Dependencies installed"
+        echo "::endgroup::"
+
     - name: Setup Greenforce Clang
       shell: bash
       run: |
@@ -103,6 +117,73 @@ jobs:
         
         echo "Clang version: $($CLANG_BIN_PATH/clang --version | head -1)"
         echo "::endgroup::"
+
+    - name: Derive Clang Short Version
+      if: true    
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        # 1. Пытаемся достать версию в формате 17.0.2 или 18.1.0
+        short=$("${CLANG_BIN_PATH}/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1)
+        
+        # 2. Если не вышло, ищем номер ревизии (r487747c)
+        if [ -z "$short" ]; then
+            short=$("${CLANG_BIN_PATH}/clang" --version | grep -oP '\br[0-9a-f]{6,}\b' | head -n1)
+        fi
+        
+        # 3. Если всё еще пусто, используем хеш (для кеша ccache)
+        if [ -z "$short" ]; then
+            short=$("${CLANG_BIN_PATH}/clang" --version | sha256sum | cut -c1-8)
+            echo "⚠️ Could not extract version string, using hash: $short"
+        else
+            echo "✅ Clang version fingerprint: $short"
+        fi
+        
+        echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
+
+    - name: Set Cache Environment
+      shell: bash
+      run: |
+        set -euo pipefail
+        CACHE_DIR="$HOME/.ccache"
+        echo "CCACHE_DIR=$CACHE_DIR" >> "$GITHUB_ENV"
+        echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+        mkdir -p "$CACHE_DIR"
+
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ccache-floresto-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ env.CLANG_VERSION_SHORT }}
+        restore-keys: |
+          ccache-floresto-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
+          ccache-floresto-v1-${{ inputs.android_version }}-
+
+    - name: Configure ccache
+      shell: bash
+      run: |
+        set -euo pipefail
+        export CCACHE_DIR="$HOME/.ccache"
+        export CCACHE_MAXSIZE="1G"
+        
+        ccache -M "$CCACHE_MAXSIZE"
+        ccache -o compression=true
+        ccache -o compression_level=3
+        ccache -o direct_mode=true
+        ccache -o hash_dir=false
+        ccache -o file_clone=true
+        ccache -o inode_cache=true
+        
+        export CCACHE_COMPILERCHECK="content"
+        export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
+        export CCACHE_NOHASHDIR="true"
+        
+        {
+          echo "CCACHE_COMPILERCHECK=content"
+          echo "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
+          echo "CCACHE_NOHASHDIR=true"
+        } >> "$GITHUB_ENV"
 
     - name: Download Kernel Repository
       uses: ./.github/actions/download-kernel
@@ -228,19 +309,6 @@ jobs:
 
     - name: Configure Kernel Options
       uses: ./.github/actions/configure-kernel
-
-    - name: Setup Hakan
-      if: ${{ inputs.variant == 'Hakan' }}
-      uses: ./.github/actions/hakan
-
-    - name: Setup vTomsonek
-      if: ${{ inputs.variant == 'vTomsonek' }}
-      uses: ./.github/actions/vtomsonek
-      with:
-        android_version: ${{ steps.parse.outputs.android_version }}
-        kernel_version: ${{ steps.parse.outputs.kernel_version }}
-        sublevel: ${{ steps.parse.outputs.sub_level }}
-        os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
 
     - name: Apply ABI Compare Bypass
       working-directory: ${{ github.workspace }}/kernel
@@ -477,24 +545,6 @@ jobs:
           exit 1
         fi
     
-    - name: Copy snd-aloop module
-      if: ${{ inputs.variant == 'vTomsonek' }}
-      run: |
-        if [ "${{ inputs.variant }}" = "vTomsonek" ]; then
-          sed -i 's|^do\.modules=.*|do.modules=1|' "$GITHUB_WORKSPACE/AnyKernel3/anykernel.sh"
-        fi
-
-        mkdir -p "$GITHUB_WORKSPACE/AnyKernel3/modules/data/adb/lkm"
-
-        if [[ "$ANDROID_VERSION" == "android12" || "$ANDROID_VERSION" == "android13" ]]; then
-          SRC_DIR="$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist"
-        else
-          SRC_DIR="$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_aarch64"
-        fi
-
-        cp "$SRC_DIR/snd-aloop.ko" "$GITHUB_WORKSPACE/AnyKernel3/modules/data/adb/lkm/"
-        cp "$SRC_DIR/g_audio.ko" "$GITHUB_WORKSPACE/AnyKernel3/modules/data/adb/lkm/"
-
     - name: Scan and collect patch rejects
       id: scan
       if: ${{ always() }}
