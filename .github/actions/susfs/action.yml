@@ -40,7 +40,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto_gki.fragment" << 'EOF'
         # KernelSU SUSFS Configuration
         CONFIG_KSU_SUSFS=y
         EOF
