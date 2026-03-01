@@ -31,7 +31,6 @@ on:
           - a16-6-12
           - lts
           - custom
-          - testing
           - bypass
         default: custom
       feature_set:
