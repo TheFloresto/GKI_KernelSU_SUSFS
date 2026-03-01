@@ -368,23 +368,6 @@ jobs:
       ksu_commit: ${{ inputs.ksu_commit || '' }}
       feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
 
-  build-testing:
-    if: ${{ inputs.kernel_build_version == 'all' || inputs.kernel_build_version == 'testing' || github.event_name == 'push' }}
-    needs: download-dependencies
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - kernel_version: "6.1.145-android14-2025-08"
-            variant: "Placeholder"
-    uses: ./.github/workflows/build.yml
-    secrets: inherit
-    with:
-      kernel_version: ${{ matrix.kernel_version }}
-      variant: ${{ matrix.variant }}
-      ksu_commit: ${{ inputs.ksu_commit || '' }}
-      feature_set: ${{ inputs.feature_set || 'WKSU+SUSFS+BBG' }}
-
   build-bypass:
     if: ${{ inputs.kernel_build_version == 'all' || inputs.kernel_build_version == 'bypass' }}
     needs: download-dependencies
@@ -430,7 +413,6 @@ jobs:
     - build-a16-6-12
     - build-custom
     - build-lts
-    - build-testing
     - build-bypass
     steps:
     - name: Download Misc Artifacts
@@ -498,7 +480,6 @@ jobs:
     - build-a16-6-12
     - build-lts
     - build-custom
-    - build-testing
     - build-bypass
 
     env:
@@ -538,7 +519,6 @@ jobs:
         check_selected "a16-6-12" "build-a16-6-12" "${{ needs.build-a16-6-12.result }}"
         check_selected "custom" "build-custom" "${{ needs.build-custom.result }}"
         check_selected "lts" "build-lts" "${{ needs.build-lts.result }}"
-        check_selected "testing" "build-testing" "${{ needs.build-testing.result }}"
 
         if [[ "$failed" -ne 0 ]]; then
           exit 1
