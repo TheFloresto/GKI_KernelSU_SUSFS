@@ -8,20 +8,26 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/thefloresto_gki.fragment" << 'EOF'
-        # KernelSU Configuration
-        CONFIG_KSU=y
-        CONFIG_KSU_DEBUG=n
-
-        # Kprobes (required for KernelSU)
-        CONFIG_KPROBES=y
-        CONFIG_HAVE_KPROBES=y
-        CONFIG_KPROBE_EVENTS=y
-
-        # KPatch Next Support
-        CONFIG_KALLSYMS=y
-        CONFIG_KALLSYMS_ALL=y
+        # ========================================
+        # CLEAN UP LOCALVERSION - ВАЖНО!
+        # ========================================
+        echo "🧹 Cleaning up existing LOCALVERSION entries..."
+          
+        # Remove ALL existing LOCALVERSION entries
+        sed -i '/^CONFIG_LOCALVERSION=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+        sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+          
+        # Verify cleanup
+        REMAINING_ENTRIES=$(grep -c '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
+          
+        if [ "$REMAINING_ENTRIES" -eq 0 ]; then
+          echo "✅ All LOCALVERSION entries removed successfully"
+        else
+          echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
+          grep '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" || true
+        fi
         
+        cat >> "${{ github.workspace }}/thefloresto_gki.fragment" << 'EOF'    
         # Optional kernel config placeholders
         # Networking Configuration
         #CONFIG_IP_NF_TARGET_TTL=y
