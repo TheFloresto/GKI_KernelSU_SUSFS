@@ -510,7 +510,8 @@ jobs:
     - build-bypass
 
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      RELEASE_REPO: NerestKernels/GKI_KernelSU_SUSFS
       RELEASE_NAME: "GKI Kernels With WKSU & SUSFS v2.0.0"
       RELEASE_BODY: ""
     outputs:
@@ -574,7 +575,7 @@ jobs:
       id: tag
       if: inputs.release_type != 'Actions'
       run: |
-        LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
+        LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
         if [[ -z "$LATEST_TAG" || "$LATEST_TAG" == "null" ]]; then
           LATEST_TAG="v0.0.0"
         fi
@@ -660,6 +661,7 @@ jobs:
 
         # Create GitHub release
         gh release create "$NEW_TAG" \
+          --repo "NerestKernels/GKI_KernelSU_SUSFS" \
           --title "$RELEASE_NAME" \
           --notes-file release_body.md \
           --target "${{ github.sha }}" \
@@ -669,12 +671,12 @@ jobs:
       uses: actions/download-artifact@v5
       with:
         path: ./downloaded-artifacts
-        pattern: '*-AnyKernel3'
+        pattern: '*-AK3'
 
     - name: Upload Release Assets
       run: |+
         shopt -s nullglob
-        mapfile -t anykernel_dirs < <(find ./downloaded-artifacts -maxdepth 2 -type d -name '*-AnyKernel3' -print)
+        mapfile -t anykernel_dirs < <(find ./downloaded-artifacts -maxdepth 2 -type d -name '*-AK3' -print)
 
         for dir in "${anykernel_dirs[@]}"; do
           artifact_name=$(basename "$dir")
@@ -686,7 +688,7 @@ jobs:
         for dir in "${anykernel_dirs[@]}"; do
           artifact_name=$(basename "$dir")
           # Upload release asset
-          gh release upload "$NEW_TAG" "$GITHUB_WORKSPACE/${artifact_name}.zip" --clobber
+          gh release upload "$NEW_TAG" "$GITHUB_WORKSPACE/${artifact_name}.zip" --repo "NerestKernels/GKI_KernelSU_SUSFS" --clobber
         done
 
   notify:
