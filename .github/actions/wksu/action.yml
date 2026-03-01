@@ -15,9 +15,19 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto_gki.fragment" << 'EOF'
         # KernelSU Configuration
         CONFIG_KSU=y
+        CONFIG_KSU_DEBUG=n
+
+        # Kprobes (required for KernelSU)
+        CONFIG_KPROBES=y
+        CONFIG_HAVE_KPROBES=y
+        CONFIG_KPROBE_EVENTS=y
+
+        # KPatch Next Support
+        CONFIG_KALLSYMS=y
+        CONFIG_KALLSYMS_ALL=y
         EOF
     
     - name: Extract KSU Version Info
