@@ -27,7 +27,7 @@ inputs:
   artifact_pattern:
     description: 'Pattern for artifacts to download'
     required: false
-    default: '*-TheWildJames-AnyKernel3'
+    default: '*-TheFloresto-AK3'
 
 runs:
   using: "composite"
@@ -43,7 +43,7 @@ runs:
       run: |
         shopt -s nullglob
         # Iterate over directories in downloaded-artifacts
-        for dir in ./downloaded-artifacts/*-AnyKernel3; do
+        for dir in ./downloaded-artifacts/*-AK3; do
           [ -d "$dir" ] || continue
           artifact_name=$(basename "$dir")
           # Create zip for each artifact
@@ -80,9 +80,9 @@ runs:
           -F message_thread_id="${{ inputs.telegram_topic_id }}" \
           -F text="
           🌽 *New Kernel $RELEASE_TYPE_TEXT Uploaded*  
-          📦 *Repository:* [${{ github.repository }}](https://github.com/${{ github.repository }})  
+          📦 *Repository:* [NerestKernels/GKI_KernelSU_SUSFS](https://github.com/NerestKernels/GKI_KernelSU_SUSFS)  
           ✏️ *Commit:* [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-          [🔗 View GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ inputs.new_tag }})" \
+          [🔗 View GitHub Release](https://github.com/NerestKernels/GKI_KernelSU_SUSFS/releases/tag/${{ inputs.new_tag }})" \
           -F parse_mode="Markdown"
 
     - name: Send Direct Message with Artifacts
