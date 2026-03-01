@@ -111,6 +111,31 @@ jobs:
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
         os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
 
+    - name: Apply Remote Patches (CLIDR Fix)
+      if: true
+      working-directory: ${{ github.workspace }}/kernel/common
+      shell: bash
+      run: |
+        set -euo pipefail
+        # CLIDR fix (essential for all variants)
+        echo "📋 Applying fix-clidr-uninitialized.patch"
+        
+        # Скачиваем патч во временную папку
+        if curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch" \
+          -o /tmp/fix-clidr.patch; then
+          
+          # Проверяем возможность применения (Dry Run)
+          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
+            # Применяем патч
+            patch -p1 --forward < /tmp/fix-clidr.patch
+            echo "✅ Patch applied successfully"
+          else
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "⚠️ Failed to download remote patch, continuing anyway"
+        fi
+
     - name: Extract Sublevel and Set File Name
       id: extract
       run: |
