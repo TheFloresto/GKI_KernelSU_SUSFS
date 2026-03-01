@@ -358,16 +358,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - kernel_version: "5.10.226-android12-2024-11"
-            variant: "vTomsonek"
-          - kernel_version: "6.1.145-android14-2025-09"
-            variant: "TheWildJames"
-          - kernel_version: "6.1.157-android14-2025-12"
-            variant: "MarionKernel"
-          - kernel_version: "6.1.128-android14-2025-03"
-            variant: "Hakan"
-          - kernel_version: "5.10.226-android12-2024-11"
-            variant: "Neyugn"
+          - kernel_version: "6.1.118-android14-2025-01"
+            variant: "TheFloresto"          
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
@@ -574,6 +566,8 @@ jobs:
     - name: Generate New Tag
       id: tag
       if: inputs.release_type != 'Actions'
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}      
       run: |
         LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
         if [[ -z "$LATEST_TAG" || "$LATEST_TAG" == "null" ]]; then
