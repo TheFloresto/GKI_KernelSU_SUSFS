@@ -22,7 +22,7 @@ jobs:
         # Download and run KSU setup
         git clone "https://github.com/WildKernels/Wild_KSU.git" -b "canary" --depth=1
 
-        git clone https://github.com/WildKernels/AnyKernel3.git -b gki-2.0 --depth=1
+        git clone https://github.com/TheFloresto/AnyKernel3.git -b gki-2.0 --depth=1
         echo "AnyKernel3 commit: $(cd AnyKernel3 && git rev-parse --short HEAD)"
         
         git clone https://github.com/WildKernels/kernel_patches.git --depth=1
