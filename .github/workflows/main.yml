@@ -562,12 +562,15 @@ jobs:
 
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.RELEASE_TOKEN }}
+        repository: NerestKernels/GKI_KernelSU_SUSFS
 
     - name: Generate New Tag
       id: tag
       if: inputs.release_type != 'Actions'
       env:
-        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}      
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
         LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
         if [[ -z "$LATEST_TAG" || "$LATEST_TAG" == "null" ]]; then
@@ -647,6 +650,8 @@ jobs:
         EOF
 
     - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
         PRERELEASE_FLAG=""
         if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
@@ -668,6 +673,8 @@ jobs:
         pattern: '*-AK3'
 
     - name: Upload Release Assets
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |+
         shopt -s nullglob
         mapfile -t anykernel_dirs < <(find ./downloaded-artifacts -maxdepth 2 -type d -name '*-AK3' -print)
@@ -682,7 +689,9 @@ jobs:
         for dir in "${anykernel_dirs[@]}"; do
           artifact_name=$(basename "$dir")
           # Upload release asset
-          gh release upload "$NEW_TAG" "$GITHUB_WORKSPACE/${artifact_name}.zip" --repo "NerestKernels/GKI_KernelSU_SUSFS" --clobber
+          gh release upload "$NEW_TAG" "$GITHUB_WORKSPACE/${artifact_name}.zip" \
+            --repo "NerestKernels/GKI_KernelSU_SUSFS" \
+            --clobber
         done
 
   notify:
@@ -704,8 +713,8 @@ jobs:
           remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
           remove_packages_one_command: true
           remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-          rm_cmd: "rmz"
-          rmz_version: "3.1.1"
+          rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
+          rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
           testing: false
 
       - name: Send Telegram Notification
