@@ -1,8 +1,8 @@
 name: 'Apply Kernel Branding'
-description: 'Apply Wild kernel branding to kernel version string'
+description: 'Apply Nerest kernel branding to kernel version string'
 inputs:
   build_type:
-    description: 'Build type (Normal, Bypass, MarionKernel, Hakan, etc.)'
+    description: 'Build type (Normal, Bypass, etc.)'
     required: true
   kernel_version:
     description: 'Kernel version (e.g., 5.10, 6.1, 6.6)'
@@ -15,34 +15,6 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        # Apply kernel branding based on version and variant
-        if [[ "${{ inputs.kernel_version }}" == "5."* ]] || [[ "${{ inputs.kernel_version }}" == "6.1" ]]; then
-          # Older kernels: append to end of version string
-          case ${{ inputs.build_type }} in
-            MarionKernel)
-              perl -i -0777 -pe 's/(.*)echo "\$res"/$1echo "\$res-Wild-MarionKernel"/s' ./common/scripts/setlocalversion
-              ;;
-            Hakan)
-              perl -i -0777 -pe 's/(.*)echo "\$res"/$1echo "\$res-Wild-Hakan"/s' ./common/scripts/setlocalversion
-              ;;
-            TheWildJames)
-              perl -i -0777 -pe 's/(.*)echo "\$res"/$1echo "\$res-Wild-TheWildJames"/s' ./common/scripts/setlocalversion
-              ;;
-            vTomsonek)
-              perl -i -0777 -pe 's/(.*)echo "\$res"/$1echo "\$res-Wild-vTomsonek"/s' ./common/scripts/setlocalversion
-              ;;
-            *)
-              perl -i -0777 -pe 's/(.*)echo "\$res"/$1echo "\$res-Wild"/s' ./common/scripts/setlocalversion
-              ;;
-          esac
-        else
-          # Newer kernels (6.6+): insert before scm_version
-          case ${{ inputs.build_type }} in
-            *)
-              perl -i -0777 -pe 's/(.*)echo "\$\{KERNELVERSION\}\$\{file_localversion\}\$\{config_localversion\}\$\{LOCALVERSION\}\$\{scm_version\}"/$1echo "\${KERNELVERSION}\${file_localversion}\${config_localversion}\${LOCALVERSION}-Wild\${scm_version}"/s' ./common/scripts/setlocalversion
-              ;;
-          esac
-        fi
-
-        # Set build timestamp
-        export KBUILD_BUILD_TIMESTAMP="$(date -u '+%a %b %e %H:%M:%S UTC %Y')"
+        echo "BUILD_USER=TheFloresto-labs" >> "$GITHUB_ENV"
+        echo "BUILD_HOST=ubuntu-build" >> "$GITHUB_ENV"
+        echo "BUILD_TIMESTAMP=Sun Jun 15 14:56:02 UTC 2025" >> "$GITHUB_ENV
