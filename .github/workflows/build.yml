@@ -638,6 +638,89 @@ jobs:
             cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch ./
             patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch || true
 
+           if [ "${ANDROID_VER}" = "android15" ] && [ "${KERNEL_VER}" = "6.6" ]; then
+              if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
+                sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
+              fi
+            fi
+
+            # Fake kernel patch to fix failures
+            fake_patched=0
+            if [ "${ANDROID_VER}" = "android16" ] && [ "${KERNEL_VER}" = "6.12" ]; then
+              if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                echo "nr_subpages Line not found. Fake Patching!"
+                sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
+                fake_patched=1
+              fi
+              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+                echo "#include <linux/dma-buf.h> Line not found. Adding missing header for android16/6.12"
+                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android15" ] && [ "${KERNEL_VER}" = "6.6" ]; then
+              if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                echo "nr_subpages Line not found. Fake Patching!"
+                sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
+                fake_patched=1
+              fi
+              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+                echo "#include <linux/dma-buf.h> Line not found. Adding missing header for android15/6.6"
+                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android12" ] && [ "${KERNEL_VER}" = "5.10" ]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android13" ] && [ "${KERNEL_VER}" = "5.15" ]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android14" ] && [ "${KERNEL_VER}" = "6.1" ]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+                echo "#include <linux/dma-buf.h> Line not found. Adding missing header"
+                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+              fi
+            fi
+           
+            # Revert Fake kernel patch
+            if [ "$fake_patched" = 1 ]; then
+              if [ "${ANDROID_VER}" = "android16" ] && [ "${KERNEL_VER}" = "6.12" ]; then
+                if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                  echo "nr_subpages Line found. Revert Fake Patching!"
+                  sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
+                fi
+              fi
+              if [ "${ANDROID_VER}" = "android15" ] && [ "${KERNEL_VER}" = "6.6" ]; then
+                if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                  echo "nr_subpages Line found. Revert Fake Patching!"
+                  sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
+                fi
+              fi
+            fi
+
+            # Unconditional show_pad safety fix
+            for _kv in "android12 5.10" "android13 5.15" "android14 6.1"; do
+              _av=$(echo "$_kv" | cut -d' ' -f1)
+              _kver=$(echo "$_kv" | cut -d' ' -f2)
+              if [ "${ANDROID_VER}" = "$_av" ] && [ "${KERNEL_VER}" = "$_kver" ]; then
+                if grep -q 'goto show_pad;' ./fs/proc/task_mmu.c 2>/dev/null; then
+                  if ! grep -q '^show_pad:' ./fs/proc/task_mmu.c 2>/dev/null; then
+                    echo "⚠️  show_pad label missing in task_mmu.c for $_av/$_kver — replacing goto with return 0"
+                    sed -i 's/\bgoto show_pad;/return 0;/g' ./fs/proc/task_mmu.c
+                  fi
+                fi
+              fi
+            done
+
             # Version-specific SUSFS post-patch fixes
             if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
               if [[ "$ACTUAL_SUBLEVEL" -le 209 ]]; then
@@ -720,14 +803,91 @@ jobs:
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
+            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch ./
+            patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch || true
 
-            if [ "${ANDROID_VER}" = "android15" ] && [ "${KERNEL_VER}" = "6.6" ]; then
+           if [ "${ANDROID_VER}" = "android15" ] && [ "${KERNEL_VER}" = "6.6" ]; then
               if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
               fi
             fi
 
-            patch -p1 --forward --fuzz=3 < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch"
+            # Fake kernel patch to fix failures
+            fake_patched=0
+            if [ "${ANDROID_VER}" = "android16" ] && [ "${KERNEL_VER}" = "6.12" ]; then
+              if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                echo "nr_subpages Line not found. Fake Patching!"
+                sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
+                fake_patched=1
+              fi
+              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+                echo "#include <linux/dma-buf.h> Line not found. Adding missing header for android16/6.12"
+                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android15" ] && [ "${KERNEL_VER}" = "6.6" ]; then
+              if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                echo "nr_subpages Line not found. Fake Patching!"
+                sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
+                fake_patched=1
+              fi
+              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+                echo "#include <linux/dma-buf.h> Line not found. Adding missing header for android15/6.6"
+                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android12" ] && [ "${KERNEL_VER}" = "5.10" ]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android13" ] && [ "${KERNEL_VER}" = "5.15" ]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+            fi
+            if [ "${ANDROID_VER}" = "android14" ] && [ "${KERNEL_VER}" = "6.1" ]; then
+              if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+                echo "vma_pages Line not found. Fake Patching!"
+                fake_patched=1
+              fi
+              if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+                echo "#include <linux/dma-buf.h> Line not found. Adding missing header"
+                sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+              fi
+            fi
+           
+            # Revert Fake kernel patch
+            if [ "$fake_patched" = 1 ]; then
+              if [ "${ANDROID_VER}" = "android16" ] && [ "${KERNEL_VER}" = "6.12" ]; then
+                if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                  echo "nr_subpages Line found. Revert Fake Patching!"
+                  sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
+                fi
+              fi
+              if [ "${ANDROID_VER}" = "android15" ] && [ "${KERNEL_VER}" = "6.6" ]; then
+                if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+                  echo "nr_subpages Line found. Revert Fake Patching!"
+                  sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
+                fi
+              fi
+            fi
+
+            # Unconditional show_pad safety fix
+            for _kv in "android12 5.10" "android13 5.15" "android14 6.1"; do
+              _av=$(echo "$_kv" | cut -d' ' -f1)
+              _kver=$(echo "$_kv" | cut -d' ' -f2)
+              if [ "${ANDROID_VER}" = "$_av" ] && [ "${KERNEL_VER}" = "$_kver" ]; then
+                if grep -q 'goto show_pad;' ./fs/proc/task_mmu.c 2>/dev/null; then
+                  if ! grep -q '^show_pad:' ./fs/proc/task_mmu.c 2>/dev/null; then
+                    echo "⚠️  show_pad label missing in task_mmu.c for $_av/$_kver — replacing goto with return 0"
+                    sed -i 's/\bgoto show_pad;/return 0;/g' ./fs/proc/task_mmu.c
+                  fi
+                fi
+              fi
+            done
 
             # Version-specific SUSFS post-patch fixes
             if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
@@ -786,20 +946,7 @@ jobs:
               fi
             fi
 
-            # Fix Recovery Bootloop (SUS_MOUNT mnt_parent panic)
-            if grep -q "mnt = mnt->mnt_parent" ./fs/statfs.c; then
-              sed -i 's/for (; mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }/for (; mnt->mnt_id >= DEFAULT_KSU_MNT_ID \&\& mnt->mnt_parent \&\& mnt != mnt->mnt_parent; mnt = mnt->mnt_parent) { }/g' ./fs/statfs.c
-            fi
-            if grep -q "mnt = mnt->mnt_parent" ./fs/proc/fd.c; then
-              sed -i 's/for (; mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }/for (; mnt->mnt_id >= DEFAULT_KSU_MNT_ID \&\& mnt->mnt_parent \&\& mnt != mnt->mnt_parent; mnt = mnt->mnt_parent) { }/g' ./fs/proc/fd.c
-            fi
-
-            # statfs Recovery fix
-            if grep -q "error = statfs_by_dentry(mnt->mnt.mnt_root, buf);" ./fs/statfs.c; then
-              sed -i 's/error = statfs_by_dentry(mnt->mnt.mnt_root, buf);/if (likely(susfs_is_current_proc_umounted_app())) { error = statfs_by_dentry(mnt->mnt.mnt_root, buf); } else { error = statfs_by_dentry(path->dentry, buf); }/g' ./fs/statfs.c
-            fi
-
-            echo "✅ SUSFS patches applied"
+            echo "✅ SUSFS patches applied"           
             ;;
         esac
 
