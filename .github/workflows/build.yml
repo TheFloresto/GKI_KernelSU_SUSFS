@@ -322,16 +322,21 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+
+        # Fix libbpf.c type casting
+        echo "🔧 Patching libbpf.c type casting..."
+        if [ -f "tools/lib/bpf/libbpf.c" ]; then
+          sed -i 's/next_path = strchr(s, '"'"':'"'"');/next_path = (char *)strchr(s, '"'"':'"'"');/' tools/lib/bpf/libbpf.c
+          echo "✅ libbpf.c patched"
+        else
+          echo "⏭️  libbpf.c not found, skipping"
+        fi
+
         # CLIDR fix (essential for all variants)
         echo "📋 Applying fix-clidr-uninitialized.patch"
-        
-        # Скачиваем патч во временную папку
         if curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch" \
           -o /tmp/fix-clidr.patch; then
-          
-          # Проверяем возможность применения (Dry Run)
           if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
-            # Применяем патч
             patch -p1 --forward < /tmp/fix-clidr.patch
             echo "✅ Patch applied successfully"
           else
@@ -934,6 +939,17 @@ jobs:
                 sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               fi
             fi
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 118 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch" || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/1_task_mmu.c.patch" || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -eq 126 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/2_task_mmu.c.patch" || true
+              fi
+            fi
 
             echo "✅ SUSFS patches applied"           
             ;;
@@ -1283,6 +1299,15 @@ jobs:
 
         # Susfs Configuration
         CONFIG_KSU_SUSFS=y
+        CONFIG_KSU_SUSFS_SUS_PATH=y
+        CONFIG_KSU_SUSFS_SUS_MOUNT=y
+        CONFIG_KSU_SUSFS_SUS_KSTAT=y
+        CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+        CONFIG_KSU_SUSFS_ENABLE_LOG=y
+        CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+        CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+        CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+        CONFIG_KSU_SUSFS_SUS_MAP=y
 
         # Mountify Support
         CONFIG_TMPFS_XATTR=y
