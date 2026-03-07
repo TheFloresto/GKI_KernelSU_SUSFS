@@ -934,17 +934,6 @@ jobs:
                 sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               fi
             fi
-            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
-              if [[ "$ACTUAL_SUBLEVEL" -le 118 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch" || true
-              fi
-              if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/1_task_mmu.c.patch" || true
-              fi
-              if [[ "$ACTUAL_SUBLEVEL" -eq 126 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/2_task_mmu.c.patch" || true
-              fi
-            fi
 
             echo "✅ SUSFS patches applied"           
             ;;
