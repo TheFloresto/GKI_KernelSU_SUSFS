@@ -616,7 +616,7 @@ jobs:
 
             # Unconditional show_pad safety fix for kernels where the SUSFS patch may
             # introduce 'goto show_pad;' without the matching 'show_pad:' label.
-            for _kv in "android12 5.10" "android13 5.15" "android14 6.1"; do
+            for _kv in "android12 5.10" "android13 5.15" "android14 5.15" "android14 6.1"; do
               _av=$(echo "$_kv" | cut -d' ' -f1)
               _kver=$(echo "$_kv" | cut -d' ' -f2)
               if [ "${ANDROID_VER}" = "$_av" ] && [ "${KERNEL_VER}" = "$_kver" ]; then
@@ -741,7 +741,7 @@ jobs:
             fi
 
             # Unconditional show_pad safety fix
-            for _kv in "android12 5.10" "android13 5.15" "android14 6.1"; do
+            for _kv in "android12 5.10" "android13 5.15" "android14 5.15" "android14 6.1"; do
               _av=$(echo "$_kv" | cut -d' ' -f1)
               _kver=$(echo "$_kv" | cut -d' ' -f2)
               if [ "${ANDROID_VER}" = "$_av" ] && [ "${KERNEL_VER}" = "$_kver" ]; then
@@ -753,6 +753,26 @@ jobs:
                 fi
               fi
             done
+
+            # fdinfo fix for older sublevels (inotify_mark_user_mask symbol missing)
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch" || true
+              fi
+            fi
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.10" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 107 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch" || true
+              fi
+            fi
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 41 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/fdinfo.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/open.c.patch" || true
+                sed -i 's|is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))|is_i_uid_not_allowed(inode->i_uid.val)))|g' fs/susfs.c || true
+              fi
+            fi
 
             # Fix Recovery Bootloop (SUS_MOUNT mnt_parent panic)
             if grep -q "mnt = mnt->mnt_parent" ./fs/statfs.c; then
