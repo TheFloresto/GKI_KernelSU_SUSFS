@@ -147,52 +147,6 @@ jobs:
         echo "✅ Dependencies installed"
         echo "::endgroup::"
 
-    - name: 🏷️ Set Build Identity
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "BUILD_USER=TheFloresto-labs" >> "$GITHUB_ENV"
-        echo "BUILD_HOST=ubuntu-build" >> "$GITHUB_ENV"
-        echo "BUILD_TIMESTAMP=Sun Jun 15 14:56:02 UTC 2025" >> "$GITHUB_ENV"
-
-    - name: Clone AnyKernel3 and Other Dependencies
-      shell: bash
-      run: |
-        set -euo pipefail
-        ANYKERNEL_BRANCH="gki-2.0"
-        git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-        rm -rf AnyKernel3/.git
-        git clone https://github.com/TheWildJames/kernel_patches.git
-
-    - name: Initialize and Sync Kernel Source
-      working-directory: ${{ env.KERNEL_ROOT }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-
-        repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16 --depth=1
-
-        REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
-        DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-        if grep -q deprecated <<< $REMOTE_BRANCH; then
-          sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
-        fi
-
-        repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle
-
-    - name: Extract Sublevel and Set File Name
-      shell: bash
-      run: |
-        set -euo pipefail
-        ACTUAL_SUBLEVEL="${{ inputs.sub_level }}"
-        if [[ -f "$KERNEL_ROOT/common/Makefile" ]]; then
-          EXTRACTED=$(grep '^SUBLEVEL = ' "$KERNEL_ROOT/common/Makefile" | awk '{print $3}')
-          [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
-        fi
-        
-        echo "ACTUAL_SUBLEVEL=$ACTUAL_SUBLEVEL" >> $GITHUB_ENV
-
     - name: Setup Greenforce Clang Toolchain
       if: true 
       shell: bash
@@ -297,6 +251,86 @@ jobs:
         fi
         
         echo "CLANG_VERSION_SHORT=$short" >> "$GITHUB_ENV"
+
+    - name: 🏷️ Set Build Identity
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "BUILD_USER=TheFloresto-labs" >> "$GITHUB_ENV"
+        echo "BUILD_HOST=ubuntu-build" >> "$GITHUB_ENV"
+        echo "BUILD_TIMESTAMP=Sun Jun 15 14:56:02 UTC 2025" >> "$GITHUB_ENV"
+
+    - name: Clone AnyKernel3 and Other Dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        ANYKERNEL_BRANCH="gki-2.0"
+        git clone https://github.com/TheFloresto/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+        rm -rf AnyKernel3/.git
+        git clone https://github.com/TheWildJames/kernel_patches.git
+
+    - name: Initialize and Sync Kernel Source
+      working-directory: ${{ env.KERNEL_ROOT }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
+
+        repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16 --depth=1
+
+        REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+        DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
+        if grep -q deprecated <<< $REMOTE_BRANCH; then
+          sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
+        fi
+
+        repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle
+
+    - name: Clean Up ABI Protected Exports
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$KERNEL_ROOT/common"
+        rm -f android/abi_gki_protected_exports_* || true
+        sed -i 's/protected_modules = \[.*\]/protected_modules = []/' modules.bzl || true
+        df -h
+
+    - name: Extract Sublevel and Set File Name
+      shell: bash
+      run: |
+        set -euo pipefail
+        ACTUAL_SUBLEVEL="${{ inputs.sub_level }}"
+        if [[ -f "$KERNEL_ROOT/common/Makefile" ]]; then
+          EXTRACTED=$(grep '^SUBLEVEL = ' "$KERNEL_ROOT/common/Makefile" | awk '{print $3}')
+          [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
+        fi
+        
+        echo "ACTUAL_SUBLEVEL=$ACTUAL_SUBLEVEL" >> $GITHUB_ENV
+
+    - name: Apply Remote Patches (CLIDR Fix)
+      if: true
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      shell: bash
+      run: |
+        set -euo pipefail
+        # CLIDR fix (essential for all variants)
+        echo "📋 Applying fix-clidr-uninitialized.patch"
+        
+        # Скачиваем патч во временную папку
+        if curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch" \
+          -o /tmp/fix-clidr.patch; then
+          
+          # Проверяем возможность применения (Dry Run)
+          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
+            # Применяем патч
+            patch -p1 --forward < /tmp/fix-clidr.patch
+            echo "✅ Patch applied successfully"
+          else
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "⚠️ Failed to download remote patch, continuing anyway"
+        fi
 
     - name: Set Cache Environment
       shell: bash
@@ -1063,31 +1097,6 @@ jobs:
         SYMBOL_LIST=android/abi_gki_aarch64_xiaomi
         echo "device_find_any_child" >> $SYMBOL_LIST
 
-    - name: Apply Remote Patches (CLIDR Fix)
-      if: true
-      working-directory: ${{ env.KERNEL_ROOT }}/common
-      shell: bash
-      run: |
-        set -euo pipefail
-        # CLIDR fix (essential for all variants)
-        echo "📋 Applying fix-clidr-uninitialized.patch"
-        
-        # Скачиваем патч во временную папку
-        if curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch" \
-          -o /tmp/fix-clidr.patch; then
-          
-          # Проверяем возможность применения (Dry Run)
-          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
-            # Применяем патч
-            patch -p1 --forward < /tmp/fix-clidr.patch
-            echo "✅ Patch applied successfully"
-          else
-            echo "⏭️  Patch skipped (likely already applied or not needed)"
-          fi
-        else
-          echo "⚠️ Failed to download remote patch, continuing anyway"
-        fi
-
     - name: Configure Kernel Options
       working-directory: ${{ env.KERNEL_ROOT }}
       shell: bash
@@ -1358,10 +1367,6 @@ jobs:
         #Remove Dirty Flag
         sed -i 's/-dirty//' ./scripts/setlocalversion
         sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
-        
-        #Remove Abi Exports and Error
-        rm -rf android/abi_gki_protected_exports_*
-        perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' BUILD.bazel
 
         cd $KERNEL_ROOT/common
         git config --global user.name "github-actions[bot]"
