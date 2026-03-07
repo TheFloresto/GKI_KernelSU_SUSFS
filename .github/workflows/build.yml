@@ -302,44 +302,94 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+        echo "::group::Configure ccache environment"
+
         CACHE_DIR="$HOME/.ccache"
         echo "CCACHE_DIR=$CACHE_DIR" >> "$GITHUB_ENV"
         echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+
         mkdir -p "$CACHE_DIR"
+
+        echo "Cache configuration:"
+        echo "  Directory: $CACHE_DIR"
+        echo "  Max size: 1G"
+        echo "  Android: ${{ inputs.android_version }}"
+        echo "  Kernel: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
+        echo "  Patch level: ${{ inputs.os_patch_level }}"
+        echo "  Clang: ${CLANG_VERSION_SHORT:-unknown}"
+        echo "  KSU Variant: ${{ inputs.ksu_variant }}"
+        echo "::endgroup::"
 
     - name: Cache ccache
       uses: actions/cache@v4
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: ccache-floresto-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ env.CLANG_VERSION_SHORT }}
+        key: ccache-thefloresto-v3-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-${{ env.CLANG_VERSION_SHORT }}
         restore-keys: |
-          ccache-floresto-v1-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
-          ccache-floresto-v1-${{ inputs.android_version }}-
+          ccache-thefloresto-v3-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-
+          ccache-thefloresto-v3-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-
+          ccache-thefloresto-v3-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
 
     - name: Configure ccache
       shell: bash
       run: |
         set -euo pipefail
+        echo "::group::Configure ccache for maximum performance"
+
         export CCACHE_DIR="$HOME/.ccache"
         export CCACHE_MAXSIZE="1G"
-        
+
         ccache -M "$CCACHE_MAXSIZE"
+
+        export CCACHE_COMPILERCHECK="content"
+        export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
+        export CCACHE_NOHASHDIR="true"
+
         ccache -o compression=true
         ccache -o compression_level=3
         ccache -o direct_mode=true
         ccache -o hash_dir=false
         ccache -o file_clone=true
         ccache -o inode_cache=true
-        
-        export CCACHE_COMPILERCHECK="content"
-        export CCACHE_BASEDIR="${GITHUB_WORKSPACE}"
-        export CCACHE_NOHASHDIR="true"
-        
+        ccache -o umask=002
+
+        if ccache --help 2>&1 | grep -q 'depend_mode'; then
+          ccache -o depend_mode=true
+        fi
+
+        ccache -o sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale
+
+        export CCACHE_IGNOREOPTIONS="--sysroot*"
+
         {
           echo "CCACHE_COMPILERCHECK=content"
           echo "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
           echo "CCACHE_NOHASHDIR=true"
+          echo "CCACHE_IGNOREOPTIONS=$CCACHE_IGNOREOPTIONS"
         } >> "$GITHUB_ENV"
+
+        echo "✅ ccache configured for production"
+        echo ""
+        echo "Configuration applied:"
+        echo "  Max size: 1G (persisted)"
+        echo "  Base dir: ${GITHUB_WORKSPACE}"
+        echo "  Compression: zstd level 3"
+        echo "  Direct mode: enabled"
+        echo "  File cloning: enabled"
+        echo "  Inode cache: enabled"
+        echo ""
+
+        if [ -d "$CCACHE_DIR" ] && find "$CCACHE_DIR" -type f -print -quit 2>/dev/null | grep -q .; then
+          echo "✅ Restored cache found"
+          echo ""
+          echo "Pre-build cache statistics:"
+          ccache -s | head -n 20
+        else
+          echo "⚠️ No existing cache - building from scratch"
+          echo "Cache will be populated for future builds"
+        fi
+
+        echo "::endgroup::"
 
     - name: Apply glibc 2.38 Compatibility Fix
       if: true
