@@ -789,6 +789,74 @@ jobs:
               fi
             fi
 
+            for _kv in "android12 5.10" "android13 5.15" "android14 6.1"; do
+              _av=$(echo "$_kv" | cut -d' ' -f1)
+              _kver=$(echo "$_kv" | cut -d' ' -f2)
+              if [ "${ANDROID_VER}" = "$_av" ] && [ "${KERNEL_VER}" = "$_kver" ]; then
+                if grep -q 'goto show_pad;' ./fs/proc/task_mmu.c 2>/dev/null; then
+                  if ! grep -q '^show_pad:' ./fs/proc/task_mmu.c 2>/dev/null; then
+                    sed -i 's/\bgoto show_pad;/return 0;/g' ./fs/proc/task_mmu.c
+                  fi
+                fi
+              fi
+            done
+
+            if [[ "${ANDROID_VER}" == "android12" && "${KERNEL_VER}" == "5.10" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 209 ]]; then
+                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/1_fdinfo.c.patch" || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -le 43 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch" || true
+              fi
+            fi
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.10" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 107 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch" || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -ge 108 && "$ACTUAL_SUBLEVEL" -le 157 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/i2c-nomadik.c.patch" || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -le 209 && "${OS_PATCH}" != "2024-05" ]]; then
+                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+              fi
+            fi
+            if [[ "${ANDROID_VER}" == "android13" && "${KERNEL_VER}" == "5.15" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 41 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/fdinfo.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/open.c.patch" || true
+                sed -i 's|is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))|is_i_uid_not_allowed(inode->i_uid.val)))|g' fs/susfs.c || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -le 148 && "${OS_PATCH}" != "2024-05" ]]; then
+                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+              fi
+            fi
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "5.15" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 148 && "${OS_PATCH}" != "2024-05" ]]; then
+                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+              fi
+            fi
+            if [[ "${ANDROID_VER}" == "android14" && "${KERNEL_VER}" == "6.1" ]]; then
+              patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a14-6.1/base.c.patch" || true
+              if [[ "$ACTUAL_SUBLEVEL" -le 75 && "${OS_PATCH}" != "2024-05" ]]; then
+                sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+              fi
+            fi
+            if [[ "${ANDROID_VER}" == "android15" && "${KERNEL_VER}" == "6.6" ]]; then
+              if [[ "$ACTUAL_SUBLEVEL" -le 118 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch" || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/1_task_mmu.c.patch" || true
+              fi
+              if [[ "$ACTUAL_SUBLEVEL" -eq 126 ]]; then
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/2_task_mmu.c.patch" || true
+              fi
+            fi
+
             echo "✅ SUSFS patches applied"           
             ;;
         esac
