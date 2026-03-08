@@ -47,23 +47,6 @@ jobs:
           }}
 
     steps:
-    - name: Build Summary
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "========================================"
-        echo "       Kernel Build Summary"
-        echo "========================================"
-        echo "Android Version : ${{ inputs.android_version }}"
-        echo "Kernel Version  : ${{ inputs.kernel_version }}"
-        echo "Sub Level       : ${{ inputs.sub_level }}"
-        echo "Patch Level     : ${{ inputs.os_patch_level }}"
-        echo "Build Type      : ${{ matrix.build_type }}"
-        echo "KSU Variant     : ${{ inputs.ksu_variant }}"
-        echo "KSU Commit      : ${{ inputs.ksu_commit || 'Default' }}"
-        echo "Variant         : ${{ inputs.variant || 'Standard' }}"
-        echo "========================================"
-
     - name: Free Disk Space
       if: true
       uses: endersonmenezes/free-disk-space@v3
