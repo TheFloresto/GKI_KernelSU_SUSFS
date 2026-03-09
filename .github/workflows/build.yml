@@ -673,7 +673,10 @@ jobs:
             SUSFS_VERSION="2.0.0"
             echo "SUSFS_VERSION=$SUSFS_VERSION" >> "$GITHUB_ENV"
             cd "$KERNEL_ROOT/KernelSU-Next"
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
+            echo "📥 Downloading 10_enable_susfs_for_ksu.patch from deepongi-labs (next)..."
+            curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/main/.github/patches/next/10_enable_susfs_for_ksu.patch" \
+              -o /tmp/10_enable_susfs_for_ksu_next.patch
+            patch -p1 --forward < /tmp/10_enable_susfs_for_ksu_next.patch || true
             echo "Applying KSUN fix patches for v${SUSFS_VERSION} (auto-detecting .rej files)..."
             for file in $(find ./kernel -maxdepth 2 -name "*.rej" -exec basename {} .rej \;); do
               echo "Patching file: $file with fix_$file.patch"
