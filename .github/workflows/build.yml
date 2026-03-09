@@ -1276,9 +1276,6 @@ jobs:
         CONFIG_IP_SET_HASH_NETPORT=y
         CONFIG_IP_SET_HASH_NETIFACE=y
         CONFIG_IP_SET_LIST_SET=y
-
-        # CAKE Queue Discipline
-        CONFIG_NET_SCH_CAKE=y
         
         # Build Optimization
         CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
