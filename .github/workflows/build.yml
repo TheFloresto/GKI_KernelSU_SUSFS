@@ -673,11 +673,7 @@ jobs:
             SUSFS_VERSION="2.0.0"
             echo "SUSFS_VERSION=$SUSFS_VERSION" >> "$GITHUB_ENV"
             cd "$KERNEL_ROOT/KernelSU-Next"
-            echo "📥 Downloading 10_enable_susfs_for_ksu.patch from deepongi-labs (ksun)..."
-            curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/main/.github/patches/next/10_enable_susfs_for_ksu.patch" \
-              -o /tmp/10_enable_susfs_for_ksu.patch
-            patch -p1 --forward < /tmp/10_enable_susfs_for_ksu.patch || true
-            
+            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true           
             echo "Applying KSUN fix patches for v${SUSFS_VERSION}..."
             patch -p1 --forward < "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_Makefile.patch" || true
             patch -p1 --forward < "$KERNEL_PATCHES/next/susfs_fix_patches/v${SUSFS_VERSION}/fix_allowlist.c.patch" || true
@@ -772,7 +768,7 @@ jobs:
                 sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               fi
               if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/1_fdinfo.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -le 43 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch" || true
@@ -816,10 +812,10 @@ jobs:
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/1_task_mmu.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -eq 126 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/2_task_mmu.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch" || true
               fi
             fi
 
