@@ -836,9 +836,10 @@ jobs:
           KSU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-            patch -p1 --forward < "$KERNEL_PATCHES/ksu/0001-add-only-KOWSU.patch" || true
-            patch -p1 --forward < "$KERNEL_PATCHES/ksu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-ksu.patch" || true
+            echo "📥 Downloading 10_enable_susfs_for_ksu.patch from deepongi-labs (tiann)..."
+            curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/main/.github/patches/tiann/10_enable_susfs_for_ksu.patch" \
+              -o /tmp/10_enable_susfs_for_ksu_tiann.patch
+            patch -p1 --forward < /tmp/10_enable_susfs_for_ksu_tiann.patch || true
 
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
@@ -936,13 +937,17 @@ jobs:
           KowXU)
             SUSFS_VERSION="2.0.0"
             cd "$KERNEL_ROOT/KernelSU"
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
+            echo "📥 Downloading 10_enable_susfs_for_ksu.patch from deepongi-labs..."
+            curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/main/.github/patches/kowsu/10_enable_susfs_for_ksu.patch" \
+              -o /tmp/10_enable_susfs_for_ksu_kowsu.patch
+            patch -p1 --forward < /tmp/10_enable_susfs_for_ksu_kowsu.patch || true
+            
             
             cd "$KERNEL_ROOT/common"
             cp "$SUSFS4KSU/kernel_patches/fs/"* "$KERNEL_ROOT/common/fs/"
             cp "$SUSFS4KSU/kernel_patches/include/linux/"* "$KERNEL_ROOT/common/include/linux/"
-            patch -p1 --forward < "$SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch" || true
-            patch -p1 --forward < "$KERNEL_PATCHES/kowsu/20-KernelSU-Spoof-LKM-mode-to-suppress-manager-warning-kowsu.patch" || true
+            cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch ./
+            patch -p1 < 50_add_susfs_in_gki-${ANDROID_VER}-${KERNEL_VER}.patch || true
             ;;
           ReSukiSU)
             SUSFS_VERSION="2.0.0"
