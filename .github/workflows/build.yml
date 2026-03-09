@@ -909,10 +909,10 @@ jobs:
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/1_task_mmu.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -eq 126 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/2_task_mmu.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch" || true
               fi
             fi
             ;;
@@ -958,7 +958,7 @@ jobs:
                 sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
               fi
               if [[ "$ACTUAL_SUBLEVEL" -le 117 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/1_fdinfo.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -le 43 ]]; then
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch" || true
@@ -1002,10 +1002,10 @@ jobs:
                 patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -le 58 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/1_task_mmu.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch" || true
               fi
               if [[ "$ACTUAL_SUBLEVEL" -eq 126 ]]; then
-                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/2_task_mmu.c.patch" || true
+                patch -p1 --forward < "$KERNEL_PATCHES/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch" || true
               fi
             fi
 
