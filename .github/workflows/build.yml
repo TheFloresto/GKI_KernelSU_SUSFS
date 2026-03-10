@@ -230,7 +230,16 @@ jobs:
         set -euo pipefail
         FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
 
-        repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1
+        success=false
+        for i in 1 2 3; do
+          if repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1; then
+            success=true
+            break
+          fi
+          echo "⚠️ repo init attempt $i failed; retrying..."
+          sleep 30
+        done
+        $success || { echo "::error::repo init failed after 3 attempts"; exit 1; }
 
         REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
         DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
@@ -243,8 +252,17 @@ jobs:
         fi
         
         echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
-        
-        repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle
+
+        success=false
+        for i in 1 2 3; do
+          if repo --trace sync -c -j$(nproc --all) --fail-fast --no-tags --force-sync --no-clone-bundle --optimized-fetch; then
+            success=true
+            break
+          fi
+          echo "⚠️ repo sync attempt $i failed; retrying..."
+          sleep 30
+        done
+        $success || { echo "::error::repo sync failed after 3 attempts"; exit 1; }
 
     - name: Clean Up ABI Protected Exports
       shell: bash
@@ -546,7 +564,36 @@ jobs:
         KSU_VARIANT="${{ inputs.ksu_variant }}"
         OS_PATCH="${{ inputs.os_patch_level }}"
         SUSFS_BRANCH="gki-${ANDROID_VER}-${KERNEL_VER}"
-        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+        
+        retry_clone() {
+          local url="$1"
+          local branch="${2:-main}"
+          local depth="${3:-1}"
+          local dir="$(basename "$url" .git)"
+          local max_attempts=3
+          local attempt=1
+
+          local clone_args=(--branch "$branch")
+          if [ "$depth" != "0" ] && [ -n "$depth" ]; then
+            clone_args+=(--depth "$depth")
+          fi
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "🔄 Attempt $attempt/$max_attempts: cloning $url ($branch)${depth:+ [depth=$depth]}"
+            git clone "${clone_args[@]}" "$url" "$dir" && {
+              echo "✅ Success"
+              return 0
+            }
+            echo "❌ Failed, cleaning up..."
+            rm -rf "$dir" 2>/dev/null
+            sleep $((attempt++ * 5))
+          done
+
+          echo "💥 All attempts failed"
+          return 1
+        }
+
+        retry_clone "https://gitlab.com/simonpunk/susfs4ksu.git" "$SUSFS_BRANCH" 1
 
         case "$KSU_VARIANT" in
           WKSU)
