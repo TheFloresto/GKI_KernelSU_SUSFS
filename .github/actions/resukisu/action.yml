@@ -13,7 +13,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s ${{ inputs.ksu_commit }}
+        curl -LSs "curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash" | bash -s ${{ inputs.ksu_commit }}
 
     - name: Enable KernelSU Config
       shell: bash
