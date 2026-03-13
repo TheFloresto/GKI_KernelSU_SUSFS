@@ -27,6 +27,11 @@ on:
         description: "Feature Set"
         required: false
         type: string
+      ksu_variant:
+        description: "KSU variant (WKSU, Next, KSU, MKSU, KowXU, ReSukiSU)"
+        required: false
+        type: string
+        default: "WKSU"
 
 jobs:
   generate-matrix:
@@ -75,4 +80,5 @@ jobs:
       patches_commit: ${{ inputs.patches_commit }}
       susfs_commit: ${{ inputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
