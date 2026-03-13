@@ -53,18 +53,29 @@ jobs:
         # Example 2: 5.10.X-android12-lts       -> K=5.10, S=X,   A=android12, P=lts
 
         INPUT_VERSION="${{ inputs.kernel_version }}"
+
+        # Split by hyphens
         IFS='-' read -r KERNEL_PART ANDROID_PART REST <<< "$INPUT_VERSION"
+
+        # Extract Kernel Version and Sublevel
         KERNEL_VERSION="${KERNEL_PART%.*}"
         SUB_LEVEL="${KERNEL_PART##*.}"
+
+        # Extract Android Version
         ANDROID_VERSION="$ANDROID_PART"
+
+        # Everything after the android version is the patch level
         OS_PATCH_LEVEL="$REST"
 
         echo "Parsed: KERNEL=$KERNEL_VERSION, SUB=$SUB_LEVEL, ANDROID=$ANDROID_VERSION, PATCH=$OS_PATCH_LEVEL"
+
+        # Set environment variables for subsequent steps and shell scripts
         echo "ANDROID_VERSION=$ANDROID_VERSION" >> "$GITHUB_ENV"
         echo "KERNEL_VERSION=$KERNEL_VERSION" >> "$GITHUB_ENV"
         echo "SUB_LEVEL=$SUB_LEVEL" >> "$GITHUB_ENV"
         echo "OS_PATCH_LEVEL=$OS_PATCH_LEVEL" >> "$GITHUB_ENV"
 
+        # Set step outputs for immediate YAML context access (avoids validation warnings)
         echo "android_version=$ANDROID_VERSION" >> $GITHUB_OUTPUT
         echo "kernel_version=$KERNEL_VERSION" >> $GITHUB_OUTPUT
         echo "sub_level=$SUB_LEVEL" >> $GITHUB_OUTPUT
@@ -96,6 +107,7 @@ jobs:
 
         touch "$GITHUB_WORKSPACE/thefloresto.fragment"
 
+        # Clone patches if commit is provided
         if [ -n "${{ inputs.patches_commit }}" ]; then
           git clone https://github.com/TheWildJames/kernel_patches.git "$GITHUB_WORKSPACE/kernel_patches"
           cd "$GITHUB_WORKSPACE/kernel_patches"
@@ -105,12 +117,14 @@ jobs:
           git clone https://github.com/TheWildJames/kernel_patches.git "$GITHUB_WORKSPACE/kernel_patches"
         fi
 
+        # Use specific commit if provided
         if [ -n "${{ inputs.anykernel_commit }}" ]; then
           git clone https://github.com/TheFloresto/AnyKernel3.git "$GITHUB_WORKSPACE/AnyKernel3"
           cd "$GITHUB_WORKSPACE/AnyKernel3"
           git checkout "${{ inputs.anykernel_commit }}"
           cd "$GITHUB_WORKSPACE"
         else
+          # Fallback to default branch
           git clone https://github.com/TheFloresto/AnyKernel3.git -b gki-2.0 "$GITHUB_WORKSPACE/AnyKernel3"
         fi
 
@@ -147,12 +161,14 @@ jobs:
     - name: Extract Sublevel and Set File Name
       id: extract
       run: |
+        # Use SUBLEVEL for LTS builds, otherwise use the input sub_level
         SUBLEVEL="$SUB_LEVEL"
         if [[ -f "$GITHUB_WORKSPACE/kernel/common/Makefile" ]]; then
           EXTRACTED=$(grep '^SUBLEVEL = ' "$GITHUB_WORKSPACE/kernel/common/Makefile" | awk '{print $3}')
           [[ -n "$EXTRACTED" ]] && SUBLEVEL="$EXTRACTED"
         fi
 
+        # Set step outputs for parse-time YAML context access
         KSU_VARIANT="${{ inputs.ksu_variant || 'WKSU' }}"
         FILE_NAME="${KSU_VARIANT}-${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}${{ inputs.variant && format('-{0}', inputs.variant) || '' }}"
         echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
@@ -328,7 +344,10 @@ jobs:
         else
           TARGET_FILE="$GITHUB_WORKSPACE/kernel/common/kernel/module.c"
         fi
+        # Apply bypass patch to the target file
         sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
+
+        # Verify the bypass
         if grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
           echo "SUCCESS: Module check bypass verified in $TARGET_FILE"
         else
@@ -352,6 +371,8 @@ jobs:
       if: false
       working-directory: ${{ github.workspace }}/kernel
       run: |
+        # ABI compare bypass per kernel/android version
+        # Edit each block as needed per version
         if [[ "$ANDROID_VERSION" == "android12" && "$KERNEL_VERSION" == "5.10" ]]; then
           sed -i 's/^\s*exit 1$/    echo "Who Cares? Bypassing Now!"/' build/abi/compare_to_symbol_list
         elif [[ "$ANDROID_VERSION" == "android13" && "$KERNEL_VERSION" == "5.10" ]]; then
@@ -382,6 +403,7 @@ jobs:
         PYTHONWARNINGS: "ignore:invalid escape sequence"
       run: |
         set -euo pipefail
+        #make -C common mrproper
         echo "::group::Build kernel with ccache optimization"
 
         cd "$KERNEL_ROOT/common"
@@ -549,6 +571,7 @@ jobs:
         CONFIG_DIR="$GITHUB_WORKSPACE/kernel"
         REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
         mkdir -p "$REJECTS_DIR"
+        # Find all .rej files under the configuration directory
         mapfile -t REJS < <(find "$CONFIG_DIR" -type f -name '*.rej')
         REJ_COUNT=${#REJS[@]}
         echo "Found $REJ_COUNT .rej files under $CONFIG_DIR"
@@ -556,10 +579,12 @@ jobs:
         echo "rej_count=$REJ_COUNT" >> $GITHUB_OUTPUT
         if [ "$REJ_COUNT" -gt 0 ]; then
           for REJ in "${REJS[@]}"; do
+            # Relative path from $CONFIG_DIR
             REL="${REJ#"$CONFIG_DIR"/}"
             DEST="$REJECTS_DIR/$REL"
             mkdir -p "$(dirname "$DEST")"
             cp "$REJ" "$DEST"
+            # Copy the associated original file alongside the .rej
             ORIG="${REJ%.rej}"
             if [ -f "$ORIG" ]; then
               ORIG_DEST="$REJECTS_DIR/${REL%.rej}"
