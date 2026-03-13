@@ -1,26 +1,25 @@
-name: Setup Wild KSU
-description: Download and configure Wild KSU with version tracking
+name: Setup KernelSU Next
+description: Download and configure KernelSU-Next
 inputs:
   ksu_commit:
     description: "KSU Commit"
-    required: true
+    required: false
     type: string
 
 runs:
   using: composite
   steps:
-    - name: Download Wild KSU
+    - name: Download KernelSU Next
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/stable/kernel/setup.sh" | bash -s ${{ inputs.ksu_commit }}
+        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s ${{ inputs.ksu_commit }}
 
     - name: Enable KernelSU Config
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
         cat >> "${{ github.workspace }}/thefloresto.fragment" << 'FRAG'
-        # KernelSU Configuration
         CONFIG_KSU=y
         CONFIG_KSU_DEBUG=n
         CONFIG_KPROBES=y
@@ -33,14 +32,13 @@ runs:
         FRAG
 
     - name: Extract KSU Version Info
-      id: ksu-version
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/Wild_KSU
+      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
       run: |
         KSU_GIT_VERSION=$(git rev-list --count HEAD 2>/dev/null)
         KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
         KSU_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
-        KSU_VERSION=$((30000 + KSU_GIT_VERSION))
+        KSU_VERSION=$((10000 + KSU_GIT_VERSION))
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> $GITHUB_ENV
         echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
         echo "KSU_COMMIT=$KSU_COMMIT" >> $GITHUB_ENV
