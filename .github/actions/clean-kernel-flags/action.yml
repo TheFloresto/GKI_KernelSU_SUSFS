@@ -6,14 +6,13 @@ runs:
   steps:
     - name: Clean Dirty Flags and ABI Exports
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel
+      working-directory: ${{ github.workspace }}/kernel/common
       run: |
         # Clean dirty flags and ABI exports based on build system
         sed -i 's/-dirty//' ./scripts/setlocalversion
         sed -i '/# Check for uncommitted changes\./,/fi/d' ./scripts/setlocalversion
 
         # Commit changes to avoid dirty state during build
-        cd ${{ github.workspace }}/kernel/common
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git add .
