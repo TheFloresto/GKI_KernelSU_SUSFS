@@ -223,13 +223,14 @@ jobs:
 
     - name: Setup ccache
       run: |
-        echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+        CACHE_DIR="$HOME/.ccache"
+        echo "CCACHE_DIR=$CACHE_DIR" >> "$GITHUB_ENV"
         mkdir -p "$CACHE_DIR"
         ccache -M 1G
         ccache -o compression=true
         ccache -o compression_level=3
         ccache -o sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers
-
+        
     - name: Cache ccache
       uses: actions/cache@v4
       with:
