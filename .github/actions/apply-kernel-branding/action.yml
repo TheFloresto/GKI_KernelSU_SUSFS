@@ -44,6 +44,3 @@ runs:
               ;;
           esac
         fi
-
-        # Set build timestamp
-        export KBUILD_BUILD_TIMESTAMP="$(date -u '+%a %b %e %H:%M:%S UTC %Y')"
