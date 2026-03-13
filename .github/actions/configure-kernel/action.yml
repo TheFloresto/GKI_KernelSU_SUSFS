@@ -1,0 +1,67 @@
+name: 'Configure Kernel Options'
+description: 'Set up kernel configuration fragment with required options'
+inputs:
+  kernel_version:
+    description: 'Kernel version (e.g., 6.6)'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Apply Kernel Configuration
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        echo "🧹 Cleaning up existing LOCALVERSION entries..."
+        sed -i '/^CONFIG_LOCALVERSION=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+        sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || true
+
+        REMAINING_ENTRIES=$(grep -c '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" 2>/dev/null || echo "0")
+        if [ "$REMAINING_ENTRIES" -eq 0 ]; then
+          echo "✅ All LOCALVERSION entries removed successfully"
+        else
+          echo "⚠️ Warning: $REMAINING_ENTRIES LOCALVERSION entries still present"
+          grep '^CONFIG_LOCALVERSION' "common/arch/arm64/configs/gki_defconfig" || true
+        fi
+
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'FRAG'
+        # Networking Configuration
+        CONFIG_IP_NF_TARGET_TTL=y
+        CONFIG_IP6_NF_TARGET_HL=y
+        CONFIG_IP6_NF_MATCH_HL=y
+
+        # BBR TCP Congestion Control
+        CONFIG_TCP_CONG_ADVANCED=y
+        CONFIG_TCP_CONG_BBR=y
+        CONFIG_NET_SCH_FQ=y
+        # CONFIG_TCP_CONG_BIC is not set
+        # CONFIG_TCP_CONG_WESTWOOD is not set
+        # CONFIG_TCP_CONG_HTCP is not set
+
+        # IPSet Support
+        CONFIG_IP_SET=y
+        CONFIG_IP_SET_MAX=65534
+        CONFIG_IP_SET_BITMAP_IP=y
+        CONFIG_IP_SET_BITMAP_IPMAC=y
+        CONFIG_IP_SET_BITMAP_PORT=y
+        CONFIG_IP_SET_HASH_IP=y
+        CONFIG_IP_SET_HASH_IPMARK=y
+        CONFIG_IP_SET_HASH_IPPORT=y
+        CONFIG_IP_SET_HASH_IPPORTIP=y
+        CONFIG_IP_SET_HASH_IPPORTNET=y
+        CONFIG_IP_SET_HASH_IPMAC=y
+        CONFIG_IP_SET_HASH_MAC=y
+        CONFIG_IP_SET_HASH_NETPORTNET=y
+        CONFIG_IP_SET_HASH_NET=y
+        CONFIG_IP_SET_HASH_NETNET=y
+        CONFIG_IP_SET_HASH_NETPORT=y
+        CONFIG_IP_SET_HASH_NETIFACE=y
+        CONFIG_IP_SET_LIST_SET=y
+        FRAG
+
+    - name: Apply Kernel Config for 5.10
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      if: inputs.kernel_version == '5.10'
+      run: |
+        sed -i 's/CONFIG_IP_SET_MAX/65534/g' net/netfilter/ipset/ip_set_core.c
