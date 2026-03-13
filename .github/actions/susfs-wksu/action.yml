@@ -86,23 +86,3 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
-    - name: Apply WKSU Enable Patch
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        ANDROID="${{ inputs.android_version }}"
-        KERNEL="${{ inputs.kernel_version }}"
-        SUBLEVEL="${{ inputs.sublevel }}"
-        SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
-        PATCH_DIR="${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}"
-
-        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
-        if [ -f "$ENABLE_PATCH" ]; then
-          patch -p1 < "$ENABLE_PATCH" || true
-        fi
-
-        # i_uid fix for android13-5.15 sublevel <= 41
-        if [[ "$ANDROID" == "android13" && "$KERNEL" == "5.15" && "$SUBLEVEL" -le 41 ]]; then
-          sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|fi->inode.i_uid.val|g' fs/susfs.c
-          sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|inode->i_uid.val|g' fs/susfs.c
-        fi
