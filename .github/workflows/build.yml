@@ -97,6 +97,14 @@ jobs:
         rmz_version: "3.1.1"
         testing: false
 
+    - name: Optimize Global Git for Repo Tool
+      shell: bash
+      run: |
+        set -euo pipefail
+        git config --global feature.manyFiles true
+        git config --global core.fsmonitor true
+        git config --global pack.sparse true
+
     - name: Setup Build Environment
       run: |
         mkdir -p "$GITHUB_WORKSPACE/kernel"
@@ -147,7 +155,7 @@ jobs:
         echo "CLANG_VERSION=$CLANG_VER" >> $GITHUB_ENV
         echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> $GITHUB_ENV
         echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> $GITHUB_ENV
-        echo "BUILD_TIMESTAMP=$(date -u '+%a %b %e %H:%M:%S UTC %Y')" >> $GITHUB_ENV
+        echo "BUILD_TIMESTAMP=Sun Jun 15 14:56:02 UTC 2025" >> "$GITHUB_ENV"
         echo "BUILD_USER=TheFloresto-labs" >> $GITHUB_ENV
         echo "BUILD_HOST=ubuntu-build" >> $GITHUB_ENV
 
@@ -167,6 +175,33 @@ jobs:
         sed -i 's/protected_modules = \[.*\]/protected_modules = []/' modules.bzl || true
         df -h
 
+    - name: Apply Remote Patches (CLIDR Fix)
+      if: true
+      working-directory: ${{ github.workspace }}/kernel/common
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "🔧 Patching libbpf.c type casting..."
+        if [ -f "tools/lib/bpf/libbpf.c" ]; then
+          sed -i 's/next_path = strchr(s, '"'"':'"'"');/next_path = (char *)strchr(s, '"'"':'"'"');/' tools/lib/bpf/libbpf.c
+          echo "✅ libbpf.c patched"
+        else
+          echo "⏭️  libbpf.c not found, skipping"
+        fi
+
+        echo "📋 Applying fix-clidr-uninitialized.patch"
+        if curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch" \
+          -o /tmp/fix-clidr.patch; then
+          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
+            patch -p1 --forward < /tmp/fix-clidr.patch
+            echo "✅ Patch applied successfully"
+          else
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "⚠️ Failed to download remote patch, continuing anyway"
+        fi
 
     - name: Extract Sublevel and Set File Name
       id: extract
@@ -405,6 +440,7 @@ jobs:
 
     - name: Build Kernel
       shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
       env:
         PYTHONWARNINGS: "ignore:invalid escape sequence"
       run: |
