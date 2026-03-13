@@ -1,13 +1,17 @@
 name: Fetch Latest Commits
-description: "Fetches the latest commit hashes for Wild KSU, AnyKernel3, Kernel Patches, and SUSFS"
+description: "Fetches the latest commit hashes for KSU variant, AnyKernel3, Kernel Patches, and SUSFS"
 inputs:
   ksu_commit:
-    description: "Optional: Specific Wild KSU commit to use"
+    description: "Optional: Specific KSU commit to use"
     required: false
     default: ""
+  ksu_variant:
+    description: "KSU variant (WKSU, Next, KSU, MKSU, KowXU, ReSukiSU)"
+    required: false
+    default: "WKSU"
 outputs:
   ksu_commit:
-    description: "Wild KSU Commit"
+    description: "KSU Commit"
     value: ${{ steps.commits.outputs.ksu_commit }}
   anykernel_commit:
     description: "AnyKernel3 Commit"
@@ -26,48 +30,45 @@ runs:
       id: commits
       shell: bash
       run: |
-        # Helper to get latest commit from remote without cloning full repo
         get_commit() {
           git ls-remote "$1" "$2" | awk '{print $1}'
         }
 
-        echo "Fetching latest commits..."
-        
-        # Wild KSU
+        echo "Fetching latest commits for variant: ${{ inputs.ksu_variant }}"
+
+        # Resolve KSU repo/branch by variant
+        case "${{ inputs.ksu_variant }}" in
+          "WKSU")     KSU_REPO="https://github.com/WildKernels/Wild_KSU.git";            KSU_REF="refs/heads/canary"     ;;
+          "Next")     KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git";     KSU_REF="refs/heads/next"       ;;
+          "KSU")      KSU_REPO="https://github.com/tiann/KernelSU.git";                  KSU_REF="refs/heads/main"       ;;
+          "MKSU")     KSU_REPO="https://github.com/5ec1cff/KernelSU.git";                KSU_REF="refs/heads/main"       ;;
+          "KowXU")    KSU_REPO="https://github.com/KOWX712/KernelSU.git";                KSU_REF="refs/heads/master"     ;;
+          "ReSukiSU") KSU_REPO="https://github.com/ShirkNeko/SukiSU-Ultra.git";          KSU_REF="refs/heads/main"       ;;
+          *)          KSU_REPO="https://github.com/WildKernels/Wild_KSU.git";            KSU_REF="refs/heads/canary"     ;;
+        esac
+
         if [ -n "${{ inputs.ksu_commit }}" ]; then
-          # Try to resolve input as a ref (branch/tag)
-          resolved_commit=$(get_commit "https://github.com/WildKernels/Wild_KSU.git" "${{ inputs.ksu_commit }}")
-          
-          if [ -n "$resolved_commit" ]; then
-            ksu_commit="$resolved_commit"
-          else
-            # If resolution failed, assume input is a commit SHA
-            ksu_commit="${{ inputs.ksu_commit }}"
-          fi
-          echo "Using provided Wild KSU commit: $ksu_commit"
+          resolved=$(get_commit "$KSU_REPO" "${{ inputs.ksu_commit }}")
+          ksu_commit="${resolved:-${{ inputs.ksu_commit }}}"
+          echo "Using provided KSU commit: $ksu_commit"
         else
-          ksu_commit=$(get_commit "https://github.com/WildKernels/Wild_KSU.git" "refs/heads/canary")
-          echo "Wild KSU: $ksu_commit"
+          ksu_commit=$(get_commit "$KSU_REPO" "$KSU_REF")
+          echo "${{ inputs.ksu_variant }}: $ksu_commit"
         fi
         echo "ksu_commit=$ksu_commit" >> $GITHUB_OUTPUT
-        
+
         # AnyKernel3
-        AK3_COMMIT=$(get_commit "https://github.com/WildKernels/AnyKernel3.git" "refs/heads/gki-2.0")
+        AK3_COMMIT=$(get_commit "https://github.com/TheFloresto/AnyKernel3.git" "refs/heads/gki-2.0")
         echo "AnyKernel3: $AK3_COMMIT"
         echo "anykernel_commit=$AK3_COMMIT" >> $GITHUB_OUTPUT
-        
+
         # Kernel Patches
-        PATCHES_COMMIT=$(get_commit "https://github.com/WildKernels/kernel_patches.git" "HEAD")
+        PATCHES_COMMIT=$(get_commit "https://github.com/TheWildJames/kernel_patches.git" "HEAD")
         echo "Kernel Patches: $PATCHES_COMMIT"
         echo "patches_commit=$PATCHES_COMMIT" >> $GITHUB_OUTPUT
-        
-        # SUSFS (using gitlab) - Fetch all relevant branches
+
+        # SUSFS
         SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-        echo "Fetching SUSFS commits for all branches..."
-        
-        # We need to construct a JSON object or a simple string map
-        # Format: branch1:commit1,branch2:commit2,...
-        
         BRANCHES=(
           "gki-android12-5.10"
           "gki-android13-5.10"
@@ -77,20 +78,20 @@ runs:
           "gki-android15-6.6"
           "gki-android16-6.12"
         )
-        
+
         SUSFS_MAP=""
         for branch in "${BRANCHES[@]}"; do
           COMMIT=$(get_commit "$SUSFS_REPO" "refs/heads/$branch")
           if [ -n "$COMMIT" ]; then
-             echo "  $branch: $COMMIT"
-             if [ -z "$SUSFS_MAP" ]; then
-               SUSFS_MAP="$branch:$COMMIT"
-             else
-               SUSFS_MAP="$SUSFS_MAP,$branch:$COMMIT"
-             fi
+            echo "  $branch: $COMMIT"
+            if [ -z "$SUSFS_MAP" ]; then
+              SUSFS_MAP="$branch:$COMMIT"
+            else
+              SUSFS_MAP="$SUSFS_MAP,$branch:$COMMIT"
+            fi
           else
-             echo "  $branch: Not found"
+            echo "  $branch: Not found"
           fi
         done
-        
+
         echo "susfs_commit=$SUSFS_MAP" >> $GITHUB_OUTPUT
