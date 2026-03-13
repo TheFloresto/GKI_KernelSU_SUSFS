@@ -157,6 +157,16 @@ jobs:
         android_version: ${{ steps.parse.outputs.android_version }}
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
         os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        
+    - name: Clean Up ABI Protected Exports
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$KERNEL_ROOT/common"
+        rm -f android/abi_gki_protected_exports_* || true
+        sed -i 's/protected_modules = \[.*\]/protected_modules = []/' modules.bzl || true
+        df -h
+
 
     - name: Extract Sublevel and Set File Name
       id: extract
@@ -178,8 +188,7 @@ jobs:
 
     - name: Setup ccache
       run: |
-        CACHE_DIR="$HOME/.ccache"
-        echo "CCACHE_DIR=$CACHE_DIR" >> "$GITHUB_ENV"
+        echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
         mkdir -p "$CACHE_DIR"
         ccache -M 1G
         ccache -o compression=true
@@ -189,7 +198,7 @@ jobs:
     - name: Cache ccache
       uses: actions/cache@v4
       with:
-        path: ${{ env.CCACHE_DIR }}
+        path: ~/.ccache
         key: ccache-nerest-v3-${{ steps.parse.outputs.android_version }}-${{ steps.parse.outputs.kernel_version }}-${{ steps.parse.outputs.os_patch_level }}-${{ env.CLANG_VERSION }}-${{ inputs.ksu_variant }}
         restore-keys: |
           ccache-nerest-v3-${{ steps.parse.outputs.android_version }}-${{ steps.parse.outputs.kernel_version }}-${{ steps.parse.outputs.os_patch_level }}-
@@ -365,8 +374,6 @@ jobs:
       with:
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
 
-
-
     - name: Apply ABI Compare Bypass
       if: false
       working-directory: ${{ github.workspace }}/kernel
@@ -398,7 +405,6 @@ jobs:
 
     - name: Build Kernel
       shell: bash
-      working-directory: ${{ env.KERNEL_ROOT }}/common
       env:
         PYTHONWARNINGS: "ignore:invalid escape sequence"
       run: |
