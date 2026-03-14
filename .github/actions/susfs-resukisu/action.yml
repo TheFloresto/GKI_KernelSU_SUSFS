@@ -83,6 +83,7 @@ runs:
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
     - name: Apply ReSukiSU Enable Patch
+      if: false
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
