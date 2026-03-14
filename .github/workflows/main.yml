@@ -25,7 +25,6 @@ on:
           - a15-6-6
           - a16-6-12
           - lts
-          - custom
           - testing
           - bypass
         default: custom
@@ -71,7 +70,7 @@ jobs:
         uses: ./.github/actions/fetch-commits
         with:
           ksu_commit: ${{ inputs.ksu_commit }}
-          ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+          ksu_variant: ${{ inputs.ksu_variant }}
 
   build-a12-5-10:
     if: ${{ inputs.kernel_build_version == 'all' || inputs.kernel_build_version == 'a12-5-10' || startsWith(github.ref, 'refs/tags/v') }}
@@ -83,8 +82,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-a13-5-10:
@@ -97,8 +96,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-a13-5-15:
@@ -111,8 +110,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-a14-5-15:
@@ -125,8 +124,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-a14-6-1:
@@ -139,8 +138,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-a15-6-6:
@@ -153,8 +152,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-a16-6-12:
@@ -167,8 +166,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-lts:
@@ -181,22 +180,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
-    secrets: inherit
-
-  build-custom:
-    if: ${{ inputs.kernel_build_version == 'all' || inputs.kernel_build_version == 'custom' || startsWith(github.ref, 'refs/tags/v') }}
-    needs: fetch-commits
-    uses: ./.github/workflows/prepare.yml
-    with:
-      config_file: .github/kernel-config/custom.json
-      ksu_commit: ${{ inputs.ksu_commit || needs.fetch-commits.outputs.ksu_commit }}
-      anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
-      patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
-      susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-testing:
@@ -209,8 +194,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   build-bypass:
@@ -223,8 +208,8 @@ jobs:
       anykernel_commit: ${{ needs.fetch-commits.outputs.anykernel_commit }}
       patches_commit: ${{ needs.fetch-commits.outputs.patches_commit }}
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
-      feature_set: ${{ inputs.feature_set || 'KSU+SUSFS+BBG' }}
-      ksu_variant: ${{ inputs.ksu_variant || 'WKSU' }}
+      feature_set: ${{ inputs.feature_set }}
+      ksu_variant: ${{ inputs.ksu_variant }}
     secrets: inherit
 
   rej:
@@ -241,7 +226,6 @@ jobs:
     - build-a14-6-1
     - build-a15-6-6
     - build-a16-6-12
-    - build-custom
     - build-lts
     - build-testing
     - build-bypass
@@ -256,33 +240,18 @@ jobs:
     - name: Process Reject Artifacts
       run: |
         mkdir -p aio-rejects
-        
-        # Iterate over Rejects artifacts in downloaded-artifacts
         for dir in ./downloaded-artifacts/*-Rejects; do
-            # Ensure it is a directory
             [ -d "$dir" ] || continue
-            
             dirname=$(basename "$dir")
-            # Process each reject artifact
-            
-            # Get original name (remove -Rejects suffix)
             original_name=${dirname%-Rejects}
-            
             mkdir -p "aio-rejects/$original_name"
-            
-            # Check for patch-rejects folder (legacy structure) or direct contents
             if [ -d "$dir/patch-rejects" ]; then
-              # Legacy structure
                 cp -r "$dir/patch-rejects/." "aio-rejects/$original_name/"
             else
-              # Current structure
                 cp -r "$dir/." "aio-rejects/$original_name/"
             fi
         done
-        
-        # Zip and upload if we found anything
         if [ "$(ls -A aio-rejects)" ]; then
-            # Create a single zip of all rejects
             cd aio-rejects
             zip -r -q -9 ../AIO-REJ.zip .
             cd ..
@@ -311,13 +280,13 @@ jobs:
     - build-a15-6-6
     - build-a16-6-12
     - build-lts
-    - build-custom
+    - build-testing
     - build-bypass
     - rej
 
     env:
-      GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant || 'WKSU' }} & SUSFS v2.0.0"
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0"
       RELEASE_BODY: ""
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
@@ -336,7 +305,6 @@ jobs:
           local target="$1"
           local job_name="$2"
           local result="$3"
-          
           if [[ "$current_type" == "all" || "$current_type" == "$target" ]]; then
             if [[ "$result" != "success" ]]; then
               echo "Required job $job_name did not succeed (result: $result)"
@@ -362,7 +330,7 @@ jobs:
 
     - name: Free Disk Space
       if: true
-      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
+      uses: endersonmenezes/free-disk-space@v3
       with:
         remove_android: true
         remove_dotnet: true
@@ -372,14 +340,16 @@ jobs:
         remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
         remove_packages_one_command: true
         remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
-        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
+        rm_cmd: "rmz"
+        rmz_version: "3.1.1"
         testing: false
 
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        token: ${{ secrets.RELEASE_TOKEN }}
+        repository: NerestKernels/GKI_KernelSU_SUSFS
 
     - name: Ensure tag is from main
       if: ${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -387,15 +357,100 @@ jobs:
         git fetch origin main
         git merge-base --is-ancestor "$GITHUB_SHA" "origin/main"
 
+    - name: Get commit hashes and generate commit URLs
+      shell: bash
+      run: |
+        set -euo pipefail
+        GITLAB_OWNER="simonpunk"
+        GITLAB_REPO="susfs4ksu"
+
+        declare -A BRANCH_MAP=(
+          ["gki_android12_5_10"]="gki-android12-5.10"
+          ["gki_android13_5_10"]="gki-android13-5.10"
+          ["gki_android13_5_15"]="gki-android13-5.15"
+          ["gki_android14_5_15"]="gki-android14-5.15"
+          ["gki_android14_6_1"]="gki-android14-6.1"
+          ["gki_android15_6_6"]="gki-android15-6.6"
+        )
+
+        for var_name in "${!BRANCH_MAP[@]}"; do
+          branch_name="${BRANCH_MAP[$var_name]}"
+          COMMIT_HASH=$(git ls-remote https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git refs/heads/$branch_name | awk '{ print $1 }')
+          if [[ -n "$COMMIT_HASH" ]]; then
+            COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$COMMIT_HASH"
+            echo "$branch_name Commit: $COMMIT_HASH"
+            echo "$branch_name Commit URL: $COMMIT_URL"
+            echo "COMMIT_HASH_${var_name}=$COMMIT_HASH" >> "$GITHUB_ENV"
+            echo "COMMIT_URL_${var_name}=$COMMIT_URL" >> "$GITHUB_ENV"
+          fi
+        done
+
+    - name: Get KernelSU variant refs and links
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "${{ inputs.ksu_variant }}" in
+          "WKSU")
+            KSU_REF=$(git ls-remote "https://github.com/WildKernels/Wild_KSU.git" refs/heads/stable | awk '{print $1}')
+            KSU_URL="https://github.com/WildKernels/Wild_KSU/commit/$KSU_REF"
+            ;;
+          "Next")
+            KSU_REF=$(git ls-remote "https://github.com/KernelSU-Next/KernelSU-Next.git" refs/heads/dev | awk '{print $1}')
+            KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_REF"
+            ;;
+          "MKSU")
+            KSU_REF=$(git ls-remote "https://github.com/5ec1cff/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/5ec1cff/KernelSU/commit/$KSU_REF"
+            ;;
+          "KSU")
+            KSU_REF=$(git ls-remote "https://github.com/tiann/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/tiann/KernelSU/commit/$KSU_REF"
+            ;;
+          "KowXU")
+            KSU_REF=$(git ls-remote "https://github.com/KOWX712/KernelSU.git" refs/heads/master | awk '{print $1}')
+            KSU_URL="https://github.com/KOWX712/KernelSU/commit/$KSU_REF"
+            ;;
+          "ReSukiSU")
+            KSU_REF=$(git ls-remote "https://github.com/ReSukiSU/KernelSU.git" refs/heads/main | awk '{print $1}')
+            KSU_URL="https://github.com/ReSukiSU/ReSukiSU/commit/$KSU_REF"
+            ;;
+          *)
+            echo "ERROR: Unknown KSU variant: ${{ inputs.ksu_variant }}"
+            exit 1
+            ;;
+        esac
+
+        if [[ -z "$KSU_REF" ]]; then
+          echo "ERROR: Failed to get KSU_REF for variant ${{ inputs.ksu_variant }}"
+          exit 1
+        fi
+
+        echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
+        echo "KSU_URL=$KSU_URL" >> $GITHUB_ENV
+
+        BBG_REF=$(git ls-remote "https://github.com/vc-teahouse/Baseband-guard.git" refs/heads/main | awk '{print $1}')
+        BBG_URL="https://github.com/vc-teahouse/Baseband-guard/commit/$BBG_REF"
+
+        if [[ -z "$BBG_REF" ]]; then
+          echo "ERROR: Failed to get BBG_REF"
+          exit 1
+        fi
+
+        echo "BBG_REF=$BBG_REF" >> $GITHUB_ENV
+        echo "BBG_URL=$BBG_URL" >> $GITHUB_ENV
+
     - name: Generate New Tag
       id: tag
       if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_type != 'Actions' }}
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
-        LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
+        LATEST_TAG=$(gh api repos/NerestKernels/GKI_KernelSU_SUSFS/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
         if [[ -z "$LATEST_TAG" || "$LATEST_TAG" == "null" ]]; then
           LATEST_TAG="v0.0.0"
         fi
-        
+
         if [[ "$LATEST_TAG" =~ ^(.*)-r([0-9]+)$ ]]; then
           VERSION="${BASH_REMATCH[1]}"
           REV="${BASH_REMATCH[2]}"
@@ -404,7 +459,7 @@ jobs:
         else
           NEW_TAG="${LATEST_TAG}-r1"
         fi
-        
+
         echo "Latest tag: $LATEST_TAG"
         echo "New tag: $NEW_TAG"
         echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
@@ -412,8 +467,7 @@ jobs:
 
     - name: Set release body
       run: |
-        cat << 'EOF' > release_body.md
-
+        cat << EOF > release_body.md
         **IMPORTANT DISCLAIMER**
         This software is provided for testing and educational purposes only. Use at your own risk.
         The developers are not responsible for any damage, data loss, or issues that may occur.
@@ -435,24 +489,42 @@ jobs:
         - Reduces risk of soft-brick/hard-brick issues
 
         🔹 Bypass Builds
-        - Includes module check bypass modifications 
-        - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules. 
-        - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability. 
+        - Includes module check bypass modifications
+        - What are kernel modules? Kernel modules are pieces of code that can be loaded into the kernel at runtime to extend functionality (like device drivers, filesystem support, etc.). These are different from KernelSU/Magisk modules.
+        - The Problem: Sometimes when installing a custom kernel, the device tries to load a kernel module that fails due to version mismatches, missing dependencies, or signature verification issues. This can cause boot failures or device instability.
         - The Solution: These versions change one line from false to true to force load the kernel module, bypassing the failure check that would normally prevent loading.
 
         Kernel Flasher:
         -> https://github.com/fatalcoder524/KernelFlasher/
 
-        Manager:
-        -> Wild KSU Manager: https://github.com/WildKernels/Wild_KSU
-        -> Next: https://github.com/KernelSU-Next/KernelSU-Next
+        Managers:
+        -> WKSU: [Github](https://github.com/WildKernels/Wild_KSU) [Telegram](https://t.me/WildKernels)
+        -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
+        -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
+        -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
+        -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
+        -> ReSukiSU: [Github](https://github.com/ReSukiSU/ReSukiSU) [Telegram](https://t.me/ReSukiSU)
 
-        Module: 
+        Commit Hashes (at the time of release):
+        -> ${{ inputs.ksu_variant }}: [$KSU_REF]($KSU_URL)
+        -> Baseband-guard: [$BBG_REF]($BBG_URL)
+
+        -> SUSFS4KSU:
+          -> gki-android12-5.10: [$COMMIT_HASH_gki_android12_5_10]($COMMIT_URL_gki_android12_5_10)
+          -> gki-android13-5.10: [$COMMIT_HASH_gki_android13_5_10]($COMMIT_URL_gki_android13_5_10)
+          -> gki-android13-5.15: [$COMMIT_HASH_gki_android13_5_15]($COMMIT_URL_gki_android13_5_15)
+          -> gki-android14-5.15: [$COMMIT_HASH_gki_android14_5_15]($COMMIT_URL_gki_android14_5_15)
+          -> gki-android14-6.1: [$COMMIT_HASH_gki_android14_6_1]($COMMIT_URL_gki_android14_6_1)
+          -> gki-android15-6.6: [$COMMIT_HASH_gki_android15_6_6]($COMMIT_URL_gki_android15_6_6)
+
+        Module:
         -> https://github.com/sidex15/ksu_module_susfs
         EOF
 
     - name: Resolve release tag
       id: release_tag
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
         if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
           echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
@@ -475,6 +547,8 @@ jobs:
         merge-multiple: true
 
     - name: Package release zips
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
         mkdir -p release-assets
         for dir in ./downloaded-artifacts/*-AK3; do
@@ -488,9 +562,12 @@ jobs:
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       with:
-        tag_name: "GKI Kernels With ${{ inputs.ksu_variant || 'WKSU' }} & SUSFS v2.0.0 (${{ steps.release_tag.outputs.tag }})"
-        name: "GKI Kernels With ${{ inputs.ksu_variant || 'WKSU' }} & SUSFS v2.0.0 (${{ steps.release_tag.outputs.tag }})"
+        repository: NerestKernels/GKI_KernelSU_SUSFS
+        tag_name: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0 (${{ steps.release_tag.outputs.tag }})"
+        name: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0 (${{ steps.release_tag.outputs.tag }})"
         body_path: release_body.md
         draft: false
         prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.release_type == 'Pre-Release' }}
