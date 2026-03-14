@@ -1,9 +1,0 @@
-{
-  "include": [
-    {"kernel_version": "5.10.226-android12-2024-11", "variant": "vTomsonek"},
-    {"kernel_version": "6.1.145-android14-2025-09", "variant": "TheWildJames"},
-    {"kernel_version": "6.1.157-android14-2025-12", "variant": "MarionKernel"},
-    {"kernel_version": "6.1.128-android14-2025-03", "variant": "Hakan"},
-    {"kernel_version": "5.10.226-android12-2024-11", "variant": "Neyugn"}
-  ]
-}
