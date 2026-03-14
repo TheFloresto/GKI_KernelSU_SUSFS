@@ -103,9 +103,3 @@ runs:
             patch -p1 < "$EXTRA_P" || true
           fi
         done
-
-        # i_uid uid_into_mnt fix for android13-5.15 sublevel <= 41
-        if [[ "$ANDROID" == "android13" && "$KERNEL" == "5.15" && "$SUBLEVEL" -le 41 ]]; then
-          sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|fi->inode.i_uid.val|g' fs/susfs.c
-          sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|inode->i_uid.val|g' fs/susfs.c
-        fi
