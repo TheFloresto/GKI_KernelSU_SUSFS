@@ -185,7 +185,7 @@ jobs:
     secrets: inherit
 
   build-testing:
-    if: ${{ inputs.kernel_build_version == 'all' || inputs.kernel_build_version == 'testing' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v')) || startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ inputs.kernel_build_version == 'testing' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v')) || startsWith(github.ref, 'refs/tags/v') }}
     needs: fetch-commits
     uses: ./.github/workflows/prepare.yml
     with:
