@@ -92,7 +92,4 @@ runs:
         SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
         PATCH_DIR="${{ github.workspace }}/kernel_patches/mksu/susfs_fix_patches/v${SUSFS_VERSION}"
 
-        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
-        if [ -f "$ENABLE_PATCH" ]; then
-          patch -p1 < "$ENABLE_PATCH" || true
-        fi
+        patch -p1 --forward < "${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
