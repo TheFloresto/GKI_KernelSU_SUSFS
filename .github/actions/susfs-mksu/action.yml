@@ -92,4 +92,7 @@ runs:
         SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
         PATCH_DIR="${{ github.workspace }}/kernel_patches/mksu/susfs_fix_patches/v${SUSFS_VERSION}"
 
-        patch -p1 --forward < "${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
+        echo "📥 Downloading 10_enable_susfs_for_ksu.patch from deepongi-labs (mksu)..."
+        curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/main/.github/patches/mksu/10_enable_susfs_for_ksu.patch" \
+          -o /tmp/10_enable_susfs_for_ksu_mksu.patch
+        patch -p1 --forward < /tmp/10_enable_susfs_for_ksu_mksu.patch || true
