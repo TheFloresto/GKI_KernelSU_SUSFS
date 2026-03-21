@@ -53,7 +53,7 @@ runs:
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" --depth=1 susfs4ksu
         fi
 
-        SUSFS_VERSION="2.0.0"
+        SUSFS_VERSION="2.1.0"
         echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
 
     - name: Enable KernelSU SUSFS Config
@@ -79,9 +79,7 @@ runs:
       run: |
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
-        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
-        patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
-
+        
     - name: Apply ReSukiSU Enable Patch
       if: false
       shell: bash
@@ -92,8 +90,3 @@ runs:
         SUBLEVEL="${{ inputs.sublevel }}"
         SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
         PATCH_DIR="${{ github.workspace }}/kernel_patches/resukisu/susfs_fix_patches/v${SUSFS_VERSION}"
-
-        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
-        if [ -f "$ENABLE_PATCH" ]; then
-          patch -p1 < "$ENABLE_PATCH" || true
-        fi
