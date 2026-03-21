@@ -475,7 +475,7 @@ jobs:
 
         Features:
         -> Wild KSU Manager Support, Also Compatible with KernelSU-Next Manager
-        -> SUSFS ඞ v2.0.0
+        -> SUSFS ඞ v2.1.0
         -> SUSFS Inline Hooks
         -> IPSet Support for Advanced Network Filtering
         -> BBRv1 TCP Congestion Control
@@ -502,7 +502,7 @@ jobs:
         -> NEXT: [Github](https://github.com/KernelSU-Next/KernelSU-Next) [Telegram](https://t.me/ksunext_ci)
         -> Official KSU: [Github](https://github.com/tiann/KernelSU) [Telegram](https://t.me/KernelSU_group)
         -> MKSU: [Github](https://github.com/5ec1cff/KernelSU) [Telegram](https://t.me/mksu_ci)
-        -> KowXU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
+        -> KowSU: [Github](https://github.com/KOWX712/KernelSU) [Telegram](https://t.me/kowchannel)
         -> ReSukiSU: [Github](https://github.com/ReSukiSU/ReSukiSU) [Telegram](https://t.me/ReSukiSU)
 
         Commit Hashes (at the time of release):
