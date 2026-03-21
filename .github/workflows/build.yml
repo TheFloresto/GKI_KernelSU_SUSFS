@@ -203,21 +203,15 @@ jobs:
           echo "⚠️ Failed to download remote patch, continuing anyway"
         fi
 
-    - name: Extract Sublevel and Set File Name
+    - name: Extract Sublevel
       id: extract
       run: |
-        # Use SUBLEVEL for LTS builds, otherwise use the input sub_level
         SUBLEVEL="$SUB_LEVEL"
         if [[ -f "$GITHUB_WORKSPACE/kernel/common/Makefile" ]]; then
           EXTRACTED=$(grep '^SUBLEVEL = ' "$GITHUB_WORKSPACE/kernel/common/Makefile" | awk '{print $3}')
           [[ -n "$EXTRACTED" ]] && SUBLEVEL="$EXTRACTED"
         fi
-
-        # Set step outputs for parse-time YAML context access
-        FILE_NAME="${KSU_VARIANT}-${KSU_VERSION}-${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}${{ inputs.variant && format('-{0}', inputs.variant) || '' }}"
         echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
-        echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
-        echo "file_name=$FILE_NAME" >> $GITHUB_OUTPUT
         echo "sublevel=$SUBLEVEL" >> $GITHUB_OUTPUT
 
     - name: Setup ccache
@@ -379,6 +373,13 @@ jobs:
     - name: Setup Baseband Guard
       if: contains(inputs.feature_set, 'BBG')
       uses: ./.github/actions/bbg
+
+    - name: Set File Name
+      id: set_filename
+      run: |
+        FILE_NAME="${{ inputs.ksu_variant }}-${KSUVER}-${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}${{ inputs.variant && format('-{0}', inputs.variant) || '' }}"
+        echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
+        echo "file_name=$FILE_NAME" >> $GITHUB_OUTPUT
 
     - name: Apply Module Check Bypass
       if: ${{ inputs.variant == 'Bypass' }}
@@ -709,10 +710,10 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.FILE_NAME }}-logs
+        name: ${{ steps.set_filename.outputs.file_name }}-logs
         path: |
-          ${{ env.KERNEL_ROOT }}/common/build.log
-          ${{ env.KERNEL_ROOT }}/common/out/.config
+          ${{ github.workspace }}/kernel/common/build.log
+          ${{ github.workspace }}/kernel/common/out/.config
         if-no-files-found: ignore
         compression-level: 9
         retention-days: 7
