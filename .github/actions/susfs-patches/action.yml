@@ -23,7 +23,9 @@ runs:
       run: |
         ANDROID_VER="${{ inputs.android_version }}"
         KERNEL_VER="${{ inputs.kernel_version }}"
-
+        SUSFS_FOLDER="${{ github.workspace }}/susfs4ksu"
+        SUSFS_BRANCH="gki-${ANDROID_VER}-${KERNEL_VER}"
+        
         fake_patched=0
 
         if [ "$ANDROID_VER" = "android15" ] && [ "$KERNEL_VER" = "6.6" ]; then
@@ -66,6 +68,9 @@ runs:
             sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
           fi
         fi
+
+        # Apply 50_add_susfs BETWEEN fake patch and revert
+        patch -p1 --forward < "${SUSFS_FOLDER}/kernel_patches/50_add_susfs_in_${SUSFS_BRANCH}.patch" || true
 
         # Revert Fake kernel patch
         if [ "$fake_patched" = 1 ]; then
