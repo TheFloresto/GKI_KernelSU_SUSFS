@@ -84,22 +84,39 @@ runs:
 
     - name: Apply KernelSU-Next Enable Patch
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        ANDROID="${{ inputs.android_version }}"
-        KERNEL="${{ inputs.kernel_version }}"
-        SUBLEVEL="${{ inputs.sublevel }}"
+        set -euo pipefail
         SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
-        PATCH_DIR="${{ github.workspace }}/kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}"
+        SUSFS_FOLDER="${{ github.workspace }}/susfs4ksu"
+        KERNEL_PATCHES_FOLDER="${{ github.workspace }}/kernel_patches"
+        PATCH_DIR="${KERNEL_PATCHES_FOLDER}/next/susfs_fix_patches/v${SUSFS_VERSION}"
 
-        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
-        if [ -f "$ENABLE_PATCH" ]; then
-          patch -p1 < "$ENABLE_PATCH" || true
+        KSUN_DIR="${{ github.workspace }}/kernel/KernelSU-Next"
+
+        if [ ! -d "$KSUN_DIR" ]; then
+          echo "::error::KernelSU-Next not found at: $KSUN_DIR"
+          exit 1
         fi
-        # Next-specific extra patches
-        for extra_patch in fix_rej overwrite_hook_mode ksu_toolkit multi_manager; do
-          EXTRA_P="$PATCH_DIR/${extra_patch}.patch"
-          if [ -f "$EXTRA_P" ]; then
-            patch -p1 < "$EXTRA_P" || true
+
+        cd "$KSUN_DIR"
+
+        patch -p1 --forward < "${SUSFS_FOLDER}/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
+
+        for file in $(find ./kernel -maxdepth 2 -name "*.rej" -exec basename {} .rej \;); do
+          patch_file="${PATCH_DIR}/fix_${file}.patch"
+          if [ -f "$patch_file" ]; then
+            echo "Patching file: $file with fix_${file}.patch"
+            patch -p1 --forward < "$patch_file"
+          else
+            echo "⚠️ Skipping missing patch: fix_${file}.patch"
           fi
         done
+
+        echo "Patching Hook Mode!"
+        patch -p1 --forward < "${PATCH_DIR}/overwrite_hook_mode.patch"
+        echo "Patching KSU_TOOLKIT Support for SusFS kernel!"
+        patch -p1 --forward < "${PATCH_DIR}/ksu_toolkit.patch"
+        echo "Patching Multi-manager Support for SusFS kernel!"
+        patch -p1 --forward < "${PATCH_DIR}/multi_manager.patch"
+        echo "Patching Multi-manager sepolicy Support for SusFS kernel!"
+        patch -p1 --forward < "${PATCH_DIR}/multi_sepolicy_fix.patch"
