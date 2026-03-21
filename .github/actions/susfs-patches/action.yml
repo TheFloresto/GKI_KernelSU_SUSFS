@@ -17,111 +17,83 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Apply Android 12 5.10 Fixes
-      if: inputs.android_version == 'android12' && inputs.kernel_version == '5.10'
+    - name: Apply 50_add_susfs patch (with fake patch)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
+        ANDROID_VER="${{ inputs.android_version }}"
+        KERNEL_VER="${{ inputs.kernel_version }}"
 
-        if [[ "$SUBLEVEL" -le 209 ]]; then
-          sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+        fake_patched=0
+
+        if [ "$ANDROID_VER" = "android15" ] && [ "$KERNEL_VER" = "6.6" ]; then
+          if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
+            sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
+          fi
+          if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+            echo "nr_subpages Line not found. Fake Patching!"
+            sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' \
+                   -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
+            fake_patched=1
+          fi
+          if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+            echo "#include <linux/dma-buf.h> Line not found. Adding missing header"
+            sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+          fi
         fi
 
-        if [[ "$SUBLEVEL" -le 117 ]]; then
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/fdinfo.c.patch ./
-          patch -p1 < fdinfo.c.patch
+        if [ "$ANDROID_VER" = "android12" ] && [ "$KERNEL_VER" = "5.10" ]; then
+          if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+            echo "vma_pages Line not found. Fake Patching!"
+            fake_patched=1
+          fi
         fi
 
-        if [[ "$SUBLEVEL" -le 43 ]]; then
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a12-5.10/base.c.patch ./
-          patch -p1 < base.c.patch
+        if [ "$ANDROID_VER" = "android13" ] && [ "$KERNEL_VER" = "5.15" ]; then
+          if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+            echo "vma_pages Line not found. Fake Patching!"
+            fake_patched=1
+          fi
         fi
 
-    - name: Apply Android 13 5.10 Fixes
-      if: inputs.android_version == 'android13' && inputs.kernel_version == '5.10'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
-
-        if [[ "$SUBLEVEL" -le 107 ]]; then
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.10/fdinfo.c.patch ./
-          patch -p1 < fdinfo.c.patch
+        if [ "$ANDROID_VER" = "android14" ] && [ "$KERNEL_VER" = "6.1" ]; then
+          if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
+            echo "vma_pages Line not found. Fake Patching!"
+            fake_patched=1
+          fi
+          if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
+            echo "#include <linux/dma-buf.h> Line not found. Adding missing header"
+            sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
+          fi
         fi
 
-        if [[ "$SUBLEVEL" -le 209 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
-          sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+        # Revert Fake kernel patch
+        if [ "$fake_patched" = 1 ]; then
+          if [ "$ANDROID_VER" = "android15" ] && [ "$KERNEL_VER" = "6.6" ]; then
+            if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
+              echo "Revert Fake Patching!"
+              sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' \
+                     -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
+            fi
+          fi
+          if [ "$ANDROID_VER" = "android12" ] && [ "$KERNEL_VER" = "5.10" ]; then
+            if grep -qxF $'\t\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
+              echo "Revert Fake Patching!"
+              sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+            fi
+          fi
+          if [ "$ANDROID_VER" = "android13" ] && [ "$KERNEL_VER" = "5.15" ]; then
+            if grep -qxF $'\t\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
+              echo "Revert Fake Patching!"
+              sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+            fi
+          fi
+          if [ "$ANDROID_VER" = "android14" ] && [ "$KERNEL_VER" = "6.1" ]; then
+            if grep -qxF $'\t\t\tgoto show_pad;' ./fs/proc/task_mmu.c; then
+              echo "Revert Fake Patching!"
+              sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+            fi
+          fi
         fi
 
-    - name: Apply Android 13 5.15 Fixes
-      if: inputs.android_version == 'android13' && inputs.kernel_version == '5.15'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
-        
-        if [[ "$SUBLEVEL" -le 41 ]]; then
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/namespace.c.patch ./
-          patch -p1 < namespace.c.patch
-
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/fdinfo.c.patch ./
-          patch -p1 < fdinfo.c.patch
-
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a13-5.15/open.c.patch ./
-          patch -p1 < open.c.patch
-
-          sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|fi->inode.i_uid.val|g' fs/susfs.c
-          sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|inode->i_uid.val|g' fs/susfs.c
-        fi
-
-        if [[ "$SUBLEVEL" -le 148 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
-          sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
-        fi
-
-    - name: Apply Android 14 5.15 Fixes
-      if: inputs.android_version == 'android14' && inputs.kernel_version == '5.15'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        SUBLEVEL=${{ env.SUBLEVEL }}
-
-        if [[ "$SUBLEVEL" -le 148 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
-          sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
-        fi
-
-    - name: Apply Android 14 6.1 Fixes
-      if: inputs.android_version == 'android14' && inputs.kernel_version == '6.1'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
-
-        cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a14-6.1/base.c.patch ./
-        patch -p1 < base.c.patch
-
-        if [[ "$SUBLEVEL" -le 75 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
-          sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
-        fi
-
-    - name: Apply Android 15 6.6 Fixes
-      if: inputs.android_version == 'android15' && inputs.kernel_version == '6.6'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        SUBLEVEL=${{ env.SUBLEVEL }}
-        SUSFS_VERSION=${{ env.SUSFS_VERSION }}
-
-        if [[ "$SUBLEVEL" -le 92 ]]; then
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/base.c.patch ./
-          patch -p1 < base.c.patch
-        fi
-
-        if [[ "$SUBLEVEL" -le 58 ]]; then
-          cp ${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/a15-6.6/task_mmu.c.patch ./
-          patch -p1 < task_mmu.c.patch
-        fi
+        echo "✅ Fake patch logic done"
