@@ -692,7 +692,7 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.extract.outputs.file_name }}-AK3
+        name: ${{ env.FILE_NAME }}-AK3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
         compression-level: 9
@@ -701,7 +701,7 @@ jobs:
       if: ${{ always() && inputs.variant != 'Bypass' && steps.scan.outputs.rej_count > 0 }}
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.extract.outputs.file_name }}-Rejects
+        name: ${{ env.FILE_NAME }}-Rejects
         path: patch-rejects/
         if-no-files-found: ignore
         compression-level: 9
@@ -710,7 +710,7 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ steps.set_filename.outputs.file_name }}-logs
+        name: ${{ env.FILE_NAME }}-logs
         path: |
           ${{ github.workspace }}/kernel/common/build.log
           ${{ github.workspace }}/kernel/common/out/.config
