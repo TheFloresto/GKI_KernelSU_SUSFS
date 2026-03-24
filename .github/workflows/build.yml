@@ -155,9 +155,6 @@ jobs:
         echo "CLANG_VERSION=$CLANG_VER" >> $GITHUB_ENV
         echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> $GITHUB_ENV
         echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> $GITHUB_ENV
-        echo "BUILD_TIMESTAMP=Sun Jun 15 14:56:02 UTC 2025" >> "$GITHUB_ENV"
-        echo "BUILD_USER=TheFloresto-labs" >> $GITHUB_ENV
-        echo "BUILD_HOST=ubuntu-build" >> $GITHUB_ENV
 
     - name: Download Kernel Repository
       uses: ./.github/actions/download-kernel
@@ -486,8 +483,8 @@ jobs:
 
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
         export KBUILD_BUILD_TIMESTAMP="${{ env.BUILD_TIMESTAMP }}"
-        export KBUILD_BUILD_USER="${BUILD_USER:-TheFloresto-labs}"
-        export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
+        export KBUILD_BUILD_USER="${BUILD_USER:-kernel}"
+        export KBUILD_BUILD_HOST="${BUILD_HOST:-kleaf}"
         export KBUILD_BUILD_VERSION=1
 
         echo "📅 Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
