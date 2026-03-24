@@ -73,13 +73,6 @@ runs:
         CONFIG_KSU_SUSFS_SUS_MAP=y
         FRAG
 
-    - name: Apply Base SUSFS Patches
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
-        
     - name: Apply KernelSU-Next Enable Patch
       shell: bash
       run: |
@@ -118,3 +111,10 @@ runs:
         patch -p1 --forward < "${PATCH_DIR}/multi_manager.patch"
         echo "Patching Multi-manager sepolicy Support for SusFS kernel!"
         patch -p1 --forward < "${PATCH_DIR}/multi_sepolicy_fix.patch"
+
+    - name: Apply Base SUSFS Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"     
