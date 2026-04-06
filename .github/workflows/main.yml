@@ -286,7 +286,7 @@ jobs:
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-      RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.0.0"
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant }} & SUSFS v2.1.0"
       RELEASE_BODY: ""
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
