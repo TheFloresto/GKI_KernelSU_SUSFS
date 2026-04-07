@@ -8,14 +8,15 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+        curl --fail --location --proto '=https' --retry 3 --retry-all-errors \
+         -LSs "https://raw.githubusercontent.com/vc-teahouse/Baseband-guard/main/setup.sh" | bash -s main
     
     - name: Configure Baseband Guard
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
         # Add BBG to defconfig
-        echo "CONFIG_BBG=y" >> "${{ github.workspace }}/wild_gki.fragment"
+        echo "CONFIG_BBG=y" >> "${{ github.workspace }}/thefloresto.fragment"
         
         # Modify security Kconfig to include baseband_guard in LSM
         sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' common/security/Kconfig
