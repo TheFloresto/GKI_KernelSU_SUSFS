@@ -48,20 +48,6 @@ runs:
           fi
         fi
 
-        if [ "$ANDROID_VER" = "android16" ] && [ "$KERNEL_VER" = "6.12" ]; then
-          if ! grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
-            echo "nr_subpages Line not found. Fake Patching!"
-            sed -i -e '/int ret = 0, copied = 0;/a \\tunsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;' \
-                   -e '/int ret = 0, copied = 0;/a \\tpagemap_entry_t \*res = NULL;' ./fs/proc/task_mmu.c
-            fake_patched=1
-          fi
-
-          if ! grep -qxF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
-            echo "#include <linux/dma-buf.h> Line not found. Adding missing header for android16/6.12"
-            sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
-          fi
-        fi
-
         if [ "$ANDROID_VER" = "android12" ] && [ "$KERNEL_VER" = "5.10" ]; then
           if ! grep -qxF $'\tif (!vma_pages(vma))' ./fs/proc/task_mmu.c; then
             echo "vma_pages Line not found. Fake Patching!"
@@ -91,38 +77,9 @@ runs:
         # Apply 50_add_susfs BETWEEN fake patch and revert
         patch -p1 --forward < "${SUSFS_FOLDER}/kernel_patches/50_add_susfs_in_${SUSFS_BRANCH}.patch" || true
 
-        # Fix exec.c reject on android16/6.12 — patch context doesn't match,
-        # so manually insert the susfs_def.h include if it's missing
-        if [ "$ANDROID_VER" = "android16" ] && [ "$KERNEL_VER" = "6.12" ]; then
-          EXEC_C="./fs/exec.c"
-          if ! grep -qF '#include <linux/susfs_def.h>' "$EXEC_C"; then
-            echo "susfs_def.h include missing in exec.c. Inserting manually..."
-            if grep -qF '#include <linux/ksm.h>' "$EXEC_C"; then
-              sed -i '/#include <linux\/ksm.h>/a #ifdef CONFIG_KSU_SUSFS\n#include <linux\/susfs_def.h>\n#endif' "$EXEC_C"
-              echo "✅ Inserted after linux/ksm.h"
-            elif grep -qF '#include <linux/rseq.h>' "$EXEC_C"; then
-              sed -i '/#include <linux\/rseq.h>/a #ifdef CONFIG_KSU_SUSFS\n#include <linux\/susfs_def.h>\n#endif' "$EXEC_C"
-              echo "✅ Inserted after linux/rseq.h"
-            else
-              LAST_INC=$(grep -n '^#include' "$EXEC_C" | tail -n1 | cut -d: -f1)
-              sed -i "${LAST_INC}a #ifdef CONFIG_KSU_SUSFS\n#include <linux\/susfs_def.h>\n#endif" "$EXEC_C"
-              echo "✅ Inserted after last #include (line $LAST_INC)"
-            fi
-          else
-            echo "✅ exec.c already contains susfs_def.h include — skipping"
-          fi
-        fi
-
         # Revert Fake kernel patch
         if [ "$fake_patched" = 1 ]; then
           if [ "$ANDROID_VER" = "android15" ] && [ "$KERNEL_VER" = "6.6" ]; then
-            if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
-              echo "nr_subpages Line found. Revert Fake Patching!"
-              sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' \
-                     -e '/pagemap_entry_t \*res = NULL;/d' ./fs/proc/task_mmu.c
-            fi
-          fi
-          if [ "$ANDROID_VER" = "android16" ] && [ "$KERNEL_VER" = "6.12" ]; then
             if grep -qxF $'\tunsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' ./fs/proc/task_mmu.c; then
               echo "nr_subpages Line found. Revert Fake Patching!"
               sed -i -e '/unsigned int nr_subpages \= __PAGE_SIZE \/ PAGE_SIZE;/d' \
