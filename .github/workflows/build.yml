@@ -175,6 +175,59 @@ jobs:
         echo "✅ Greenforce Clang: $CLANG_VERSION"
         echo "::endgroup::"
 
+
+    - name: Check or Detect Rust
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "::group::Detect Rust"
+        RUSTC_FOUND=false
+
+        # Priority 1: Prebuilt из kernel tree
+        for base in "$GITHUB_WORKSPACE/kernel/prebuilts" "$GITHUB_WORKSPACE/kernel/prebuilts-master"; do
+          [ -d "$base/rust/linux-x86" ] || continue
+          latest=$(ls -d "$base/rust/linux-x86/1."* 2>/dev/null | sort -V | tail -n1 || true)
+          if [ -n "$latest" ] && [ -x "$latest/bin/rustc" ]; then
+            RUSTC_BIN="$latest/bin"
+            RUSTC_FOUND=true
+            echo "✅ Found prebuilt rustc: $latest"
+            break
+          fi
+        done
+
+        # Priority 2: System rustc
+        if [ "$RUSTC_FOUND" = false ] && command -v rustc >/dev/null 2>&1; then
+          RUSTC_BIN="$(dirname "$(command -v rustc)")"
+          RUSTC_FOUND=true
+          echo "✅ Using system rustc"
+        fi
+
+        [ "$RUSTC_FOUND" = true ] || { echo "::error::No Rust toolchain found"; exit 1; }
+
+        echo "RUSTC_BIN_PATH=$RUSTC_BIN" >> "$GITHUB_ENV"
+        RUSTC_VERSION="$("$RUSTC_BIN/rustc" --version | head -n1)"
+        echo "RUSTC_VERSION=$RUSTC_VERSION" >> "$GITHUB_ENV"
+        echo "✅ Detected RUSTC: $RUSTC_VERSION"
+        echo "::endgroup::"
+
+    - name: Install bindgen
+      shell: bash
+      run: |
+        # Install bindgen via cargo (no full rustc needed)
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+        source $HOME/.cargo/env
+        
+        # Install bindgen CLI only (~50-100MB total)
+        cargo install bindgen-cli --version 0.69.5
+        
+        # Verify
+        bindgen --version
+        which bindgen
+
+    - name: Show bindgen version
+      shell: bash
+      run: bindgen --version
+
     - name: Download Kernel Repository
       uses: ./.github/actions/download-kernel
       with:
@@ -516,7 +569,15 @@ jobs:
         export HOSTCC="ccache clang"
         export HOSTCXX="ccache clang++"
 
-        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+        if [ -n "${RUSTC_BIN_PATH:-}" ]; then
+          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${RUSTC_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+          export RUSTC="$RUSTC_BIN_PATH/rustc"
+          export LIBCLANG_PATH="${CLANG_BIN_PATH}/../lib"
+          export BINDGEN="bindgen"
+          echo "🦀 Rust enabled: $RUSTC"
+        else
+          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+        fi
 
         OUT=out
         mkdir -p "$OUT"
@@ -758,6 +819,8 @@ jobs:
         echo "BBG Version         : $BBG_VERSION"
         # Clang info
         echo "Clang Version       : ${CLANG_VERSION:-unknown}"
+        # Rust info
+        echo "Rust Version        : ${RUSTC_VERSION:-not used}"
         # Variant info
         echo "Variant             : ${{ inputs.variant || 'Standard' }}"
         echo "File Name           : $FILE_NAME"
