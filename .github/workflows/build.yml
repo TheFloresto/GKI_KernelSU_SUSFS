@@ -145,53 +145,24 @@ jobs:
           libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils
         sudo apt-get clean
 
-    - name: Setup Clang (ZyCromerZ)
+    - name: Setup Clang (Greenforce)
       run: |
         set -euo pipefail
-        echo "::group::Setup ZyCromerZ Clang"
-        FEATURE_SET="${{ inputs.feature_set }}"
+        echo "::group::Setup Greenforce Clang"
 
-        ZYC_URL=""
-        if echo "$FEATURE_SET" | grep -qE '(^|[,+])zyc='; then
-         ZYC_URL="$(echo "$FEATURE_SET" | grep -oE '(^|[,+])zyc=[^,+]+' | sed 's/^[,+]//' | cut -d= -f2-)"
-        fi
-        [ -n "$ZYC_URL" ] || { echo "::error::zyc= not found in feature_set"; exit 1; }
+        GFC_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
+        [ -x "$GFC_DIR/bin/clang" ] || { echo "::error::clang binary not found after Greenforce install"; exit 1; }
 
-        ZYC_DIR="$GITHUB_WORKSPACE/zyc-clang"
-        TEMP_TAR="$GITHUB_WORKSPACE/zyc-compiler.tar.gz"
-        mkdir -p "$ZYC_DIR"
+        echo "CLANG_BIN_PATH=$GFC_DIR/bin" >> "$GITHUB_ENV"
+        echo "$GFC_DIR/bin" >> "$GITHUB_PATH"
 
-        max_retries=5
-        attempt=1
-        download_success=false
-        while [ $attempt -le $max_retries ]; do
-          echo "Download attempt $attempt/$max_retries..."
-          if curl -L --fail --retry 3 --retry-delay 5 --connect-timeout 60 -o "$TEMP_TAR" "$ZYC_URL"; then
-            download_success=true
-            break
-          else
-            rm -f "$TEMP_TAR" 2>/dev/null
-            [ $attempt -eq $max_retries ] && break
-            attempt=$((attempt + 1))
-            sleep 8
-          fi
-        done
-
-        [ "$download_success" = true ] || { echo "::error::Failed to download ZyCromerZ after $max_retries attempts"; exit 1; }
-
-        tar -xzf "$TEMP_TAR" -C "$ZYC_DIR" 2>/dev/null || true
-        rm -f "$TEMP_TAR"
-        [ -x "$ZYC_DIR/bin/clang" ] || { echo "::error::clang binary not found after extraction"; exit 1; }
-
-        echo "CLANG_BIN_PATH=$ZYC_DIR/bin" >> "$GITHUB_ENV"
-        echo "$ZYC_DIR/bin" >> "$GITHUB_PATH"
-
-        CLANG_VERSION="$("$ZYC_DIR/bin/clang" --version | head -n1)"
+        CLANG_VERSION="$("$GFC_DIR/bin/clang" --version | head -n1)"
         echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
 
-        short="$("$ZYC_DIR/bin/clang" --version | sed -n '1s/.*clang-r\([0-9.]\+\).*/\1/p')"
+        short="$("$GFC_DIR/bin/clang" --version | sed -n '1s/.*clang-r\([0-9.]\+\).*/\1/p')"
         if [ -z "$short" ]; then
-          short="$("$ZYC_DIR/bin/clang" --version | sha256sum | cut -c1-8)"
+          short="$("$GFC_DIR/bin/clang" --version | sha256sum | cut -c1-8)"
           echo "⚠️ Could not extract clang-r version, using hash: $short"
         else
           echo "✅ Clang fingerprint: $short"
@@ -201,73 +172,7 @@ jobs:
         echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
         echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
 
-        echo "✅ ZyCromerZ Clang: $CLANG_VERSION"
-        echo "::endgroup::"
-
-    - name: Check or Detect Rust
-      shell: bash
-      if: ${{ contains(inputs.feature_set, 'rust') }}
-      run: |
-        set -euo pipefail
-        echo "::group::Detect Rust"
-        RUSTC_FOUND=false
-        FEATURE_SET="${{ inputs.feature_set }}"
-
-        # Кастомный путь через feature_set: rust_compiler=path/to/rustc                
-        RUST_COMPILER=""
-        if echo "$FEATURE_SET" | grep -qE '(^|[,+])rust_compiler='; then
-         RUST_COMPILER="$(echo "$FEATURE_SET" | grep -oE '(^|[,+])rust_compiler=[^,+]+' | sed 's/^[,+]//' | cut -d= -f2-)"
-        fi
-
-        if [ -n "$RUST_COMPILER" ]; then
-          # Priority 1: Кастомный путь (как OP_RUST_COMPILER в OnePlus)
-          CUSTOM_RUSTC="$GITHUB_WORKSPACE/$RUST_COMPILER/rustc"
-          if [ -x "$CUSTOM_RUSTC" ]; then
-            RUSTC_BIN="$GITHUB_WORKSPACE/$RUST_COMPILER"
-            RUSTC_FOUND=true
-            echo "✅ Using custom rustc: $RUSTC_BIN"
-          else
-            echo "⚠️ rust_compiler='$RUST_COMPILER' but rustc not found at $CUSTOM_RUSTC, falling through..."
-          fi
-        fi
-
-        # Priority 2: rustc внутри ZyC toolchain
-        if [ "$RUSTC_FOUND" = false ]; then
-          ZYC_DIR="$GITHUB_WORKSPACE/zyc-clang"
-          if [ -x "$ZYC_DIR/bin/rustc" ]; then
-            RUSTC_BIN="$ZYC_DIR/bin"
-            RUSTC_FOUND=true
-            echo "✅ Found rustc inside ZyCromerZ toolchain"
-          fi
-        fi
-
-        # Priority 3: Prebuilt из kernel tree (как в OnePlus)
-        if [ "$RUSTC_FOUND" = false ]; then
-          for base in "$GITHUB_WORKSPACE/kernel/prebuilts" "$GITHUB_WORKSPACE/kernel/prebuilts-master"; do
-            [ -d "$base/rust/linux-x86" ] || continue
-            latest=$(ls -d "$base/rust/linux-x86/1."* 2>/dev/null | sort -V | tail -n1 || true)
-            if [ -n "$latest" ] && [ -x "$latest/bin/rustc" ]; then
-              RUSTC_BIN="$latest/bin"
-              RUSTC_FOUND=true
-              echo "✅ Found prebuilt rustc: $latest"
-              break
-            fi
-          done
-        fi
-
-        # Priority 4: System rustc
-        if [ "$RUSTC_FOUND" = false ] && command -v rustc >/dev/null 2>&1; then
-          RUSTC_BIN="$(dirname "$(command -v rustc)")"
-          RUSTC_FOUND=true
-          echo "✅ Using system rustc"
-        fi
-
-        [ "$RUSTC_FOUND" = true ] || { echo "::error::No Rust toolchain found"; exit 1; }
-
-        echo "RUSTC_BIN_PATH=$RUSTC_BIN" >> "$GITHUB_ENV"
-        RUSTC_VERSION="$("$RUSTC_BIN/rustc" --version | head -n1)"
-        echo "RUSTC_VERSION=$RUSTC_VERSION" >> "$GITHUB_ENV"
-        echo "✅ Detected RUSTC: $RUSTC_VERSION"
+        echo "✅ Greenforce Clang: $CLANG_VERSION"
         echo "::endgroup::"
 
     - name: Download Kernel Repository
@@ -611,16 +516,7 @@ jobs:
         export HOSTCC="ccache clang"
         export HOSTCXX="ccache clang++"
 
-        # Rust / LIBCLANG setup
-        if [ -n "${RUSTC_BIN_PATH:-}" ]; then
-          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${RUSTC_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
-          export RUSTC="$RUSTC_BIN_PATH/rustc"
-          export LIBCLANG_PATH="${CLANG_BIN_PATH}/../lib"
-          export BINDGEN="bindgen"
-          echo "🦀 Rust enabled: $RUSTC"
-        else
-          export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
-        fi
+        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
 
         OUT=out
         mkdir -p "$OUT"
@@ -862,8 +758,6 @@ jobs:
         echo "BBG Version         : $BBG_VERSION"
         # Clang info
         echo "Clang Version       : ${CLANG_VERSION:-unknown}"
-        # Rust info
-        echo "Rust Version        : ${RUSTC_VERSION:-not used}"
         # Variant info
         echo "Variant             : ${{ inputs.variant || 'Standard' }}"
         echo "File Name           : $FILE_NAME"
