@@ -152,8 +152,8 @@ jobs:
         FEATURE_SET="${{ inputs.feature_set }}"
 
         ZYC_URL=""
-        if echo "$FEATURE_SET" | grep -qE '(^|,)zyc='; then
-          ZYC_URL="$(echo "$FEATURE_SET" | grep -oE '(^|,)zyc=[^,]+' | sed 's/^,//' | cut -d= -f2-)"
+        if echo "$FEATURE_SET" | grep -qE '(^|[,+])zyc='; then
+         ZYC_URL="$(echo "$FEATURE_SET" | grep -oE '(^|[,+])zyc=[^,+]+' | sed 's/^[,+]//' | cut -d= -f2-)"
         fi
         [ -n "$ZYC_URL" ] || { echo "::error::zyc= not found in feature_set"; exit 1; }
 
@@ -213,10 +213,10 @@ jobs:
         RUSTC_FOUND=false
         FEATURE_SET="${{ inputs.feature_set }}"
 
-        # Кастомный путь через feature_set: rust_compiler=path/to/rustc
+        # Кастомный путь через feature_set: rust_compiler=path/to/rustc                
         RUST_COMPILER=""
-        if echo "$FEATURE_SET" | grep -qE '(^|,)rust_compiler='; then
-          RUST_COMPILER="$(echo "$FEATURE_SET" | grep -oE '(^|,)rust_compiler=[^,]+' | sed 's/^,//' | cut -d= -f2-)"
+        if echo "$FEATURE_SET" | grep -qE '(^|[,+])rust_compiler='; then
+         RUST_COMPILER="$(echo "$FEATURE_SET" | grep -oE '(^|[,+])rust_compiler=[^,+]+' | sed 's/^[,+]//' | cut -d= -f2-)"
         fi
 
         if [ -n "$RUST_COMPILER" ]; then
