@@ -12,12 +12,23 @@ runs:
         mkdir -p bootimgs
         mkdir -p boot-artifacts
 
-        if [ -f "$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image" ]; then
-          cp "$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image" "$GITHUB_WORKSPACE/bootimgs/Image"
-          cp "$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image.lz4" "$GITHUB_WORKSPACE/bootimgs/Image.lz4"
+        KERNEL_OUT_DIR="$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION"
+
+        if [ -f "$KERNEL_OUT_DIR/dist/Image" ]; then
+          SRC_DIR="$KERNEL_OUT_DIR/dist"
+        elif [ -f "$KERNEL_OUT_DIR/arch/arm64/boot/Image" ]; then
+          SRC_DIR="$KERNEL_OUT_DIR/arch/arm64/boot"
         else
-          cp "$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_aarch64/Image" "$GITHUB_WORKSPACE/bootimgs/Image"
-          cp "$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_aarch64/Image.lz4" "$GITHUB_WORKSPACE/bootimgs/Image.lz4"
+          echo "Error: could not locate built kernel Image under $KERNEL_OUT_DIR"
+          ls -la "$KERNEL_OUT_DIR" 2>/dev/null || true
+          exit 1
+        fi
+
+        cp "$SRC_DIR/Image" "$GITHUB_WORKSPACE/bootimgs/Image"
+        if [ -f "$SRC_DIR/Image.lz4" ]; then
+          cp "$SRC_DIR/Image.lz4" "$GITHUB_WORKSPACE/bootimgs/Image.lz4"
+        else
+          lz4 -9 -f "$SRC_DIR/Image" "$GITHUB_WORKSPACE/bootimgs/Image.lz4"
         fi
 
         gzip -n -k -f -9 "$GITHUB_WORKSPACE/bootimgs/Image" > "$GITHUB_WORKSPACE/bootimgs/Image.gz"

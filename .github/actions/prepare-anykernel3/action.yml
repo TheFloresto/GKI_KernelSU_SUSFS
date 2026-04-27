@@ -8,14 +8,17 @@ runs:
       run: |
         set -euo pipefail
 
-        if [ -f "$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image" ]; then
-          cp "$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image" "$GITHUB_WORKSPACE/AnyKernel3/Image"
+        KERNEL_OUT_DIR="$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION"
+
+        if [ -f "$KERNEL_OUT_DIR/dist/Image" ]; then
+          cp "$KERNEL_OUT_DIR/dist/Image" "$GITHUB_WORKSPACE/AnyKernel3/Image"
           exit 0
         fi
 
-        if [ -f "$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_aarch64/Image" ]; then
-          cp "$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_aarch64/Image" "$GITHUB_WORKSPACE/AnyKernel3/Image"
+        if [ -f "$KERNEL_OUT_DIR/arch/arm64/boot/Image" ]; then
+          cp "$KERNEL_OUT_DIR/arch/arm64/boot/Image" "$GITHUB_WORKSPACE/AnyKernel3/Image"
           exit 0
         fi
 
+        echo "Error: could not locate built kernel Image under $KERNEL_OUT_DIR"
         exit 1

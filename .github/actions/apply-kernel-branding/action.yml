@@ -1,5 +1,5 @@
 name: 'Apply Kernel Branding & Timestamp'
-description: 'Apply Wild kernel branding to kernel version string'
+description: 'Apply TheFloresto kernel branding to kernel version string'
 inputs:
   variant:
     description: 'Variant of kernel to apply branding to'
@@ -21,27 +21,27 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        CONFIG_FRAGMENT="${GITHUB_WORKSPACE}/wild_gki.fragment"
+        CONFIG_FRAGMENT="${GITHUB_WORKSPACE}/thefloresto.fragment"
         touch "$CONFIG_FRAGMENT"
 
         DEFCONFIG="${GITHUB_WORKSPACE}/kernel/common/arch/arm64/configs/gki_defconfig"
 
-        if [ "${{ inputs.variant }}" == "Wild" ]; then
+        if [ "${{ inputs.variant }}" == "TheFloresto" ]; then
           tac scripts/setlocalversion | awk '!seen && /^echo / {seen=1; next} 1' | tac > scripts/setlocalversion.tmp
           mv scripts/setlocalversion.tmp scripts/setlocalversion
           if [[ ${{ inputs.kernel_version }} == "6.6" || ${{ inputs.kernel_version }} == "6.12" ]]; then
             KERNEL_STRING="${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.android_version }}"
-            echo "echo \"$KERNEL_STRING-Wild\"" >> scripts/setlocalversion
+            echo "echo \"$KERNEL_STRING-TheFloresto\"" >> scripts/setlocalversion
           else
-            echo 'echo "-Wild"' >> scripts/setlocalversion
+            echo 'echo "-TheFloresto"' >> scripts/setlocalversion
           fi
           chmod +x scripts/setlocalversion
         else
           if grep -q '^CONFIG_LOCALVERSION=' "$DEFCONFIG"; then
             LOCALVERSION_VALUE="$(grep -m1 '^CONFIG_LOCALVERSION=' "$DEFCONFIG" | sed -E 's/^CONFIG_LOCALVERSION="?([^"]*)"?$/\1/')"
-           echo "CONFIG_LOCALVERSION=\"${LOCALVERSION_VALUE}-Wild\"" >> "$CONFIG_FRAGMENT"
+           echo "CONFIG_LOCALVERSION=\"${LOCALVERSION_VALUE}-TheFloresto\"" >> "$CONFIG_FRAGMENT"
           else
-            echo 'CONFIG_LOCALVERSION="-Wild"' >> "$CONFIG_FRAGMENT"
+            echo 'CONFIG_LOCALVERSION="-TheFloresto"' >> "$CONFIG_FRAGMENT"
           fi
         fi
 
@@ -60,10 +60,10 @@ runs:
         echo "KBUILD_BUILD_TIMESTAMP=$KERNEL_BUILD_DATE" >> $GITHUB_ENV
 
     - name: Apply Kernel Configuration
-      if: ${{ inputs.variant == 'Wild' }}
+      if: ${{ inputs.variant == 'TheFloresto' }}
       shell: bash
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         CONFIG_LOCALVERSION=""
         # CONFIG_LOCALVERSION_AUTO is not set
         EOF

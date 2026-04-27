@@ -14,7 +14,7 @@ runs:
     - name: Apply Kernel Configuration
       shell: bash
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         # Mountify Support
         CONFIG_OVERLAY_FS=y
         CONFIG_TMPFS_XATTR=y
