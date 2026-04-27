@@ -227,6 +227,29 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         susfs_commit: ${{ inputs.susfs_commit }}
 
+    - name: Augment File Name with KSU Version
+      id: filename
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        KSU_TAG="${KSU_GIT_TAG:-}"
+        if [ -z "$KSU_TAG" ] && [ -n "${KSU_VERSION:-}" ]; then
+          KSU_TAG="$KSU_VERSION"
+        fi
+
+        BASE="${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}-${{ inputs.ksu_variant }}"
+
+        if [ -n "$KSU_TAG" ]; then
+          FILE_NAME="${BASE}-${KSU_TAG}-${{ inputs.variant }}"
+        else
+          FILE_NAME="${BASE}-${{ inputs.variant }}"
+        fi
+
+        echo "Composed FILE_NAME=$FILE_NAME"
+        echo "FILE_NAME=$FILE_NAME" >> "$GITHUB_ENV"
+        echo "file_name=$FILE_NAME" >> "$GITHUB_OUTPUT"
+
     - name: Baseband Guard
       if: contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'FULL'
       uses: ./.github/actions/bbg
@@ -298,7 +321,7 @@ jobs:
       if: ${{ always() && inputs.variant == 'Normal' }}
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.extract.outputs.file_name }}-Rejects
+        name: ${{ steps.filename.outputs.file_name }}-Rejects
         path: patch-rejects/
         if-no-files-found: ignore
         compression-level: 9
@@ -319,21 +342,21 @@ jobs:
     - name: Upload Boot Image (boot.img)
       uses: actions/upload-artifact@v7
       with:
-        path: ${{ github.workspace }}/boot-artifacts/${{ steps.extract.outputs.file_name }}-boot.img
+        path: ${{ github.workspace }}/boot-artifacts/${{ steps.filename.outputs.file_name }}-boot.img
         if-no-files-found: error
         archive: false
 
     - name: Upload Boot Image (boot-gz.img)
       uses: actions/upload-artifact@v7
       with:
-        path: ${{ github.workspace }}/boot-artifacts/${{ steps.extract.outputs.file_name }}-boot-gz.img
+        path: ${{ github.workspace }}/boot-artifacts/${{ steps.filename.outputs.file_name }}-boot-gz.img
         if-no-files-found: error
         archive: false
 
     - name: Upload Boot Image (boot-lz4.img)
       uses: actions/upload-artifact@v7
       with:
-        path: ${{ github.workspace }}/boot-artifacts/${{ steps.extract.outputs.file_name }}-boot-lz4.img
+        path: ${{ github.workspace }}/boot-artifacts/${{ steps.filename.outputs.file_name }}-boot-lz4.img
         if-no-files-found: error
         archive: false
 
@@ -343,7 +366,7 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.extract.outputs.file_name }}-AK3
+        name: ${{ steps.filename.outputs.file_name }}-AK3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
         compression-level: 9
