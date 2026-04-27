@@ -43,7 +43,7 @@ runs:
         cd KernelSU/kernel
 
         COMMITS_COUNT=$(/usr/bin/git rev-list --count HEAD)
-        BASE_VERSION=10000
+        BASE_VERSION=30000
         KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
         sed -i "s/^KSU_VERSION_FALLBACK := 1$/KSU_VERSION_FALLBACK := ${KSU_VERSION}/" Kbuild
 
