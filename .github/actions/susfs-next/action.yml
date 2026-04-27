@@ -80,17 +80,8 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
       run: |
-        set -u
-        SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
-        PATCH_DIR="${{ github.workspace }}/kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}"
-
-        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
-        if [ -f "$ENABLE_PATCH" ]; then
-          cp "$ENABLE_PATCH" ./
-          patch -p1 < "$(basename "$ENABLE_PATCH")" || true
-        else
-          echo "No KernelSU-Next SUSFS enable patch found at $ENABLE_PATCH; skipping."
-        fi
+        cp ${{ github.workspace }}/kernel_patches/wild/ksun-8c1b4a9-susfs-v2.1.0-a14-6.1-45013457.patch ./
+        patch -p1 < ksun-8c1b4a9-susfs-v2.1.0-a14-6.1-45013457.patch
 
     - name: Apply Kernel SUSFS Patches
       shell: bash
@@ -162,40 +153,40 @@ runs:
         if [ "${{ inputs.sublevel }}" -le "117" ]; then
         sed '/size_t this_len = min_t(size_t, count, PAGE_SIZE);/r'<(cat <<'EOF'
         #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-                mnt = real_mount(file->f_path.mnt);
-                if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
-                    likely(susfs_is_current_proc_umounted()))
-                {
-                    struct path path;
-                    char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
-                    char *dpath;
-                    if (!pathname) {
-                        goto orig_flow;
-                    }
-                    dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
-                    if (!dpath) {
-                        goto out_kfree;
-                    }
-                    if (kern_path(dpath, 0, &path)) {
-                        goto out_kfree;
-                    }
-                    if (!path.dentry->d_inode) {
-                        goto out_path_put;
-                    }
-                    seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
-                            inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
-                            inotify_mark_user_mask(mark));
-                    show_mark_fhandle(m, path.dentry->d_inode);
-                    seq_putc(m, '\n');
-                    path_put(&path);
-                    kfree(pathname);
-                    iput(inode);
-                    return;
+        		mnt = real_mount(file->f_path.mnt);
+        		if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
+        			likely(susfs_is_current_proc_umounted()))
+        		{
+        			struct path path;
+        			char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
+        			char *dpath;
+        			if (!pathname) {
+        				goto orig_flow;
+        			}
+        			dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
+        			if (!dpath) {
+        				goto out_kfree;
+        			}
+        			if (kern_path(dpath, 0, &path)) {
+        				goto out_kfree;
+        			}
+        			if (!path.dentry->d_inode) {
+        				goto out_path_put;
+        			}
+        			seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
+        					inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
+        					inotify_mark_user_mask(mark));
+        			show_mark_fhandle(m, path.dentry->d_inode);
+        			seq_putc(m, '\n');
+        			path_put(&path);
+        			kfree(pathname);
+        			iput(inode);
+        			return;
         out_path_put:
-                    path_put(&path);
+        			path_put(&path);
         out_kfree:
-                    kfree(pathname);
-                }
+        			kfree(pathname);
+        		}
         orig_flow:
         #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
         EOF
