@@ -4,6 +4,20 @@ description: 'Builds the kernel with clang + ccache (ported from DusfffSSSSSSSS)
 runs:
   using: composite
   steps:
+    - name: Install Build Dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          ccache \
+          flex bison \
+          libelf-dev libssl-dev libncurses-dev zlib1g-dev \
+          liblz4-tool libxml2-utils \
+          rsync unzip dwarves bc dos2unix kmod libdw-dev elfutils
+        ccache --version | head -n1
+
     - name: Setup Greenforce Clang and Env
       shell: bash
       run: |
