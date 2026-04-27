@@ -6,7 +6,7 @@ inputs:
     required: false
     default: ""
   ksu_variant:
-    description: "KernelSU Variant (Next, KSU, MKSU, KowXU, ReSukiSU, WKSU)"
+    description: "KernelSU Variant (Next, KSU, MKSU, KowSU, ReSukiSU, WKSU)"
     required: false
     default: "Next"
 outputs:
@@ -67,7 +67,7 @@ runs:
             KSU_REPO="https://github.com/5ec1cff/KernelSU.git"
             KSU_DEFAULT_BRANCH="main"
             ;;
-          KowXU)
+          KowSU)
             KSU_REPO="https://github.com/KOWX712/KernelSU.git"
             KSU_DEFAULT_BRANCH="master"
             ;;
@@ -113,7 +113,7 @@ runs:
         echo "ksu_tag=$KSU_TAG" >> $GITHUB_OUTPUT
 
         # AnyKernel3
-        AK3_COMMIT=$(get_commit "https://github.com/WildKernels/AnyKernel3.git" "refs/heads/gki-2.0")
+        AK3_COMMIT=$(get_commit "https://github.com/TheFloresto/AnyKernel3.git" "refs/heads/gki-2.0")
         echo "AnyKernel3: $AK3_COMMIT"
         echo "anykernel_commit=$AK3_COMMIT" >> $GITHUB_OUTPUT
 

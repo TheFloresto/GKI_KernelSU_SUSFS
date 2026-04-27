@@ -103,6 +103,34 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
 
+    - name: Apply Remote Patches (CLIDR Fix)
+      if: true
+      working-directory: ${{ github.workspace }}/kernel/common
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Patching libbpf.c type casting..."
+        if [ -f "tools/lib/bpf/libbpf.c" ]; then
+          sed -i 's/next_path = strchr(s, '"'"':'"'"');/next_path = (char *)strchr(s, '"'"':'"'"');/' tools/lib/bpf/libbpf.c
+          echo "libbpf.c patched"
+        else
+          echo "libbpf.c not found, skipping"
+        fi
+
+        echo "Applying fix-clidr-uninitialized.patch"
+        if curl -LSs "https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch" \
+          -o /tmp/fix-clidr.patch; then
+          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
+            patch -p1 --forward < /tmp/fix-clidr.patch
+            echo "Patch applied successfully"
+          else
+            echo "Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "Failed to download remote patch, continuing anyway"
+        fi
+
     - name: Setup KernelSU-Next
       if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'Next'
       uses: ./.github/actions/next
@@ -121,9 +149,9 @@ jobs:
       with:
         ksu_commit: ${{ inputs.ksu_commit }}
 
-    - name: Setup KowXU
-      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KowXU'
-      uses: ./.github/actions/kowxu
+    - name: Setup KowSU
+      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KowSU'
+      uses: ./.github/actions/kowsu
       with:
         ksu_commit: ${{ inputs.ksu_commit }}
 
@@ -169,9 +197,9 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         susfs_commit: ${{ inputs.susfs_commit }}
 
-    - name: SUSFS (KowXU)
-      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KowXU'
-      uses: ./.github/actions/susfs-kowxu
+    - name: SUSFS (KowSU)
+      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KowSU'
+      uses: ./.github/actions/susfs-kowsu
       with:
         android_version: ${{ steps.parse.outputs.android_version }}
         kernel_version: ${{ steps.parse.outputs.kernel_version }}

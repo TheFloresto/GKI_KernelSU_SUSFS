@@ -65,7 +65,7 @@ on:
           - Next
           - KSU
           - MKSU
-          - KowXU
+          - KowSU
           - ReSukiSU
           - WKSU
         default: Next
