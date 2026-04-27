@@ -9,6 +9,7 @@ runs:
         set -euo pipefail
 
         KERNEL_OUT_DIR="$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION"
+        COMMON_OUT_DIR="$GITHUB_WORKSPACE/kernel/common/out"
 
         if [ -f "$KERNEL_OUT_DIR/dist/Image" ]; then
           cp "$KERNEL_OUT_DIR/dist/Image" "$GITHUB_WORKSPACE/AnyKernel3/Image"
@@ -20,5 +21,10 @@ runs:
           exit 0
         fi
 
-        echo "Error: could not locate built kernel Image under $KERNEL_OUT_DIR"
+        if [ -f "$COMMON_OUT_DIR/arch/arm64/boot/Image" ]; then
+          cp "$COMMON_OUT_DIR/arch/arm64/boot/Image" "$GITHUB_WORKSPACE/AnyKernel3/Image"
+          exit 0
+        fi
+
+        echo "Error: could not locate built kernel Image under $KERNEL_OUT_DIR or $COMMON_OUT_DIR"
         exit 1
