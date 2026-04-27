@@ -1,0 +1,111 @@
+name: Setup SUSFS for KernelSU-Next
+description: Clone and apply SUSFS patches for KernelSU-Next
+inputs:
+  android_version:
+    description: 'Android version (e.g., android15)'
+    required: true
+  kernel_version:
+    description: 'Kernel version (e.g., 6.6)'
+    required: true
+  os_patch_level:
+    description: 'OS patch level (e.g., 2024-07)'
+    required: true
+  sublevel:
+    description: 'Kernel sublevel'
+    required: true
+  susfs_commit:
+    description: 'Commit map (branch:commit,branch:commit...)'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Setup SUSFS Branch
+      shell: bash
+      run: |
+        SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+        SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
+
+        echo "Preparing SUSFS for branch: $SUSFS_BRANCH"
+
+        COMMIT_MAP="${{ inputs.susfs_commit }}"
+        TARGET_COMMIT=""
+
+        if [ -n "$COMMIT_MAP" ]; then
+          IFS=',' read -ra ENTRIES <<< "$COMMIT_MAP"
+          for entry in "${ENTRIES[@]}"; do
+            IFS=':' read -r branch commit <<< "$entry"
+            if [ "$branch" == "$SUSFS_BRANCH" ]; then
+              TARGET_COMMIT="$commit"
+              break
+            fi
+          done
+        fi
+
+        if [ -n "$TARGET_COMMIT" ]; then
+          echo "Found specific commit for $SUSFS_BRANCH: $TARGET_COMMIT"
+          git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" susfs4ksu
+          cd susfs4ksu
+          git checkout "$TARGET_COMMIT"
+          cd ..
+        else
+          echo "No specific commit found for $SUSFS_BRANCH, cloning latest..."
+          git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" --depth=1 susfs4ksu
+        fi
+
+        SUSFS_VERSION="2.0.0"
+        echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
+
+    - name: Enable KernelSU SUSFS Config
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'FRAG'
+        CONFIG_KSU_SUSFS=y
+        CONFIG_KSU_SUSFS_SUS_PATH=y
+        CONFIG_KSU_SUSFS_SUS_MOUNT=y
+        CONFIG_KSU_SUSFS_SUS_KSTAT=y
+        CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+        CONFIG_KSU_SUSFS_ENABLE_LOG=y
+        CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+        CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+        CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+        CONFIG_KSU_SUSFS_SUS_MAP=y
+        FRAG
+
+    - name: Apply Base SUSFS Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
+        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
+        patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+
+    - name: Apply KernelSU-Next Enable Patch
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        ANDROID="${{ inputs.android_version }}"
+        KERNEL="${{ inputs.kernel_version }}"
+        SUBLEVEL="${{ inputs.sublevel }}"
+        SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
+        PATCH_DIR="${{ github.workspace }}/kernel_patches/next/susfs_fix_patches/v${SUSFS_VERSION}"
+
+        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
+        if [ -f "$ENABLE_PATCH" ]; then
+          patch -p1 < "$ENABLE_PATCH" || true
+        fi
+        # Next-specific extra patches
+        for extra_patch in fix_rej overwrite_hook_mode ksu_toolkit multi_manager; do
+          EXTRA_P="$PATCH_DIR/${extra_patch}.patch"
+          if [ -f "$EXTRA_P" ]; then
+            patch -p1 < "$EXTRA_P" || true
+          fi
+        done
+
+        # i_uid uid_into_mnt fix for android13-5.15 sublevel <= 41
+        if [[ "$ANDROID" == "android13" && "$KERNEL" == "5.15" && "$SUBLEVEL" -le 41 ]]; then
+          sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|fi->inode.i_uid.val|g' fs/susfs.c
+          sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|inode->i_uid.val|g' fs/susfs.c
+        fi

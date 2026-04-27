@@ -1,0 +1,44 @@
+name: Setup KowXU
+description: Download and configure KowXU (KOWX712/KernelSU)
+inputs:
+  ksu_commit:
+    description: "KSU Commit"
+    required: false
+    type: string
+
+runs:
+  using: composite
+  steps:
+    - name: Download KowXU
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s ${{ inputs.ksu_commit }}
+
+    - name: Enable KernelSU Config
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'FRAG'
+        CONFIG_KSU=y
+        CONFIG_KSU_DEBUG=n
+        CONFIG_KPROBES=y
+        CONFIG_HAVE_KPROBES=y
+        CONFIG_KPROBE_EVENTS=y
+        CONFIG_KALLSYMS=y
+        CONFIG_KALLSYMS_ALL=y
+        CONFIG_KSU_KPROBES_HOOK=n
+        CONFIG_KSU_LSM_SECURITY_HOOKS=y
+        FRAG
+
+    - name: Extract KSU Version Info
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/KernelSU
+      run: |
+        KSU_GIT_VERSION=$(git rev-list --count HEAD 2>/dev/null)
+        KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+        KSU_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
+        KSU_VERSION=$((10000 + KSU_GIT_VERSION))
+        echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> $GITHUB_ENV
+        echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
+        echo "KSU_COMMIT=$KSU_COMMIT" >> $GITHUB_ENV
