@@ -28,7 +28,12 @@ runs:
           if [ -n "$EXTRACTED" ]; then SUBLEVEL="$EXTRACTED"; fi
         fi
 
-        FILE_NAME="${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}-${{ inputs.ksu_variant }}-${{ inputs.variant }}"
+        BASE="${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}-${{ inputs.ksu_variant }}"
+        if [ -n "${KSU_VERSION:-}" ]; then
+          FILE_NAME="${BASE}-${KSU_VERSION}-${{ inputs.variant }}"
+        else
+          FILE_NAME="${BASE}-${{ inputs.variant }}"
+        fi
 
         echo "SUBLEVEL=$SUBLEVEL" >> "$GITHUB_ENV"
         echo "FILE_NAME=$FILE_NAME" >> "$GITHUB_ENV"

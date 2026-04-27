@@ -227,23 +227,12 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         susfs_commit: ${{ inputs.susfs_commit }}
 
-    - name: Augment File Name with KSU Version
+    - name: Recompose File Name with KSU Version
       id: filename
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        BASE="${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}-${{ inputs.ksu_variant }}"
-
-        if [ -n "${KSU_VERSION:-}" ]; then
-          FILE_NAME="${BASE}-${KSU_VERSION}-${{ inputs.variant }}"
-        else
-          FILE_NAME="${BASE}-${{ inputs.variant }}"
-        fi
-
-        echo "Composed FILE_NAME=$FILE_NAME"
-        echo "FILE_NAME=$FILE_NAME" >> "$GITHUB_ENV"
-        echo "file_name=$FILE_NAME" >> "$GITHUB_OUTPUT"
+      uses: ./.github/actions/extract-sublevel-file-name
+      with:
+        variant: ${{ inputs.variant }}
+        ksu_variant: ${{ inputs.ksu_variant }}
 
     - name: Baseband Guard
       if: contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'FULL'
