@@ -111,6 +111,24 @@ runs:
 
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
 
+        # Fallback: when patch hunk #1 (the susfs_def.h #include) rejects, inject it manually
+        # so that SUSFS_IS_INODE_SUS_MAP / SUSFS_IS_INODE_OPEN_REDIRECT macros resolve.
+        if [ -f fs/proc/base.c ] && ! grep -q '<linux/susfs_def.h>' fs/proc/base.c; then
+          echo "[susfs] injecting missing <linux/susfs_def.h> include into fs/proc/base.c"
+          ANCHOR="$(grep -nE '^#include <linux/dma-buf\.h>$' fs/proc/base.c | head -n1 | cut -d: -f1)"
+          if [ -z "$ANCHOR" ]; then
+            ANCHOR="$(grep -nE '^#include "internal\.h"$' fs/proc/base.c | head -n1 | cut -d: -f1)"
+          fi
+          if [ -n "$ANCHOR" ]; then
+            awk -v anchor="$ANCHOR" 'NR==anchor{print; print "#if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)"; print "#include <linux/susfs_def.h>"; print "#endif"; next} {print}' fs/proc/base.c > fs/proc/base.c.tmp
+            mv fs/proc/base.c.tmp fs/proc/base.c
+            echo "[susfs] inject done at line $ANCHOR"
+          else
+            echo "[susfs] WARNING: anchor for #include injection not found" >&2
+          fi
+        fi
+        rm -f fs/proc/base.c.rej fs/proc/base.c.orig
+
         if [ "$FIX_NAMESPACE" = "1" ]; then
           sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
         fi
