@@ -15,7 +15,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         # Add BBG to defconfig
-        echo "CONFIG_BBG=y" >> "${{ github.workspace }}/wild_gki.fragment"
+        echo "CONFIG_BBG=y" >> "${{ github.workspace }}/thefloresto.fragment"
         
         # Modify security Kconfig to include baseband_guard in LSM
         sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' common/security/Kconfig

@@ -37,7 +37,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         CONFIG_NETFILTER=y
         CONFIG_NETFILTER_ADVANCED=y
         CONFIG_NETFILTER_XTABLES=y
@@ -45,16 +45,16 @@ runs:
         EOF
 
         if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
-          echo "# CONFIG_NF_TABLES is not set" >> "${{ github.workspace }}/wild_gki.fragment"
+          echo "# CONFIG_NF_TABLES is not set" >> "${{ github.workspace }}/thefloresto.fragment"
         else
-          echo "CONFIG_NF_TABLES=y" >> "${{ github.workspace }}/wild_gki.fragment"
+          echo "CONFIG_NF_TABLES=y" >> "${{ github.workspace }}/thefloresto.fragment"
         fi
 
     - name: Apply IP Tables Extensions
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         CONFIG_IP_NF_TARGET_TTL=y
         CONFIG_IP6_NF_TARGET_HL=y
         CONFIG_IP6_NF_MATCH_HL=y
@@ -64,7 +64,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         CONFIG_IP_SET=y
         CONFIG_IP_SET_BITMAP_IP=y
         CONFIG_IP_SET_BITMAP_IPMAC=y
@@ -89,7 +89,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         CONFIG_TCP_CONG_ADVANCED=y
         CONFIG_TCP_CONG_BBR=y
         CONFIG_TCP_CONG_CUBIC=y

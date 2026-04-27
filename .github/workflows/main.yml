@@ -56,17 +56,30 @@ on:
           - All
           - Normal
           - Bypass
-          - Wild
+          - TheFloresto
         default: Normal
+      ksu_variant:
+        description: "KernelSU Variant"
+        type: choice
+        options:
+          - Next
+          - KSU
+          - MKSU
+          - KowXU
+          - ReSukiSU
+          - WKSU
+        default: Next
 
 jobs:
   fetch-commits:
     runs-on: ubuntu-latest
     outputs:
       ksu_commit: ${{ steps.fetch.outputs.ksu_commit }}
+      ksu_tag: ${{ steps.fetch.outputs.ksu_tag }}
       anykernel_commit: ${{ steps.fetch.outputs.anykernel_commit }}
       patches_commit: ${{ steps.fetch.outputs.patches_commit }}
       susfs_commit: ${{ steps.fetch.outputs.susfs_commit }}
+      bbg_commit: ${{ steps.fetch.outputs.bbg_commit }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -75,6 +88,7 @@ jobs:
         uses: ./.github/actions/fetch-commits
         with:
           ksu_commit: ${{ inputs.ksu_commit }}
+          ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
 
   build-a12-5-10:
     if: ${{ inputs.kernel_build_version == 'All' || inputs.kernel_build_version == 'a12-5-10' }}
@@ -88,6 +102,7 @@ jobs:
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       variant: ${{ inputs.variant || 'Normal' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
     secrets: inherit
 
   build-a13-5-10:
@@ -102,6 +117,7 @@ jobs:
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       variant: ${{ inputs.variant || 'Normal' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
     secrets: inherit
 
   build-a13-5-15:
@@ -116,6 +132,7 @@ jobs:
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       variant: ${{ inputs.variant || 'Normal' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
     secrets: inherit
 
   build-a14-5-15:
@@ -130,6 +147,7 @@ jobs:
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       variant: ${{ inputs.variant || 'Normal' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
     secrets: inherit
 
   build-a14-6-1:
@@ -144,6 +162,7 @@ jobs:
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       variant: ${{ inputs.variant || 'Normal' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
     secrets: inherit
 
   build-a15-6-6:
@@ -158,6 +177,7 @@ jobs:
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       variant: ${{ inputs.variant || 'Normal' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
     secrets: inherit
 
   build-a16-6-12:
@@ -172,6 +192,7 @@ jobs:
       susfs_commit: ${{ needs.fetch-commits.outputs.susfs_commit }}
       feature_set: ${{ inputs.feature_set || 'FULL' }}
       variant: ${{ inputs.variant || 'Normal' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
     secrets: inherit
 
   rej:
@@ -257,8 +278,9 @@ jobs:
     - build-a16-6-12
 
     env:
-      GH_TOKEN: ${{ github.token }}
-      RELEASE_NAME: "GKI Kernels With KernelSU-Next & SUSFS v2.1.0"
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      RELEASE_REPO: NerestKernels/GKI_KernelSU_SUSFS
+      RELEASE_NAME: "GKI Kernels With ${{ inputs.ksu_variant || 'Next' }} & SUSFS v2.1.0"
       RELEASE_BODY: ""
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
@@ -313,12 +335,16 @@ jobs:
 
     - name: Checkout code
       uses: actions/checkout@v5
+      with:
+        token: ${{ secrets.RELEASE_TOKEN || github.token }}
+        repository: NerestKernels/GKI_KernelSU_SUSFS
+        fetch-depth: 0
 
     - name: Generate New Tag
       id: tag
       if: inputs.release_type != 'Actions'
       run: |
-        LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
+        LATEST_TAG=$(gh api repos/${RELEASE_REPO}/tags --jq '.[0].name' 2>/dev/null || echo "v0.0.0")
         if [[ -z "$LATEST_TAG" || "$LATEST_TAG" == "null" ]]; then
           LATEST_TAG="v0.0.0"
         fi
@@ -342,6 +368,7 @@ jobs:
         set -e
 
         FEATURE_SET="${{ inputs.feature_set }}"
+        KSU_VARIANT="${{ inputs.ksu_variant || 'Next' }}"
         KSUN_COMMIT="${{ needs.fetch-commits.outputs.ksu_commit }}"
         KSUN_TAG="${{ needs.fetch-commits.outputs.ksu_tag }}"
         AK3_COMMIT="${{ needs.fetch-commits.outputs.anykernel_commit }}"
@@ -362,8 +389,9 @@ jobs:
           echo "| Component | Version/Setting |"
           echo "|---|---|"
           echo "| Feature Set | ${FEATURE_SET} |"
-          echo "| KernelSU-Next Commit | ${KSUN_COMMIT} |"
-          echo "| KernelSU-Next Tag | ${KSUN_TAG:-None} |"
+          echo "| KernelSU Variant | ${KSU_VARIANT} |"
+          echo "| KernelSU Commit | ${KSUN_COMMIT} |"
+          echo "| KernelSU Tag | ${KSUN_TAG:-None} |"
           echo "| SUSFS Version | ${SUSFS_VERSION} |"
           echo "| AnyKernel3 Commit | ${AK3_COMMIT} |"
           echo "| Kernel Patches Commit | ${PATCHES_COMMIT} |"
@@ -495,8 +523,10 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
+        repository: NerestKernels/GKI_KernelSU_SUSFS
+        token: ${{ secrets.RELEASE_TOKEN || github.token }}
         tag_name: ${{ steps.tag.outputs.new_tag }}
-        name: ${{ steps.tag.outputs.new_tag }}
+        name: ${{ env.RELEASE_NAME }} (${{ steps.tag.outputs.new_tag }})
         body_path: release_body.md
         draft: false
         prerelease: ${{ inputs.release_type == 'Pre-Release' }}

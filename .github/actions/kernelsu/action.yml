@@ -55,7 +55,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         # KernelSU Configuration
         CONFIG_KSU=y
         EOF

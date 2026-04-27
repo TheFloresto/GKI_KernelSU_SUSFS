@@ -27,10 +27,14 @@ on:
       feature_set:
         required: true
         type: string
+      ksu_variant:
+        required: false
+        type: string
+        default: Next
 
 jobs:
   build-gki:
-    name: "${{ inputs.kernel_version }} (${{ inputs.variant }})"
+    name: "${{ inputs.kernel_version }} (${{ inputs.variant }}, ${{ inputs.ksu_variant }})"
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -88,7 +92,8 @@ jobs:
       id: extract
       uses: ./.github/actions/extract-sublevel-file-name
       with:
-        variant: ${{ matrix.variant }}
+        variant: ${{ inputs.variant }}
+        ksu_variant: ${{ inputs.ksu_variant }}
 
     - name: Kernel Fixes
       uses: ./.github/actions/kernel-fixes
@@ -99,14 +104,94 @@ jobs:
         os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
 
     - name: Setup KernelSU-Next
-      if: contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL'
-      uses: ./.github/actions/kernelsu
+      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'Next'
+      uses: ./.github/actions/next
       with:
         ksu_commit: ${{ inputs.ksu_commit }}
 
-    - name: SUSFS
-      if: contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL'
-      uses: ./.github/actions/susfs
+    - name: Setup KernelSU (tiann)
+      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KSU'
+      uses: ./.github/actions/ksu
+      with:
+        ksu_commit: ${{ inputs.ksu_commit }}
+
+    - name: Setup MKSU
+      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'MKSU'
+      uses: ./.github/actions/mksu
+      with:
+        ksu_commit: ${{ inputs.ksu_commit }}
+
+    - name: Setup KowXU
+      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KowXU'
+      uses: ./.github/actions/kowxu
+      with:
+        ksu_commit: ${{ inputs.ksu_commit }}
+
+    - name: Setup ReSukiSU
+      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'ReSukiSU'
+      uses: ./.github/actions/resukisu
+      with:
+        ksu_commit: ${{ inputs.ksu_commit }}
+
+    - name: Setup Wild KSU (WKSU)
+      if: (contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'WKSU'
+      uses: ./.github/actions/wksu
+      with:
+        ksu_commit: ${{ inputs.ksu_commit }}
+
+    - name: SUSFS (KernelSU-Next)
+      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'Next'
+      uses: ./.github/actions/susfs-next
+      with:
+        android_version: ${{ steps.parse.outputs.android_version }}
+        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
+        susfs_commit: ${{ inputs.susfs_commit }}
+
+    - name: SUSFS (KSU tiann)
+      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KSU'
+      uses: ./.github/actions/susfs-ksu
+      with:
+        android_version: ${{ steps.parse.outputs.android_version }}
+        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
+        susfs_commit: ${{ inputs.susfs_commit }}
+
+    - name: SUSFS (MKSU)
+      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'MKSU'
+      uses: ./.github/actions/susfs-mksu
+      with:
+        android_version: ${{ steps.parse.outputs.android_version }}
+        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
+        susfs_commit: ${{ inputs.susfs_commit }}
+
+    - name: SUSFS (KowXU)
+      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'KowXU'
+      uses: ./.github/actions/susfs-kowxu
+      with:
+        android_version: ${{ steps.parse.outputs.android_version }}
+        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
+        susfs_commit: ${{ inputs.susfs_commit }}
+
+    - name: SUSFS (ReSukiSU)
+      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'ReSukiSU'
+      uses: ./.github/actions/susfs-resukisu
+      with:
+        android_version: ${{ steps.parse.outputs.android_version }}
+        kernel_version: ${{ steps.parse.outputs.kernel_version }}
+        os_patch_level: ${{ steps.parse.outputs.os_patch_level }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
+        susfs_commit: ${{ inputs.susfs_commit }}
+
+    - name: SUSFS (WKSU)
+      if: (contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL') && inputs.ksu_variant == 'WKSU'
+      uses: ./.github/actions/susfs-wksu
       with:
         android_version: ${{ steps.parse.outputs.android_version }}
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
@@ -132,7 +217,7 @@ jobs:
         android_version: ${{ steps.parse.outputs.android_version }}
 
     - name: Apply Module Check Bypass
-      if: ${{ matrix.variant == 'Bypass' }}
+      if: ${{ inputs.variant == 'Bypass' }}
       uses: ./.github/actions/module-check-bypass
       with:
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
@@ -165,7 +250,7 @@ jobs:
     - name: Apply Kernel Branding
       uses: ./.github/actions/apply-kernel-branding
       with:
-        variant: ${{ matrix.variant }}
+        variant: ${{ inputs.variant }}
         kernel_version: ${{ steps.parse.outputs.kernel_version }}
         android_version: ${{ steps.parse.outputs.android_version }}
         sublevel: ${{ steps.extract.outputs.sublevel }}
@@ -178,11 +263,11 @@ jobs:
 
     - name: Scan and collect patch rejects
       id: scan
-      if: ${{ always() && matrix.variant == 'Normal' }}
+      if: ${{ always() && inputs.variant == 'Normal' }}
       uses: ./.github/actions/scan-patch-rejects
 
     - name: Upload Rejects
-      if: ${{ always() && matrix.variant == 'Normal' }}
+      if: ${{ always() && inputs.variant == 'Normal' }}
       uses: actions/upload-artifact@v7
       with:
         name: ${{ steps.extract.outputs.file_name }}-Rejects

@@ -1,5 +1,5 @@
 name: 'Build Kernel'
-description: 'Builds kernel using legacy build.sh or Bazel (kleaf)'
+description: 'Builds kernel using the clang-based toolchain (build.sh or make with LLVM)'
 
 runs:
   using: composite
@@ -8,9 +8,30 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
+
+        FRAGMENT="$GITHUB_WORKSPACE/thefloresto.fragment"
+
         if [ -f "build/build.sh" ]; then
-          SKIP_MRPROPER=1 GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/wild_gki.fragment" BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
+          SKIP_MRPROPER=1 \
+            GKI_DEFCONFIG_FRAGMENT="$FRAGMENT" \
+            BUILD_CONFIG=common/build.config.gki.aarch64 \
+            LLVM=1 LLVM_IAS=1 \
+            build/build.sh
         else
-          cp "$GITHUB_WORKSPACE/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
-          tools/bazel build --config=release --stamp --notrim --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment //common:kernel_aarch64_dist
+          OUT_DIR="out/${ANDROID_VERSION}-${KERNEL_VERSION}"
+          mkdir -p "$OUT_DIR"
+
+          cp -f "$FRAGMENT" "common/arch/arm64/configs/thefloresto.fragment"
+          KCONFIG_CONFIG="$OUT_DIR/.config" \
+            scripts/kconfig/merge_config.sh -O "$OUT_DIR" \
+              common/arch/arm64/configs/gki_defconfig \
+              common/arch/arm64/configs/thefloresto.fragment
+
+          make -C common \
+            O="$GITHUB_WORKSPACE/kernel/$OUT_DIR" \
+            ARCH=arm64 \
+            LLVM=1 LLVM_IAS=1 \
+            CC=clang LD=ld.lld \
+            -j"$(nproc)" \
+            Image Image.lz4
         fi

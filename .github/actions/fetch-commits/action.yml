@@ -1,16 +1,20 @@
 name: Fetch Latest Commits
-description: "Fetches the latest commit hashes for KernelSU-Next, AnyKernel3, Kernel Patches, SUSFS, and BBG"
+description: "Fetches the latest commit hashes for the selected KernelSU variant, AnyKernel3, Kernel Patches, SUSFS, and BBG"
 inputs:
   ksu_commit:
-    description: "Optional: Specific KernelSU-Next ref/commit to use"
+    description: "Optional: Specific KernelSU ref/commit to use"
     required: false
     default: ""
+  ksu_variant:
+    description: "KernelSU Variant (Next, KSU, MKSU, KowXU, ReSukiSU, WKSU)"
+    required: false
+    default: "Next"
 outputs:
   ksu_commit:
-    description: "KernelSU-Next Commit"
+    description: "Resolved KSU Commit"
     value: ${{ steps.commits.outputs.ksu_commit }}
   ksu_tag:
-    description: "KernelSU-Next Tag (best effort)"
+    description: "KSU Tag (best effort)"
     value: ${{ steps.commits.outputs.ksu_tag }}
   anykernel_commit:
     description: "AnyKernel3 Commit"
@@ -32,11 +36,12 @@ runs:
       id: commits
       shell: bash
       run: |
-        # Helper to get latest commit from remote without cloning full repo
+        set -euo pipefail
+
         get_commit() {
           git ls-remote "$1" "$2" | awk '{print $1}'
         }
-        
+
         get_tag_for_commit() {
           repo="$1"
           commit="$2"
@@ -46,53 +51,81 @@ runs:
             | tail -n 1
         }
 
-        echo "Fetching latest commits..."
-        
-        # KernelSU-Next
+        VARIANT="${{ inputs.ksu_variant }}"
+        [ -z "$VARIANT" ] && VARIANT="Next"
+
+        case "$VARIANT" in
+          Next)
+            KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git"
+            KSU_DEFAULT_BRANCH="dev"
+            ;;
+          KSU)
+            KSU_REPO="https://github.com/tiann/KernelSU.git"
+            KSU_DEFAULT_BRANCH="main"
+            ;;
+          MKSU)
+            KSU_REPO="https://github.com/5ec1cff/KernelSU.git"
+            KSU_DEFAULT_BRANCH="main"
+            ;;
+          KowXU)
+            KSU_REPO="https://github.com/KOWX712/KernelSU.git"
+            KSU_DEFAULT_BRANCH="master"
+            ;;
+          ReSukiSU)
+            KSU_REPO="https://github.com/ShirkNeko/SukiSU-Ultra.git"
+            KSU_DEFAULT_BRANCH="main"
+            ;;
+          WKSU)
+            KSU_REPO="https://github.com/WildKernels/Wild_KSU.git"
+            KSU_DEFAULT_BRANCH="stable"
+            ;;
+          *)
+            echo "Unknown ksu_variant: $VARIANT"
+            exit 1
+            ;;
+        esac
+
+        echo "KSU variant: $VARIANT (repo=$KSU_REPO, default=$KSU_DEFAULT_BRANCH)"
+
         if [ -n "${{ inputs.ksu_commit }}" ]; then
           input_ref="${{ inputs.ksu_commit }}"
-          resolved_commit="$(get_commit "https://github.com/KernelSU-Next/KernelSU-Next.git" "$input_ref")"
+          resolved_commit="$(get_commit "$KSU_REPO" "$input_ref")"
           if [ -z "$resolved_commit" ]; then
-            resolved_commit="$(get_commit "https://github.com/KernelSU-Next/KernelSU-Next.git" "refs/heads/$input_ref")"
+            resolved_commit="$(get_commit "$KSU_REPO" "refs/heads/$input_ref")"
           fi
           if [ -z "$resolved_commit" ]; then
-            resolved_commit="$(get_commit "https://github.com/KernelSU-Next/KernelSU-Next.git" "refs/tags/$input_ref")"
+            resolved_commit="$(get_commit "$KSU_REPO" "refs/tags/$input_ref")"
           fi
-          
           if [ -n "$resolved_commit" ]; then
             ksu_commit="$resolved_commit"
           else
-            # If resolution failed, assume input is a commit SHA
             ksu_commit="$input_ref"
           fi
-          echo "Using provided KernelSU-Next commit: $ksu_commit"
+          echo "Using provided KSU commit: $ksu_commit"
         else
-          ksu_commit=$(get_commit "https://github.com/KernelSU-Next/KernelSU-Next.git" "refs/heads/dev")
-          echo "KernelSU-Next: $ksu_commit"
+          ksu_commit=$(get_commit "$KSU_REPO" "refs/heads/$KSU_DEFAULT_BRANCH")
+          echo "KSU ($VARIANT): $ksu_commit"
         fi
         echo "ksu_commit=$ksu_commit" >> $GITHUB_OUTPUT
-        
-        KSUN_TAG="$(get_tag_for_commit "https://github.com/KernelSU-Next/KernelSU-Next.git" "$ksu_commit")"
-        echo "KernelSU-Next Tag: ${KSUN_TAG:-None}"
-        echo "ksu_tag=$KSUN_TAG" >> $GITHUB_OUTPUT
-        
+
+        KSU_TAG="$(get_tag_for_commit "$KSU_REPO" "$ksu_commit")"
+        echo "KSU Tag: ${KSU_TAG:-None}"
+        echo "ksu_tag=$KSU_TAG" >> $GITHUB_OUTPUT
+
         # AnyKernel3
         AK3_COMMIT=$(get_commit "https://github.com/WildKernels/AnyKernel3.git" "refs/heads/gki-2.0")
         echo "AnyKernel3: $AK3_COMMIT"
         echo "anykernel_commit=$AK3_COMMIT" >> $GITHUB_OUTPUT
-        
+
         # Kernel Patches
         PATCHES_COMMIT=$(get_commit "https://github.com/WildKernels/kernel_patches.git" "HEAD")
         echo "Kernel Patches: $PATCHES_COMMIT"
         echo "patches_commit=$PATCHES_COMMIT" >> $GITHUB_OUTPUT
-        
+
         # SUSFS (using gitlab) - Fetch all relevant branches
         SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
         echo "Fetching SUSFS commits for all branches..."
-        
-        # We need to construct a JSON object or a simple string map
-        # Format: branch1:commit1,branch2:commit2,...
-        
+
         BRANCHES=(
           "gki-android12-5.10"
           "gki-android13-5.10"
@@ -102,7 +135,7 @@ runs:
           "gki-android15-6.6"
           "gki-android16-6.12"
         )
-        
+
         SUSFS_MAP=""
         for branch in "${BRANCHES[@]}"; do
           COMMIT=$(get_commit "$SUSFS_REPO" "refs/heads/$branch")
@@ -117,9 +150,9 @@ runs:
              echo "  $branch: Not found"
           fi
         done
-        
+
         echo "susfs_commit=$SUSFS_MAP" >> $GITHUB_OUTPUT
-        
+
         # BBG
         BBG_COMMIT=$(get_commit "https://github.com/vc-teahouse/Baseband-guard.git" "refs/heads/main")
         echo "BBG: $BBG_COMMIT"
