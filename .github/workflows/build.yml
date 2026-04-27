@@ -233,9 +233,9 @@ jobs:
       run: |
         set -euo pipefail
 
-        KSU_TAG="${KSU_GIT_TAG:-}"
-        if [ -z "$KSU_TAG" ] && [ -n "${KSU_VERSION:-}" ]; then
-          KSU_TAG="$KSU_VERSION"
+        KSU_TAG="${KSU_VERSION:-}"
+        if [ -z "$KSU_TAG" ] && [ -n "${KSU_GIT_TAG:-}" ]; then
+          KSU_TAG="$KSU_GIT_TAG"
         fi
 
         BASE="${KERNEL_VERSION}.${SUBLEVEL}-${ANDROID_VERSION}-${OS_PATCH_LEVEL}-${{ inputs.ksu_variant }}"
