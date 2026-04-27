@@ -13,14 +13,18 @@ runs:
         mkdir -p boot-artifacts
 
         KERNEL_OUT_DIR="$GITHUB_WORKSPACE/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION"
+        COMMON_OUT_DIR="$GITHUB_WORKSPACE/kernel/common/out"
 
         if [ -f "$KERNEL_OUT_DIR/dist/Image" ]; then
           SRC_DIR="$KERNEL_OUT_DIR/dist"
         elif [ -f "$KERNEL_OUT_DIR/arch/arm64/boot/Image" ]; then
           SRC_DIR="$KERNEL_OUT_DIR/arch/arm64/boot"
+        elif [ -f "$COMMON_OUT_DIR/arch/arm64/boot/Image" ]; then
+          SRC_DIR="$COMMON_OUT_DIR/arch/arm64/boot"
         else
-          echo "Error: could not locate built kernel Image under $KERNEL_OUT_DIR"
+          echo "Error: could not locate built kernel Image under $KERNEL_OUT_DIR or $COMMON_OUT_DIR"
           ls -la "$KERNEL_OUT_DIR" 2>/dev/null || true
+          ls -la "$COMMON_OUT_DIR" 2>/dev/null || true
           exit 1
         fi
 
