@@ -1,27 +1,27 @@
-name: Setup Wild KSU
-description: Download and configure Wild KSU with version tracking
+name: Setup KowSU (KOWX712/KernelSU)
+description: Download and configure KowSU (KOWX712/KernelSU) with ref/tag/commit resolution and version tracking
 inputs:
   ksu_commit:
-    description: "KernelSU-Next ref/commit (optional, defaults to dev)"
+    description: "KernelSU commit, branch, or tag (optional). Defaults to 'master'."
     required: false
-    default: ""
+    type: string
 
 runs:
   using: composite
   steps:
-    - name: Download Wild KSU
+    - name: Download KowSU (KOWX712/KernelSU)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
 
         TARGET_REF="${{ inputs.ksu_commit }}"
-        if [ -z "$TARGET_REF" ]; then TARGET_REF="dev"; fi
+        if [ -z "$TARGET_REF" ]; then TARGET_REF="master"; fi
 
-        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+        curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/master/kernel/setup.sh" | bash -s master
 
-        if [ "$TARGET_REF" != "dev" ]; then
-          cd KernelSU-Next
+        if [ "$TARGET_REF" != "master" ]; then
+          cd KernelSU
           if git rev-parse --is-shallow-repository >/dev/null 2>&1 && git rev-parse --is-shallow-repository | grep -q true; then
             git fetch --unshallow --tags --prune || true
           fi
@@ -34,43 +34,47 @@ runs:
           elif git checkout "refs/tags/$TARGET_REF" 2>/dev/null; then
             :
           else
-            echo "Error: could not checkout KernelSU-Next ref/commit/tag: $TARGET_REF"
+            echo "Error: could not checkout KowSU (KOWX712/KernelSU) ref/commit/tag: $TARGET_REF"
             exit 1
           fi
           cd "$GITHUB_WORKSPACE/kernel"
         fi
-        
-        cd KernelSU-Next/kernel
-        
+
+        cd KernelSU/kernel
+
         COMMITS_COUNT=$(/usr/bin/git rev-list --count HEAD)
-        BASE_VERSION=30000
+        BASE_VERSION=10000
         KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
         sed -i "s/^KSU_VERSION_FALLBACK := 1$/KSU_VERSION_FALLBACK := ${KSU_VERSION}/" Kbuild
 
         KSU_GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.1")"
         sed -i "s/^KSU_VERSION_TAG_FALLBACK := v0.0.1$/KSU_VERSION_TAG_FALLBACK := ${KSU_GIT_TAG}/" Kbuild
 
-
     - name: Enable KernelSU Config
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
-        # KernelSU Configuration
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'FRAG'
         CONFIG_KSU=y
-        EOF
-    
+        CONFIG_KSU_DEBUG=n
+        CONFIG_KPROBES=y
+        CONFIG_HAVE_KPROBES=y
+        CONFIG_KPROBE_EVENTS=y
+        CONFIG_KALLSYMS=y
+        CONFIG_KALLSYMS_ALL=y
+        CONFIG_KSU_KPROBES_HOOK=n
+        CONFIG_KSU_LSM_SECURITY_HOOKS=y
+        FRAG
+
     - name: Extract KSU Version Info
-      id: ksu-version
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
+      working-directory: ${{ github.workspace }}/kernel/KernelSU
       run: |
-        # Extract and export KSU version info
         KSU_GIT_VERSION=$(git rev-list --count HEAD 2>/dev/null)
         KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
         KSU_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
-        KSU_VERSION=$((30000 + KSU_GIT_VERSION))
-        
-        echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> $GITHUB_ENV
-        echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
-        echo "KSU_COMMIT=$KSU_COMMIT" >> $GITHUB_ENV
+        KSU_VERSION=$((10000 + KSU_GIT_VERSION))
+        echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
+        echo "KSU_VERSION=$KSU_VERSION" >> "$GITHUB_ENV"
+        echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
+        echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"

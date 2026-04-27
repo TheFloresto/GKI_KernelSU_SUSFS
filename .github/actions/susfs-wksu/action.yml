@@ -1,5 +1,5 @@
-name: Setup SUSFS
-description: Clone and apply SUSFS patches with version-specific fixes
+name: Setup SUSFS for Wild KSU
+description: Clone and apply SUSFS patches for Wild KSU with version-specific fixes
 inputs:
   android_version:
     description: 'Android version (e.g., android15)'
@@ -25,18 +25,15 @@ runs:
       run: |
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-        
+
         echo "Preparing SUSFS for branch: $SUSFS_BRANCH"
-        
-        # Parse commit map to find the commit for this branch
+
         COMMIT_MAP="${{ inputs.susfs_commit }}"
         TARGET_COMMIT=""
-        
+
         if [ -n "$COMMIT_MAP" ]; then
-          # Split by comma
           IFS=',' read -ra ENTRIES <<< "$COMMIT_MAP"
           for entry in "${ENTRIES[@]}"; do
-            # Split by colon
             IFS=':' read -r branch commit <<< "$entry"
             if [ "$branch" == "$SUSFS_BRANCH" ]; then
               TARGET_COMMIT="$commit"
@@ -44,7 +41,7 @@ runs:
             fi
           done
         fi
-        
+
         if [ -n "$TARGET_COMMIT" ]; then
           echo "Found specific commit for $SUSFS_BRANCH: $TARGET_COMMIT"
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" susfs4ksu
@@ -55,9 +52,11 @@ runs:
           echo "No specific commit found for $SUSFS_BRANCH, cloning latest..."
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" --depth=1 susfs4ksu
         fi
-        
-        SUSFS_VERSION="2.0.0"
-        echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
+
+        SUSFS_VERSION="2.1.0"
+        echo "SUSFS_VERSION=$SUSFS_VERSION" >> "$GITHUB_ENV"
+        echo "SUSFS_BRANCH=$SUSFS_BRANCH" >> "$GITHUB_ENV"
+        echo "SUSFS_COMMIT=$TARGET_COMMIT" >> "$GITHUB_ENV"
 
     - name: Enable KernelSU SUSFS Config
       shell: bash
@@ -76,8 +75,24 @@ runs:
         CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
         CONFIG_KSU_SUSFS_SUS_MAP=y
         EOF
-    
-    - name: Apply Base SUSFS Patches
+
+    - name: Apply KSU SUSFS Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/Wild_KSU
+      run: |
+        set -u
+        SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
+        PATCH_DIR="${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}"
+
+        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
+        if [ -f "$ENABLE_PATCH" ]; then
+          cp "$ENABLE_PATCH" ./
+          patch -p1 < "$(basename "$ENABLE_PATCH")" || true
+        else
+          echo "No Wild KSU SUSFS enable patch found at $ENABLE_PATCH; skipping."
+        fi
+
+    - name: Apply Kernel SUSFS Patches
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
@@ -85,24 +100,104 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./
+
+        FIX_NAMESPACE=0
+        if [ "${{ inputs.kernel_version }}" = "6.1" ]; then
+          if grep -q '^#include <trace/hooks/blk.h>$' fs/namespace.c; then
+            sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
+            FIX_NAMESPACE=1
+          fi
+        fi
+
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
-    - name: Apply WKSU Enable Patch
+
+        if [ "$FIX_NAMESPACE" = "1" ]; then
+          sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
+        fi
+
+        SHOULD_FIX=0
+        if [[ "${{ inputs.android_version }}" = "android12" && "${{ inputs.kernel_version }}" = "5.10" && "${{ inputs.sublevel }}" -le 209 ]]; then
+          SHOULD_FIX=1
+        elif [[ "${{ inputs.android_version }}" = "android13" && "${{ inputs.kernel_version }}" = "5.10" && "${{ inputs.sublevel }}" -le 209 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
+          SHOULD_FIX=1
+        elif [[ "${{ inputs.android_version }}" = "android13" && "${{ inputs.kernel_version }}" = "5.15" && "${{ inputs.sublevel }}" -le 148 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
+          SHOULD_FIX=1
+        elif [[ "${{ inputs.android_version }}" = "android14" && "${{ inputs.kernel_version }}" = "5.15" && "${{ inputs.sublevel }}" -le 148 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
+          SHOULD_FIX=1
+        elif [[ "${{ inputs.android_version }}" = "android14" && "${{ inputs.kernel_version }}" = "6.1" ]]; then
+          SHOULD_FIX=1
+        fi
+
+        if [[ "$SHOULD_FIX" = "1" ]]; then
+          sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
+        fi
+
+    - name: Apply Android 12 5.10 Fixes
+      if: inputs.android_version == 'android12' && inputs.kernel_version == '5.10'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        ANDROID="${{ inputs.android_version }}"
-        KERNEL="${{ inputs.kernel_version }}"
-        SUBLEVEL="${{ inputs.sublevel }}"
-        SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
-        PATCH_DIR="${{ github.workspace }}/kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}"
-
-        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
-        if [ -f "$ENABLE_PATCH" ]; then
-          patch -p1 < "$ENABLE_PATCH" || true
+        if [ "${{ inputs.sublevel }}" -le "43" ]; then
+        sed '/size_t this_len = min_t(size_t, count, PAGE_SIZE);/r'<(cat <<'EOF'
+        #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+            vma = find_vma(mm, addr);
+            if (vma && vma->vm_file) {
+                struct inode *inode = file_inode(vma->vm_file);
+                if (SUSFS_IS_INODE_SUS_MAP(inode)) {
+                    if (write) {
+                        copied = -EFAULT;
+                    } else {
+                        copied = -EIO;
+                    }
+                    *ppos = addr;
+                    mmput(mm);
+                    goto free;
+                }
+            }
+        #endif
+        EOF
+        ) fs/proc/base.c
         fi
 
-        # i_uid fix for android13-5.15 sublevel <= 41
-        if [[ "$ANDROID" == "android13" && "$KERNEL" == "5.15" && "$SUBLEVEL" -le 41 ]]; then
-          sed -i 's|i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val|fi->inode.i_uid.val|g' fs/susfs.c
-          sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|inode->i_uid.val|g' fs/susfs.c
+        if [ "${{ inputs.sublevel }}" -le "117" ]; then
+        sed '/size_t this_len = min_t(size_t, count, PAGE_SIZE);/r'<(cat <<'EOF'
+        #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+                mnt = real_mount(file->f_path.mnt);
+                if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
+                    likely(susfs_is_current_proc_umounted()))
+                {
+                    struct path path;
+                    char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
+                    char *dpath;
+                    if (!pathname) {
+                        goto orig_flow;
+                    }
+                    dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
+                    if (!dpath) {
+                        goto out_kfree;
+                    }
+                    if (kern_path(dpath, 0, &path)) {
+                        goto out_kfree;
+                    }
+                    if (!path.dentry->d_inode) {
+                        goto out_path_put;
+                    }
+                    seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
+                            inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
+                            inotify_mark_user_mask(mark));
+                    show_mark_fhandle(m, path.dentry->d_inode);
+                    seq_putc(m, '\n');
+                    path_put(&path);
+                    kfree(pathname);
+                    iput(inode);
+                    return;
+        out_path_put:
+                    path_put(&path);
+        out_kfree:
+                    kfree(pathname);
+                }
+        orig_flow:
+        #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+        EOF
+        ) fs/notify/fdinfo.c
         fi

@@ -32,7 +32,7 @@ on:
         required: false
         type: string
       ksu_variant:
-        description: "KernelSU Variant (Next, KSU, MKSU, KowXU, ReSukiSU, WKSU)"
+        description: "KernelSU Variant (Next, KSU, MKSU, KowSU, ReSukiSU, WKSU)"
         required: false
         type: string
         default: Next

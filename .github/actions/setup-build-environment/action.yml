@@ -31,12 +31,12 @@ runs:
 
         if [ -n "${{ inputs.anykernel_commit }}" ]; then
           if [ -d "$GITHUB_WORKSPACE/AnyKernel3" ]; then rm -rf "$GITHUB_WORKSPACE/AnyKernel3"; fi
-          git clone https://github.com/WildKernels/AnyKernel3.git "$GITHUB_WORKSPACE/AnyKernel3"
+          git clone https://github.com/TheFloresto/AnyKernel3.git "$GITHUB_WORKSPACE/AnyKernel3"
           cd "$GITHUB_WORKSPACE/AnyKernel3"
           git checkout "${{ inputs.anykernel_commit }}"
           cd "$GITHUB_WORKSPACE"
         elif [ ! -d "$GITHUB_WORKSPACE/AnyKernel3" ]; then
-          git clone https://github.com/WildKernels/AnyKernel3.git -b gki-2.0 "$GITHUB_WORKSPACE/AnyKernel3"
+          git clone https://github.com/TheFloresto/AnyKernel3.git -b gki-2.0 "$GITHUB_WORKSPACE/AnyKernel3"
         fi
 
         AOSP_MIRROR=https://android.googlesource.com

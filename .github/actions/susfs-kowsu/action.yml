@@ -1,5 +1,5 @@
-name: Setup SUSFS
-description: Clone and apply SUSFS patches with version-specific fixes
+name: Setup SUSFS for KowSU
+description: Clone and apply SUSFS patches for KowSU with version-specific fixes
 inputs:
   android_version:
     description: 'Android version (e.g., android15)'
@@ -25,18 +25,15 @@ runs:
       run: |
         SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
         SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-        
+
         echo "Preparing SUSFS for branch: $SUSFS_BRANCH"
-        
-        # Parse commit map to find the commit for this branch
+
         COMMIT_MAP="${{ inputs.susfs_commit }}"
         TARGET_COMMIT=""
-        
+
         if [ -n "$COMMIT_MAP" ]; then
-          # Split by comma
           IFS=',' read -ra ENTRIES <<< "$COMMIT_MAP"
           for entry in "${ENTRIES[@]}"; do
-            # Split by colon
             IFS=':' read -r branch commit <<< "$entry"
             if [ "$branch" == "$SUSFS_BRANCH" ]; then
               TARGET_COMMIT="$commit"
@@ -44,7 +41,7 @@ runs:
             fi
           done
         fi
-        
+
         if [ -n "$TARGET_COMMIT" ]; then
           echo "Found specific commit for $SUSFS_BRANCH: $TARGET_COMMIT"
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" susfs4ksu
@@ -55,11 +52,11 @@ runs:
           echo "No specific commit found for $SUSFS_BRANCH, cloning latest..."
           git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" --depth=1 susfs4ksu
         fi
-        
-        SUSFS_VERSION="v2.1.0"
-        echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
-        echo "SUSFS_BRANCH=$SUSFS_BRANCH" >> $GITHUB_ENV
-        echo "SUSFS_COMMIT=$TARGET_COMMIT" >> $GITHUB_ENV
+
+        SUSFS_VERSION="2.1.0"
+        echo "SUSFS_VERSION=$SUSFS_VERSION" >> "$GITHUB_ENV"
+        echo "SUSFS_BRANCH=$SUSFS_BRANCH" >> "$GITHUB_ENV"
+        echo "SUSFS_COMMIT=$TARGET_COMMIT" >> "$GITHUB_ENV"
 
     - name: Enable KernelSU SUSFS Config
       shell: bash
@@ -81,10 +78,19 @@ runs:
 
     - name: Apply KSU SUSFS Patches
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
+      working-directory: ${{ github.workspace }}/kernel/KernelSU
       run: |
-        cp ${{ github.workspace }}/kernel_patches/wild/ksun-8c1b4a9-susfs-v2.1.0-a14-6.1-45013457.patch ./
-        patch -p1 < ksun-8c1b4a9-susfs-v2.1.0-a14-6.1-45013457.patch
+        set -u
+        SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
+        PATCH_DIR="${{ github.workspace }}/kernel_patches/kowsu/susfs_fix_patches/v${SUSFS_VERSION}"
+
+        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
+        if [ -f "$ENABLE_PATCH" ]; then
+          cp "$ENABLE_PATCH" ./
+          patch -p1 < "$(basename "$ENABLE_PATCH")" || true
+        else
+          echo "No KowSU SUSFS enable patch found at $ENABLE_PATCH; skipping."
+        fi
 
     - name: Apply Kernel SUSFS Patches
       shell: bash
@@ -156,40 +162,40 @@ runs:
         if [ "${{ inputs.sublevel }}" -le "117" ]; then
         sed '/size_t this_len = min_t(size_t, count, PAGE_SIZE);/r'<(cat <<'EOF'
         #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-        		mnt = real_mount(file->f_path.mnt);
-        		if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
-        			likely(susfs_is_current_proc_umounted()))
-        		{
-        			struct path path;
-        			char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
-        			char *dpath;
-        			if (!pathname) {
-        				goto orig_flow;
-        			}
-        			dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
-        			if (!dpath) {
-        				goto out_kfree;
-        			}
-        			if (kern_path(dpath, 0, &path)) {
-        				goto out_kfree;
-        			}
-        			if (!path.dentry->d_inode) {
-        				goto out_path_put;
-        			}
-        			seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
-        					inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
-        					inotify_mark_user_mask(mark));
-        			show_mark_fhandle(m, path.dentry->d_inode);
-        			seq_putc(m, '\n');
-        			path_put(&path);
-        			kfree(pathname);
-        			iput(inode);
-        			return;
+                mnt = real_mount(file->f_path.mnt);
+                if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
+                    likely(susfs_is_current_proc_umounted()))
+                {
+                    struct path path;
+                    char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
+                    char *dpath;
+                    if (!pathname) {
+                        goto orig_flow;
+                    }
+                    dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
+                    if (!dpath) {
+                        goto out_kfree;
+                    }
+                    if (kern_path(dpath, 0, &path)) {
+                        goto out_kfree;
+                    }
+                    if (!path.dentry->d_inode) {
+                        goto out_path_put;
+                    }
+                    seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
+                            inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
+                            inotify_mark_user_mask(mark));
+                    show_mark_fhandle(m, path.dentry->d_inode);
+                    seq_putc(m, '\n');
+                    path_put(&path);
+                    kfree(pathname);
+                    iput(inode);
+                    return;
         out_path_put:
-        			path_put(&path);
+                    path_put(&path);
         out_kfree:
-        			kfree(pathname);
-        		}
+                    kfree(pathname);
+                }
         orig_flow:
         #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
         EOF
