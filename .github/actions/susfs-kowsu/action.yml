@@ -76,21 +76,29 @@ runs:
         CONFIG_KSU_SUSFS_SUS_MAP=y
         EOF
 
-    - name: Apply KSU SUSFS Patches
+    - name: Apply KowXU Enable Patch
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU
+      working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        set -u
+        ANDROID="${{ inputs.android_version }}"
+        KERNEL="${{ inputs.kernel_version }}"
+        SUBLEVEL="${{ inputs.sublevel }}"
         SUSFS_VERSION="${{ env.SUSFS_VERSION }}"
         PATCH_DIR="${{ github.workspace }}/kernel_patches/kowsu/susfs_fix_patches/v${SUSFS_VERSION}"
 
-        ENABLE_PATCH="$PATCH_DIR/10_enable_susfs_for_ksu.patch"
-        if [ -f "$ENABLE_PATCH" ]; then
-          cp "$ENABLE_PATCH" ./
-          patch -p1 < "$(basename "$ENABLE_PATCH")" || true
-        else
-          echo "No KowSU SUSFS enable patch found at $ENABLE_PATCH; skipping."
+        KSUN_DIR="${{ github.workspace }}/kernel/KernelSU"
+
+        if [ ! -d "$KSUN_DIR" ]; then
+          echo "::error::KernelSU-Next not found at: $KSUN_DIR"
+          exit 1
         fi
+
+        cd "$KSUN_DIR"
+
+        echo "📥 Downloading 10_enable_susfs_for_ksu.patch from deepongi-labs (kowsu)..."
+        curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/main/.github/patches/kowsu/10_enable_susfs_for_ksu.patch" \
+          -o /tmp/10_enable_susfs_for_ksu_kowsu.patch
+        patch -p1 --forward < /tmp/10_enable_susfs_for_ksu_kowsu.patch || true
 
     - name: Apply Kernel SUSFS Patches
       shell: bash
