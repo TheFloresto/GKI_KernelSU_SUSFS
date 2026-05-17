@@ -42,8 +42,10 @@ runs:
             BASE_VERSION=30000
             ;;
           ReSukiSU)
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
-            if [ -d "SukiSU-Ultra" ] && [ ! -d "KernelSU" ]; then
+            curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+            if [ -d "ReSukiSU" ] && [ ! -d "KernelSU" ]; then
+              KSU_DIR="ReSukiSU"
+            elif [ -d "SukiSU-Ultra" ] && [ ! -d "KernelSU" ]; then
               KSU_DIR="SukiSU-Ultra"
             else
               KSU_DIR="KernelSU"
