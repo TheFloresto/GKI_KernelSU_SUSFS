@@ -124,24 +124,13 @@ runs:
         while IFS= read -r -d '' f; do
           if grep -q 'ksu_late_loaded' "$f" && \
              ! grep -qE '(^|[^A-Za-z_])bool[[:space:]]+ksu_late_loaded' "$f"; then
-            python3 - "$f" <<'PY'
-import re, sys
-p = sys.argv[1]
-src = open(p).read()
-inject = "bool ksu_late_loaded = false;\n"
-# place after the last top-level #include in the first 200 lines
-lines = src.splitlines(keepends=True)
-last_inc = -1
-for i, line in enumerate(lines[:300]):
-    if line.lstrip().startswith("#include"):
-        last_inc = i
-if last_inc < 0:
-    out = inject + src
-else:
-    out = "".join(lines[:last_inc+1]) + "\n" + inject + "".join(lines[last_inc+1:])
-open(p, "w").write(out)
-PY
-            echo "[ksu-fix] injected 'bool ksu_late_loaded' into $f"
+            LAST_INC=$(awk 'NR>300{exit} /^[[:space:]]*#include/{n=NR} END{print n+0}' "$f")
+            if [ "${LAST_INC:-0}" -gt 0 ]; then
+              sed -i "${LAST_INC}s|.*|&\nbool ksu_late_loaded = false;|" "$f"
+            else
+              sed -i "1i bool ksu_late_loaded = false;" "$f"
+            fi
+            echo "[ksu-fix] injected 'bool ksu_late_loaded' into $f (after line ${LAST_INC:-0})"
             FIXED=$((FIXED+1))
           fi
         done < <(find . -path ./common -prune -o -type f -name 'init.c' -print0 2>/dev/null)
