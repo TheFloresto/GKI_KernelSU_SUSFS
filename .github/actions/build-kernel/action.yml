@@ -1,138 +1,192 @@
 name: 'Build Kernel'
-description: 'Build kernel directly with greenforce clang via make (all GKI versions)'
+description: 'Build kernel with greenforce clang + ccache (all GKI versions)'
 
 runs:
   using: composite
   steps:
-  - name: 'Install Build Dependencies'
-    shell: bash
-    run: |
-      set -euo pipefail
-      sudo apt-get update -qq
-      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        flex bison libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-        libxml2-utils rsync unzip dwarves bc dos2unix kmod libdw-dev elfutils \
-        cpio python3 ccache lld llvm
-      ccache --version | head -1 || true
+    - name: 'Install Build Dependencies'
+      shell: bash
+      run: |
+        set -euo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          ccache \
+          flex bison \
+          libelf-dev libssl-dev libncurses-dev zlib1g-dev \
+          liblz4-tool libxml2-utils \
+          rsync unzip dwarves bc dos2unix kmod libdw-dev elfutils \
+          lld llvm cpio python3
+        ccache --version | head -n1
 
-  - name: 'Setup Greenforce Clang'
-    shell: bash
-    working-directory: ${{ github.workspace }}
-    run: |
-      set -euo pipefail
+    - name: 'Setup Greenforce Clang'
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
 
-      CLANG_DIR="/home/runner/greenforce-clang"
+        CLANG_DIR="/home/runner/greenforce-clang"
 
-      if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-        rm -rf "$CLANG_DIR"
-        mkdir -p "$CLANG_DIR"
+        if [ ! -x "$CLANG_DIR/bin/clang" ]; then
+          rm -rf "$CLANG_DIR"
+          mkdir -p "$CLANG_DIR"
+          git clone --depth=1 https://github.com/greenforce-project/greenforce_clang "$CLANG_DIR" \
+            || (rm -rf "$CLANG_DIR" && git clone --depth=1 https://github.com/greenforce-project/greenforce_clang.git "$CLANG_DIR")
+        fi
 
-        # Greenforce ships a single-branch repo containing prebuilt toolchain binaries.
-        # Shallow clone to keep CI fast.
-        git clone --depth=1 https://github.com/greenforce-project/greenforce_clang "$CLANG_DIR" \
-          || (rm -rf "$CLANG_DIR" && git clone --depth=1 https://github.com/greenforce-project/greenforce_clang.git "$CLANG_DIR")
-      fi
+        if [ ! -x "$CLANG_DIR/bin/clang" ]; then
+          echo "::error::greenforce clang clone failed or layout unexpected"
+          ls -la "$CLANG_DIR" || true
+          exit 1
+        fi
 
-      if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-        echo "::error::greenforce clang clone failed or layout unexpected"
-        ls -la "$CLANG_DIR" || true
-        exit 1
-      fi
+        echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
+        echo "CLANG_BIN_PATH=$CLANG_DIR/bin" >> "$GITHUB_ENV"
+        echo "GREENFORCE_CLANG_DIR=$CLANG_DIR" >> "$GITHUB_ENV"
 
-      echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
-      echo "GREENFORCE_CLANG_DIR=$CLANG_DIR" >> "$GITHUB_ENV"
+        "$CLANG_DIR/bin/clang" --version | head -2
 
-      "$CLANG_DIR/bin/clang" --version | head -2
+    - name: Build Kernel
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      env:
+        PYTHONWARNINGS: "ignore:invalid escape sequence"
+      run: |
+        set -euo pipefail
+        echo "::group::Build kernel with ccache optimization"
 
-  - name: 'Build Kernel'
-    shell: bash
-    working-directory: ${{ github.workspace }}/kernel/common
-    run: |
-      set -euo pipefail
+        KERNEL_ROOT="${KERNEL_ROOT:-$GITHUB_WORKSPACE/kernel}"
+        FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
 
-      export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
-      export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
-      echo "KBUILD_BUILD_USER=$KBUILD_BUILD_USER" >> "$GITHUB_ENV"
-      echo "KBUILD_BUILD_HOST=$KBUILD_BUILD_HOST" >> "$GITHUB_ENV"
+        cd "$KERNEL_ROOT/common"
+        : > "$KERNEL_ROOT/common/.scmversion"
 
-      GKI_KCONFIG_FRAGMENT_PATH="${{ github.workspace }}/thefloresto.fragment"
-      CLANG_BIN="${GREENFORCE_CLANG_DIR}/bin"
-      export PATH="$CLANG_BIN:$PATH"
+        export PYTHONWARNINGS="${PYTHONWARNINGS}"
 
-      # Wrap compiler with ccache if available (cache-setup configures buckets/dirs).
-      if command -v ccache >/dev/null 2>&1; then
-        CC_CMD="ccache clang"
-        HOSTCC_CMD="ccache clang"
-        HOSTCXX_CMD="ccache clang++"
-      else
-        CC_CMD="clang"
-        HOSTCC_CMD="clang"
-        HOSTCXX_CMD="clang++"
-      fi
+        echo "Getting last commit timestamp from kernel source..."
+        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-      MAKE_ARGS=(
-        O=out
-        ARCH=arm64
-        LLVM=1
-        LLVM_IAS=1
-        CC="$CC_CMD"
-        HOSTCC="$HOSTCC_CMD"
-        HOSTCXX="$HOSTCXX_CMD"
-        LD=ld.lld
-        AR=llvm-ar
-        NM=llvm-nm
-        OBJCOPY=llvm-objcopy
-        OBJDUMP=llvm-objdump
-        STRIP=llvm-strip
-        READELF=llvm-readelf
-        HOSTAR=llvm-ar
-        HOSTLD=ld.lld
-      )
+        WORKSPACE="${GITHUB_WORKSPACE}"
+        MAP="-fdebug-prefix-map=${WORKSPACE}=."
+        MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
+        FPMAP="-ffile-prefix-map=${WORKSPACE}=."
 
-      mkdir -p out
+        export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -D__ANDROID_COMMON_KERNEL__"
+        export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
 
-      make "${MAKE_ARGS[@]}" gki_defconfig
+        export LLVM=1 LLVM_IAS=1
+        export ARCH=arm64 SUBARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
 
-      if [ -f "$GKI_KCONFIG_FRAGMENT_PATH" ]; then
-        scripts/kconfig/merge_config.sh -m -O out out/.config "$GKI_KCONFIG_FRAGMENT_PATH"
-        make "${MAKE_ARGS[@]}" olddefconfig
-      fi
+        if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
+          export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
+        else
+          export PAHOLE="$(which pahole || true)"
+        fi
+        echo "Using pahole: $PAHOLE ($($PAHOLE --version 2>/dev/null || echo 'unknown version'))"
 
-      # Force ThinLTO if not already set by fragment
-      if ! grep -q '^CONFIG_LTO_CLANG_THIN=y' out/.config; then
-        scripts/config --file out/.config \
-          -d LTO_NONE \
-          -e LTO_CLANG_THIN
-        make "${MAKE_ARGS[@]}" olddefconfig
-      fi
+        export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm
+        export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
 
-      make "${MAKE_ARGS[@]}" -j"$(nproc)" Image Image.lz4
+        set +u
+        source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
+        set -u
 
-  - name: 'Print Kernel Uname'
-    shell: bash
-    working-directory: ${{ github.workspace }}/kernel
-    run: |
-      set -euo pipefail
+        export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
+        export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
+        export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
+        export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
+        export KBUILD_BUILD_VERSION=1
 
-      IMG=""
-      for candidate in \
-        common/out/arch/arm64/boot/Image \
-        out/*/dist/Image \
-        bazel-bin/common/kernel_aarch64/Image \
-        out/arch/arm64/boot/Image; do
-        for f in $candidate; do
-          if [ -f "$f" ]; then
-            IMG="$f"
-            break 2
-          fi
-        done
-      done
+        echo "Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
+        echo "SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 
-      if [ -z "$IMG" ]; then
-        echo "::warning::Kernel Image not found for KERNEL_UNAME extraction"
-        exit 0
-      fi
+        export CC="ccache clang"
+        export CXX="ccache clang++"
+        export HOSTCC="ccache clang"
+        export HOSTCXX="ccache clang++"
 
-      KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
-      echo "Kernel Uname: $KERNEL_UNAME"
-      echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
+        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+
+        OUT=out
+        mkdir -p "$OUT"
+
+        echo "============================================"
+        echo "Compiler & ccache Verification"
+        echo "which clang: $(which clang)"
+        echo "CC: $CC"
+        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+        ccache -s || true
+        echo "============================================"
+
+        make O="$OUT" gki_defconfig
+
+        # Merge thefloresto.fragment into .config
+        if [ -f "$FRAGMENT" ]; then
+          ./scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
+        else
+          echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
+        fi
+
+        LOCAL_LOCALVERSION="${CUSTOM_LOCALVERSION:--TheFloresto}"
+        if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
+          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion || true
+        fi
+
+        scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+        scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        KCFLAGS_EXTRA="-O2"
+
+        scripts/config --file "$OUT/.config" -e LTO_CLANG
+        scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
+
+        make O="$OUT" olddefconfig
+
+        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
+        KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+
+        echo "============================================"
+        echo "Build Configuration"
+        echo "Kernel: ${KERNEL_VERSION:-?}.${SUBLEVEL:-?}"
+        echo "Android: ${ANDROID_VERSION:-?}"
+        echo "Variant: ${INPUT_VARIANT:-unknown}"
+        echo "ksu_variant: ${INPUT_KSU_VARIANT:-unknown}"
+        echo "============================================"
+
+        BUILD_START=$(date +%s)
+        make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+
+        BUILD_END=$(date +%s)
+        BUILD_TIME=$((BUILD_END - BUILD_START))
+        echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+
+        IMG="$OUT/arch/arm64/boot/Image"
+        if [ ! -f "$IMG" ]; then
+          echo "::error::Kernel Image missing"
+          echo "::group::Last 100 lines of build log"
+          tail -n 100 build.log || echo "Build log not available"
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        IMG_SIZE=$(stat -c%s "$IMG")
+        echo "============================================"
+        echo "Build Completed Successfully"
+        echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
+        echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
+
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+        echo "Kernel Uname: $KERNEL_UNAME"
+        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
+
+        echo ""
+        echo "ccache Post-Build Statistics"
+        echo "============================================"
+        ccache -s
+        echo "============================================"
+        echo "::endgroup::"
