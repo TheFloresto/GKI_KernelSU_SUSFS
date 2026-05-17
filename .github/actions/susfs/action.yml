@@ -69,7 +69,7 @@ runs:
 
         case "$KSU_VARIANT" in
           Next)
-            PATCH_SRC="${{ github.workspace }}/kernel_patches/wild/ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch"
+            PATCH_SRC="${{ github.workspace }}/kernel_patches/wild/ksun-5a4a718-susfs-f7ae19ef-gki-android14-6.1.patch"
             ;;
           KSU)
             PATCH_SRC="$(ls ${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
