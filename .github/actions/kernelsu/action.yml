@@ -24,7 +24,7 @@ runs:
             KSU_SETUP_COMMIT=$(jq -er '.kernelsu.dev' "$COMMITS_JSON")
             curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s "$KSU_SETUP_COMMIT"
             KSU_DIR="KernelSU-Next"
-            BASE_VERSION=10200
+            BASE_VERSION=30000
             ;;
           KSU)
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
