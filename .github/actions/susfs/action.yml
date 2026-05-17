@@ -106,6 +106,7 @@ runs:
         patch -p1 < "$(basename "$PATCH_SRC")" || true
 
     - name: Fix KSU SUSFS Patch Rejects (ksu_late_loaded)
+      if: inputs.ksu_variant == 'KSU'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
