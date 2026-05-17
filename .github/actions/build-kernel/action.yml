@@ -19,30 +19,28 @@ runs:
           lld llvm cpio python3
         ccache --version | head -n1
 
-    - name: 'Setup Greenforce Clang'
+    - name: 'Setup Greenforce Clang and Env'
       shell: bash
-      working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail
 
-        CLANG_DIR="/home/runner/greenforce-clang"
+        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
+
+        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
 
         if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-          rm -rf "$CLANG_DIR"
-          mkdir -p "$CLANG_DIR"
-          git clone --depth=1 https://github.com/greenforce-project/greenforce_clang "$CLANG_DIR" \
-            || (rm -rf "$CLANG_DIR" && git clone --depth=1 https://github.com/greenforce-project/greenforce_clang.git "$CLANG_DIR")
-        fi
-
-        if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-          echo "::error::greenforce clang clone failed or layout unexpected"
+          echo "::error::greenforce clang install failed or layout unexpected at $CLANG_DIR"
           ls -la "$CLANG_DIR" || true
           exit 1
         fi
 
         echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
         echo "CLANG_BIN_PATH=$CLANG_DIR/bin" >> "$GITHUB_ENV"
-        echo "GREENFORCE_CLANG_DIR=$CLANG_DIR" >> "$GITHUB_ENV"
+
+        CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1)
+        echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
+        echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
+        echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
 
         "$CLANG_DIR/bin/clang" --version | head -2
 
