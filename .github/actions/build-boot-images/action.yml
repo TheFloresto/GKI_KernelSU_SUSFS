@@ -31,12 +31,29 @@ runs:
         mkdir -p bootimgs
         mkdir -p boot-artifacts
 
-        if [ -f "${{ github.workspace }}/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image" ]; then
+        if [ -f "${{ github.workspace }}/kernel/common/out/arch/arm64/boot/Image" ]; then
+          cp "${{ github.workspace }}/kernel/common/out/arch/arm64/boot/Image" "${{ github.workspace }}/bootimgs/Image"
+          if [ -f "${{ github.workspace }}/kernel/common/out/arch/arm64/boot/Image.lz4" ]; then
+            cp "${{ github.workspace }}/kernel/common/out/arch/arm64/boot/Image.lz4" "${{ github.workspace }}/bootimgs/Image.lz4"
+          else
+            lz4 -fz9 "${{ github.workspace }}/bootimgs/Image" "${{ github.workspace }}/bootimgs/Image.lz4"
+          fi
+        elif [ -f "${{ github.workspace }}/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image" ]; then
           cp "${{ github.workspace }}/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image" "${{ github.workspace }}/bootimgs/Image"
           cp "${{ github.workspace }}/kernel/out/$ANDROID_VERSION-$KERNEL_VERSION/dist/Image.lz4" "${{ github.workspace }}/bootimgs/Image.lz4"
-        else
+        elif [ -f "${{ github.workspace }}/kernel/bazel-bin/common/kernel_aarch64/Image" ]; then
           cp "${{ github.workspace }}/kernel/bazel-bin/common/kernel_aarch64/Image" "${{ github.workspace }}/bootimgs/Image"
           cp "${{ github.workspace }}/kernel/bazel-bin/common/kernel_aarch64/Image.lz4" "${{ github.workspace }}/bootimgs/Image.lz4"
+        elif [ -f "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image" ]; then
+          cp "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image" "${{ github.workspace }}/bootimgs/Image"
+          if [ -f "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image.lz4" ]; then
+            cp "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image.lz4" "${{ github.workspace }}/bootimgs/Image.lz4"
+          else
+            lz4 -fz9 "${{ github.workspace }}/bootimgs/Image" "${{ github.workspace }}/bootimgs/Image.lz4"
+          fi
+        else
+          echo "::error::No Image found"
+          exit 1
         fi
 
         gzip -n -k -f -9 "${{ github.workspace }}/bootimgs/Image" > "${{ github.workspace }}/bootimgs/Image.gz"
