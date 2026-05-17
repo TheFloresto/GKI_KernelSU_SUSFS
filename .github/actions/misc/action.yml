@@ -14,7 +14,7 @@ inputs:
     description: 'Sublevel of kernel version (e.g., 1)'
     required: true
   variant:
-    description: 'Build variant (Normal, Bypass, Wild, boot-time)'
+    description: 'Build variant (Normal, Bypass, TheFloresto, boot-time)'
     required: true
 
 runs:
@@ -23,7 +23,7 @@ runs:
     - name: Apply Kernel Configuration
       shell: bash
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         # Mountify Support
         CONFIG_OVERLAY_FS=y
         CONFIG_TMPFS_XATTR=y
@@ -44,7 +44,7 @@ runs:
       run: |
         set -euo pipefail
         echo "Add Build based configs"
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         # CONFIG_ANDROID_BINDER_IPC_RUST is not set
         CONFIG_ANDROID_BINDER_IPC_RUST_DUMMY=m
         EOF
