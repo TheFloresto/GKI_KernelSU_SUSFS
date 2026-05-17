@@ -92,6 +92,7 @@ runs:
 
     - name: Fix KSU include paths (upstream breakage workarounds)
       shell: bash
+      if: ${{ inputs.version == 'android15-6.12' }}
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
