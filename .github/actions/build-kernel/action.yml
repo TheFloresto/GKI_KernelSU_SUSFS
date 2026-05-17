@@ -1,12 +1,52 @@
 name: 'Build Kernel'
-description: 'Builds kernel using legacy build.sh or Bazel (kleaf)'
+description: 'Build kernel directly with greenforce clang via make (all GKI versions)'
 
 runs:
   using: composite
   steps:
+  - name: 'Install Build Dependencies'
+    shell: bash
+    run: |
+      set -euo pipefail
+      sudo apt-get update -qq
+      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        flex bison libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+        libxml2-utils rsync unzip dwarves bc dos2unix kmod libdw-dev elfutils \
+        cpio python3 ccache lld llvm
+      ccache --version | head -1 || true
+
+  - name: 'Setup Greenforce Clang'
+    shell: bash
+    working-directory: ${{ github.workspace }}
+    run: |
+      set -euo pipefail
+
+      CLANG_DIR="/home/runner/greenforce-clang"
+
+      if [ ! -x "$CLANG_DIR/bin/clang" ]; then
+        rm -rf "$CLANG_DIR"
+        mkdir -p "$CLANG_DIR"
+
+        # Greenforce ships a single-branch repo containing prebuilt toolchain binaries.
+        # Shallow clone to keep CI fast.
+        git clone --depth=1 https://github.com/greenforce-project/greenforce_clang "$CLANG_DIR" \
+          || (rm -rf "$CLANG_DIR" && git clone --depth=1 https://github.com/greenforce-project/greenforce_clang.git "$CLANG_DIR")
+      fi
+
+      if [ ! -x "$CLANG_DIR/bin/clang" ]; then
+        echo "::error::greenforce clang clone failed or layout unexpected"
+        ls -la "$CLANG_DIR" || true
+        exit 1
+      fi
+
+      echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
+      echo "GREENFORCE_CLANG_DIR=$CLANG_DIR" >> "$GITHUB_ENV"
+
+      "$CLANG_DIR/bin/clang" --version | head -2
+
   - name: 'Build Kernel'
     shell: bash
-    working-directory: ${{ github.workspace }}/kernel
+    working-directory: ${{ github.workspace }}/kernel/common
     run: |
       set -euo pipefail
 
@@ -16,48 +56,57 @@ runs:
       echo "KBUILD_BUILD_HOST=$KBUILD_BUILD_HOST" >> "$GITHUB_ENV"
 
       GKI_KCONFIG_FRAGMENT_PATH="${{ github.workspace }}/thefloresto.fragment"
-      GKI_DEFCONFIG_WRAPPER_PATH="${{ github.workspace }}/thefloresto.wrap.sh"
+      CLANG_BIN="${GREENFORCE_CLANG_DIR}/bin"
+      export PATH="$CLANG_BIN:$PATH"
 
-      cat > "${GKI_DEFCONFIG_WRAPPER_PATH}" <<EOF
-      append_cmd POST_DEFCONFIG_CMDS 'if [ -f "${GKI_KCONFIG_FRAGMENT_PATH}" ]; then \${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -O \${OUT_DIR} \${OUT_DIR}/.config "${GKI_KCONFIG_FRAGMENT_PATH}"; fi && (cd \${KERNEL_DIR} && make O=\${OUT_DIR} olddefconfig)'
-      EOF
-
-      # Override expensive GKI build.sh artifact defaults we do not need in CI.
-      GKI_BUILD_CONFIG_FRAGMENT_PATH="${{ github.workspace }}/gki_build_overrides.fragment"
-      cat > "${GKI_BUILD_CONFIG_FRAGMENT_PATH}" <<'EOF'
-      BUILD_GKI_ARTIFACTS=
-      BUILD_GKI_CERTIFICATION_TOOLS=0
-      BUILD_SYSTEM_DLKM=0
-
-      # Skip heavy packaging steps we don't need in CI
-      SKIP_VENDOR_BOOT=1
-      SKIP_EXT_MODULES=1
-      SKIP_CP_KERNEL_HDR=1
-      SKIP_MRPROPER=1
-      EOF
-
-      if [ -f "build/build.sh" ]; then
-        #SKIP_MRPROPER=1 \
-        LTO=thin \
-        GKI_DEFCONFIG_FRAGMENT="${GKI_DEFCONFIG_WRAPPER_PATH}" \
-        GKI_BUILD_CONFIG_FRAGMENT="${GKI_BUILD_CONFIG_FRAGMENT_PATH}" \
-        BUILD_CONFIG=common/build.config.gki.aarch64 \
-        build/build.sh -j"$(nproc)" \
-        CC="$CC" \
-        CXX="$CXX" \
-        HOSTCC="$HOSTCC" \
-        HOSTCXX="$HOSTCXX" \
-        LD="$LD" \
-        HOSTLD="$HOSTLD"
+      # Wrap compiler with ccache if available (cache-setup configures buckets/dirs).
+      if command -v ccache >/dev/null 2>&1; then
+        CC_CMD="ccache clang"
+        HOSTCC_CMD="ccache clang"
+        HOSTCXX_CMD="ccache clang++"
       else
-        cp "${{ github.workspace }}/thefloresto.fragment" common/arch/arm64/configs/thefloresto.fragment
-        tools/bazel build \
-          --linkopt="--thinlto-cache-dir=/home/runner/.ld_cache" \
-          --config=fast \
-          --defconfig_fragment=//common:arch/arm64/configs/thefloresto.fragment \
-          --disk_cache="$BAZEL_CACHE_DIR" \
-          //common:kernel_aarch64
+        CC_CMD="clang"
+        HOSTCC_CMD="clang"
+        HOSTCXX_CMD="clang++"
       fi
+
+      MAKE_ARGS=(
+        O=out
+        ARCH=arm64
+        LLVM=1
+        LLVM_IAS=1
+        CC="$CC_CMD"
+        HOSTCC="$HOSTCC_CMD"
+        HOSTCXX="$HOSTCXX_CMD"
+        LD=ld.lld
+        AR=llvm-ar
+        NM=llvm-nm
+        OBJCOPY=llvm-objcopy
+        OBJDUMP=llvm-objdump
+        STRIP=llvm-strip
+        READELF=llvm-readelf
+        HOSTAR=llvm-ar
+        HOSTLD=ld.lld
+      )
+
+      mkdir -p out
+
+      make "${MAKE_ARGS[@]}" gki_defconfig
+
+      if [ -f "$GKI_KCONFIG_FRAGMENT_PATH" ]; then
+        scripts/kconfig/merge_config.sh -m -O out out/.config "$GKI_KCONFIG_FRAGMENT_PATH"
+        make "${MAKE_ARGS[@]}" olddefconfig
+      fi
+
+      # Force ThinLTO if not already set by fragment
+      if ! grep -q '^CONFIG_LTO_CLANG_THIN=y' out/.config; then
+        scripts/config --file out/.config \
+          -d LTO_NONE \
+          -e LTO_CLANG_THIN
+        make "${MAKE_ARGS[@]}" olddefconfig
+      fi
+
+      make "${MAKE_ARGS[@]}" -j"$(nproc)" Image Image.lz4
 
   - name: 'Print Kernel Uname'
     shell: bash
@@ -67,9 +116,9 @@ runs:
 
       IMG=""
       for candidate in \
+        common/out/arch/arm64/boot/Image \
         out/*/dist/Image \
         bazel-bin/common/kernel_aarch64/Image \
-        common/out/arch/arm64/boot/Image \
         out/arch/arm64/boot/Image; do
         for f in $candidate; do
           if [ -f "$f" ]; then
