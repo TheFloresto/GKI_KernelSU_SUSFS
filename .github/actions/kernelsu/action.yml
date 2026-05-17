@@ -24,27 +24,31 @@ runs:
             KSU_SETUP_COMMIT=$(jq -er '.kernelsu.dev' "$COMMITS_JSON")
             curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s "$KSU_SETUP_COMMIT"
             KSU_DIR="KernelSU-Next"
-            BASE_VERSION=30000
+            BASE_VERSION=10200
             ;;
           KSU)
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
             KSU_DIR="KernelSU"
-            BASE_VERSION=10000
+            BASE_VERSION=30000
             ;;
           MKSU)
             curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -s main
             KSU_DIR="KernelSU"
-            BASE_VERSION=10000
+            BASE_VERSION=30000
             ;;
           KowSU)
             curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU-Next/master/kernel/setup.sh" | bash -s master
-            KSU_DIR="KernelSU-Next"
-            BASE_VERSION=10000
+            KSU_DIR="KernelSU"
+            BASE_VERSION=30000
             ;;
           ReSukiSU)
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
-            KSU_DIR="SukiSU-Ultra"
-            BASE_VERSION=10000
+            if [ -d "SukiSU-Ultra" ] && [ ! -d "KernelSU" ]; then
+              KSU_DIR="SukiSU-Ultra"
+            else
+              KSU_DIR="KernelSU"
+            fi
+            BASE_VERSION=33275
             ;;
           WKSU)
             curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/stable/kernel/setup.sh" | bash -s stable
