@@ -90,6 +90,31 @@ runs:
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
         echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"
 
+    - name: Fix KSU include paths (upstream breakage workarounds)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+
+        # KernelSU-Next dev currently has policy/allowlist.h including
+        # "uapi/app_profile.h" but no policy/uapi/ directory exists in the
+        # tree — the file is at policy/app_profile.h. Patch the include
+        # to use the actual location. Idempotent: if upstream fixes it
+        # (either by adding policy/uapi/ or correcting the include), the
+        # sed becomes a no-op.
+        FIXED=0
+        while IFS= read -r -d '' f; do
+          if grep -q '#include "uapi/app_profile\.h"' "$f"; then
+            sed -i 's|#include "uapi/app_profile\.h"|#include "app_profile.h"|' "$f"
+            echo "[ksu-fix] rewrote uapi/app_profile.h include in $f"
+            FIXED=$((FIXED+1))
+          fi
+        done < <(find . -path ./common -prune -o -type f -name 'allowlist.h' -print0 2>/dev/null)
+
+        if [ "$FIXED" -eq 0 ]; then
+          echo "[ksu-fix] no allowlist.h files needed patching"
+        fi
+
     - name: Enable KernelSU Config
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
