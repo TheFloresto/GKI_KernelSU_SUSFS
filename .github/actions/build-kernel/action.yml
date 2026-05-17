@@ -10,8 +10,13 @@ runs:
     run: |
       set -euo pipefail
 
-      GKI_KCONFIG_FRAGMENT_PATH="${{ github.workspace }}/wild_gki.fragment"
-      GKI_DEFCONFIG_WRAPPER_PATH="${{ github.workspace }}/wild_gki.wrap.sh"
+      export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
+      export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
+      echo "KBUILD_BUILD_USER=$KBUILD_BUILD_USER" >> "$GITHUB_ENV"
+      echo "KBUILD_BUILD_HOST=$KBUILD_BUILD_HOST" >> "$GITHUB_ENV"
+
+      GKI_KCONFIG_FRAGMENT_PATH="${{ github.workspace }}/thefloresto.fragment"
+      GKI_DEFCONFIG_WRAPPER_PATH="${{ github.workspace }}/thefloresto.wrap.sh"
 
       cat > "${GKI_DEFCONFIG_WRAPPER_PATH}" <<EOF
       append_cmd POST_DEFCONFIG_CMDS 'if [ -f "${GKI_KCONFIG_FRAGMENT_PATH}" ]; then \${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -O \${OUT_DIR} \${OUT_DIR}/.config "${GKI_KCONFIG_FRAGMENT_PATH}"; fi && (cd \${KERNEL_DIR} && make O=\${OUT_DIR} olddefconfig)'
@@ -45,11 +50,40 @@ runs:
         LD="$LD" \
         HOSTLD="$HOSTLD"
       else
-        cp "${{ github.workspace }}/wild_gki.fragment" common/arch/arm64/configs/wild_gki.fragment
+        cp "${{ github.workspace }}/thefloresto.fragment" common/arch/arm64/configs/thefloresto.fragment
         tools/bazel build \
           --linkopt="--thinlto-cache-dir=/home/runner/.ld_cache" \
           --config=fast \
-          --defconfig_fragment=//common:arch/arm64/configs/wild_gki.fragment \
+          --defconfig_fragment=//common:arch/arm64/configs/thefloresto.fragment \
           --disk_cache="$BAZEL_CACHE_DIR" \
           //common:kernel_aarch64
       fi
+
+  - name: 'Print Kernel Uname'
+    shell: bash
+    working-directory: ${{ github.workspace }}/kernel
+    run: |
+      set -euo pipefail
+
+      IMG=""
+      for candidate in \
+        out/*/dist/Image \
+        bazel-bin/common/kernel_aarch64/Image \
+        common/out/arch/arm64/boot/Image \
+        out/arch/arm64/boot/Image; do
+        for f in $candidate; do
+          if [ -f "$f" ]; then
+            IMG="$f"
+            break 2
+          fi
+        done
+      done
+
+      if [ -z "$IMG" ]; then
+        echo "::warning::Kernel Image not found for KERNEL_UNAME extraction"
+        exit 0
+      fi
+
+      KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+      echo "Kernel Uname: $KERNEL_UNAME"
+      echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"

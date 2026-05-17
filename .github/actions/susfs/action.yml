@@ -16,6 +16,10 @@ inputs:
   sublevel:
     description: 'Kernel sublevel'
     required: true
+  ksu_variant:
+    description: 'KSU variant (Next, KSU, MKSU, KowSU, ReSukiSU, WKSU)'
+    required: false
+    default: Next
 
 runs:
   using: composite
@@ -41,7 +45,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         # KernelSU SUSFS Configuration
         CONFIG_KSU_SUSFS=y
         CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -57,10 +61,49 @@ runs:
 
     - name: Apply KSU SUSFS Patches
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
+      working-directory: ${{ github.workspace }}/kernel
       run: |
-        cp ${{ github.workspace }}/kernel_patches/wild/ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch ./
-        patch -p1 < ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch
+        set -euo pipefail
+        KSU_VARIANT="${{ inputs.ksu_variant }}"
+        KSU_DIR="${KSU_DIR:-KernelSU-Next}"
+
+        case "$KSU_VARIANT" in
+          Next)
+            PATCH_SRC="${{ github.workspace }}/kernel_patches/wild/ksun-4c9737a-susfs-v2.1.0-a14-6.1-ef16cbce.patch"
+            ;;
+          KSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/kernel_patches/ksu/susfs_fix_patches/v2.1.0/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          MKSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/kernel_patches/mksu/susfs_fix_patches/v2.1.0/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          KowSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/kernel_patches/kowsu/susfs_fix_patches/v2.1.0/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          ReSukiSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/kernel_patches/resukisu/susfs_fix_patches/v2.1.0/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          WKSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/kernel_patches/wild/ksun-*-susfs-v2.1.0-*.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          *)
+            PATCH_SRC=""
+            ;;
+        esac
+
+        if [ -z "$PATCH_SRC" ] || [ ! -f "$PATCH_SRC" ]; then
+          echo "::warning::No KSU SUSFS patch found for variant $KSU_VARIANT, skipping"
+          exit 0
+        fi
+
+        if [ ! -d "$KSU_DIR" ]; then
+          echo "::warning::$KSU_DIR not found; using KernelSU-Next as fallback"
+          KSU_DIR="KernelSU-Next"
+        fi
+
+        cd "$KSU_DIR"
+        cp "$PATCH_SRC" ./
+        patch -p1 < "$(basename "$PATCH_SRC")" || true
 
     - name: Apply Kernel SUSFS Patches
       shell: bash

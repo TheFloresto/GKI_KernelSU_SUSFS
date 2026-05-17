@@ -70,7 +70,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        cat >> "${{ github.workspace }}/wild_gki.fragment" << 'EOF'
+        cat >> "${{ github.workspace }}/thefloresto.fragment" << 'EOF'
         CONFIG_SYSVIPC=y
         CONFIG_POSIX_MQUEUE=y
         CONFIG_IPC_NS=y
