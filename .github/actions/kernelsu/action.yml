@@ -20,9 +20,8 @@ runs:
         COMMITS_JSON="${{ github.workspace }}/.github/config/commits.json"
 
         case "$KSU_VARIANT" in
-          Next)
-            KSU_SETUP_COMMIT=$(jq -er '.kernelsu.dev' "$COMMITS_JSON")
-            curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s "$KSU_SETUP_COMMIT"
+          Next)         
+            curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
             KSU_DIR="KernelSU-Next"
             BASE_VERSION=30000
             ;;
@@ -90,31 +89,14 @@ runs:
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
         echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"
 
-    - name: Fix KSU include paths (upstream breakage workarounds)
+    - name: 'Fix KernelSU-Next'
+      if: ${{ inputs.ksu_variant == 'Next' }}
       shell: bash
-      if: ${{ inputs.version == 'android15-6.12' }}
-      working-directory: ${{ github.workspace }}/kernel
+      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
       run: |
         set -euo pipefail
-
-        # KernelSU-Next dev currently has policy/allowlist.h including
-        # "uapi/app_profile.h" but no policy/uapi/ directory exists in the
-        # tree — the file is at policy/app_profile.h. Patch the include
-        # to use the actual location. Idempotent: if upstream fixes it
-        # (either by adding policy/uapi/ or correcting the include), the
-        # sed becomes a no-op.
-        FIXED=0
-        while IFS= read -r -d '' f; do
-          if grep -q '#include "uapi/app_profile\.h"' "$f"; then
-            sed -i 's|#include "uapi/app_profile\.h"|#include "app_profile.h"|' "$f"
-            echo "[ksu-fix] rewrote uapi/app_profile.h include in $f"
-            FIXED=$((FIXED+1))
-          fi
-        done < <(find . -path ./common -prune -o -type f -name 'allowlist.h' -print0 2>/dev/null)
-
-        if [ "$FIXED" -eq 0 ]; then
-          echo "[ksu-fix] no allowlist.h files needed patching"
-        fi
+        cp ${{ github.action_path }}/patches/static.patch "${{ github.workspace }}/kernel/KernelSU-Next/static.patch"
+        patch -p1 < static.patch
 
     - name: Enable KernelSU Config
       shell: bash
