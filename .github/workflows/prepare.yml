@@ -16,6 +16,11 @@ on:
         required: false
         type: boolean
         default: false
+      ksu_variant:
+        description: "KSU Variant (Next, KSU, MKSU, KowSU, ReSukiSU, WKSU)"
+        required: false
+        type: string
+        default: Next        
       use_latest_commits:
         description: "Use branch tip for KernelSU and SUSFS instead of pinned commits"
         required: false
@@ -91,6 +96,7 @@ jobs:
       sublevel: ${{ matrix.sublevel }}
       os_patch_level: ${{ matrix.os_patch_level }}
       variant: ${{ matrix.variant }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}
       feature_set: ${{ inputs.feature_set }}
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
