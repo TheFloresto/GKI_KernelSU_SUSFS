@@ -53,6 +53,7 @@ runs:
         echo "::endgroup::"        
 
     - name: 'Setup Greenforce Clang and Env'
+      if: false
       shell: bash
       run: |
         set -euo pipefail
