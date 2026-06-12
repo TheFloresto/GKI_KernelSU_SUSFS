@@ -16,6 +16,10 @@ inputs:
   sublevel:
     required: true
     type: string
+  ksu_variant:
+    required: false
+    type: string
+    default: ""   
 outputs:
   file_name:
     value: ${{ steps.extract.outputs.file_name }}
