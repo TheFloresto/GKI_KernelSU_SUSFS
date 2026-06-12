@@ -76,6 +76,7 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
+        PATCH_SRC=""
         KSU_VARIANT="${{ inputs.ksu_variant }}"
         KSU_DIR="${KSU_DIR:-KernelSU-Next}"
 
