@@ -86,7 +86,7 @@ runs:
         
         # Определяем переменные, если они не заданы в env
         # Используем стандартные переменные GitHub или ваши параметры
-        ANDROID_VER="${{ inputs.version }}" 
+        ANDROID_VER="${{ inputs.android_version }}" 
         
         # Создаем кастомный локальный нейминг
         CUSTOM_LOCALVERSION="-${ANDROID_VER}-TheFloresto"
