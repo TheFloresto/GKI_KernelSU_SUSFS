@@ -39,6 +39,15 @@ runs:
         fi
 
         FILE_NAME="${{ inputs.kernel_version }}.${SUBLEVEL}-${{ inputs.android_version }}-${{ inputs.os_patch_level }}"
+
+        # Append KSU variant + version (if available — populated after the kernelsu step)
+        if [ -n "${{ inputs.ksu_variant }}" ]; then
+          FILE_NAME="${FILE_NAME}-${{ inputs.ksu_variant }}"
+        fi
+        if [ -n "${KSU_VERSION:-}" ]; then
+          FILE_NAME="${FILE_NAME}-${KSU_VERSION}"
+        fi
+
         # Append variant only when it's provided and not the default 'Normal'
         if [ -n "${{ inputs.variant }}" ] && [ "${{ inputs.variant }}" != "Normal" ]; then
           FILE_NAME="${FILE_NAME}-${{ inputs.variant }}"
