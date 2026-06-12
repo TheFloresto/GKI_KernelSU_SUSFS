@@ -112,6 +112,12 @@ runs:
         export CROSS_COMPILE=aarch64-linux-gnu-
         export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
+        export COMPATCC="arm-linux-gnueabi-gcc"
+        export COMPATCXX="arm-linux-gnueabi-g++"
+        export COMPATLD="arm-linux-gnueabi-ld"
+        export COMPATAR="arm-linux-gnueabi-ar"
+        export COMPATNM="arm-linux-gnueabi-nm"        
+
         if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
           export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
         else
