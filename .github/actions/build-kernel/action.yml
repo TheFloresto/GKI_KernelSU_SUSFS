@@ -77,19 +77,20 @@ runs:
         echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
 
         "$CLANG_DIR/bin/clang" --version | head -2
-
+        
     - name: 'Build Kernel'
       shell: bash
-      working-directory: ${{ github.workspace }}/kernel
+      working-directory: ${{ github.workspace }}/kernel/common
       env:
         PYTHONWARNINGS: "ignore:invalid escape sequence"
       run: |
         set -euo pipefail
         echo "::group::Build kernel with ccache optimization"
 
-        KERNEL_ROOT="${{ github.workspace }}/kernel"
+        KERNEL_ROOT="${KERNEL_ROOT:-$GITHUB_WORKSPACE/kernel}"
         FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
 
+        cd "$KERNEL_ROOT/common"
         : > "$KERNEL_ROOT/common/.scmversion"
 
         export PYTHONWARNINGS="${PYTHONWARNINGS}"
@@ -140,7 +141,7 @@ runs:
 
         export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
 
-        OUT="out"
+        OUT=out
         mkdir -p "$OUT"
 
         echo "============================================"
@@ -151,15 +152,11 @@ runs:
         ccache -s || true
         echo "============================================"
 
-        # Отключаем проверку defconfig, как в оригинальном скрипте
-        sed -i 's/check_defconfig//' ./common/build.config.gki || true
-
-        # Указываем kbuild искать исходники и Makefile сборки ядра внутри каталога common/
-        make -C common O="../$OUT" gki_defconfig
+        make O="$OUT" gki_defconfig
 
         # Merge thefloresto.fragment into .config
         if [ -f "$FRAGMENT" ]; then
-          ./common/scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
+          ./scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
         else
           echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
         fi
@@ -169,33 +166,35 @@ runs:
         LOCAL_LOCALVERSION="-${ANDROID_PREFIX}${CUSTOM_LOCALVERSION:--TheFloresto}"
         
         if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
-          ./common/scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
-          ./common/scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' ./common/scripts/setlocalversion || true
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
+          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion || true
         fi
 
-        ./common/scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
-        ./common/scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+        scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
         KCFLAGS_EXTRA="-O2"
 
-        ./common/scripts/config --file "$OUT/.config" -e LTO_CLANG
-        ./common/scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
-        ./common/scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
-        ./common/scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
+        scripts/config --file "$OUT/.config" -e LTO_CLANG
+        scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
 
-        make -C common O="../$OUT" olddefconfig
+        make O="$OUT" olddefconfig
 
         KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
 
         echo "============================================"
         echo "Build Configuration"
-        echo "Kernel Version Input: ${{ inputs.version }}"
-        echo "Calculated LOCALVERSION: ${LOCAL_LOCALVERSION}"
+        echo "Kernel: ${KERNEL_VERSION:-?}.${SUBLEVEL:-?}"
+        echo "Android: ${ANDROID_VERSION:-?}"
+        echo "Variant: ${INPUT_VARIANT:-unknown}"
+        echo "ksu_variant: ${INPUT_KSU_VARIANT:-unknown}"
         echo "============================================"
 
         BUILD_START=$(date +%s)
-        make -C common -j"$(nproc --all)" O="../$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+        make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
 
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - BUILD_START))
@@ -209,10 +208,6 @@ runs:
           echo "::endgroup::"
           exit 1
         fi
-
-        # Копируем собранный Image туда, где его ждет шаг 'Gather Build Artifacts'
-        mkdir -p /home/runner/out
-        cp "$IMG" /home/runner/out/Image
 
         IMG_SIZE=$(stat -c%s "$IMG")
         echo "============================================"
