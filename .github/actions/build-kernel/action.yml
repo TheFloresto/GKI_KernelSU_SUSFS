@@ -76,6 +76,24 @@ runs:
         echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
 
         "$CLANG_DIR/bin/clang" --version | head -2
+
+    - name: Customize Kernel Branding
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Customize Kernel Branding"
+        
+        # Определяем переменные, если они не заданы в env
+        # Используем стандартные переменные GitHub или ваши параметры
+        ANDROID_VER="${{ inputs.version }}" 
+        
+        # Создаем кастомный локальный нейминг
+        CUSTOM_LOCALVERSION="-${ANDROID_VER}-TheFloresto"
+        
+        # Сохраняем для использования в других шагах (через GITHUB_ENV)
+        echo "CUSTOM_LOCALVERSION=${CUSTOM_LOCALVERSION}" >> "$GITHUB_ENV"
+                
+        echo "Branding set to: $CUSTOM_LOCALVERSION"
         
     - name: 'Build Kernel'
       shell: bash
@@ -109,13 +127,6 @@ runs:
         export LLVM=1 LLVM_IAS=1
         export ARCH=arm64 SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
-        export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-
-        export COMPATCC="arm-linux-gnueabi-gcc"
-        export COMPATCXX="arm-linux-gnueabi-g++"
-        export COMPATLD="arm-linux-gnueabi-ld"
-        export COMPATAR="arm-linux-gnueabi-ar"
-        export COMPATNM="arm-linux-gnueabi-nm"        
 
         if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
           export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
@@ -167,10 +178,7 @@ runs:
           echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
         fi
 
-        # Извлекаем "android14" из "android14-6.1"
-        ANDROID_PREFIX=$(echo "${{ inputs.version }}" | cut -d'-' -f1)
-        LOCAL_LOCALVERSION="-${ANDROID_PREFIX}${CUSTOM_LOCALVERSION:--TheFloresto}"
-        
+        LOCAL_LOCALVERSION="${CUSTOM_LOCALVERSION:--TheFloresto}"
         if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
           scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
           scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
@@ -227,6 +235,14 @@ runs:
         ccache -s
         echo "============================================"
         echo "::endgroup::"
+
+    - name: 'Check name'
+      shell: bash
+      run: |
+        set -euo pipefail
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+        echo "Kernel Uname: $KERNEL_UNAME"
+        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
 
     - name: 'Gather Build Artifacts'
       shell: bash
