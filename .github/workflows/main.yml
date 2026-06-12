@@ -44,6 +44,17 @@ on:
           - NONE
           - FULL
         default: FULL
+      ksu_variant:
+        description: "KSU Variant"
+        type: choice
+        options:
+          - Next
+          - KSU
+          - MKSU
+          - KowSU
+          - ReSukiSU
+          - WKSU
+        default: Next        
       use_repo:
         description: "Use repo for downloading kernel source"
         type: boolean
@@ -64,6 +75,7 @@ jobs:
     with:
       config_file: .github/config/android12-5.10.json
       feature_set: ${{ inputs.feature_set || 'FULL' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}      
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
     secrets: inherit
@@ -74,6 +86,7 @@ jobs:
     with:
       config_file: .github/config/android13-5.10.json
       feature_set: ${{ inputs.feature_set || 'FULL' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}      
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
     secrets: inherit
@@ -84,6 +97,7 @@ jobs:
     with:
       config_file: .github/config/android13-5.15.json
       feature_set: ${{ inputs.feature_set || 'FULL' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}     
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
     secrets: inherit
@@ -94,6 +108,7 @@ jobs:
     with:
       config_file: .github/config/android14-5.15.json
       feature_set: ${{ inputs.feature_set || 'FULL' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}      
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
     secrets: inherit
@@ -104,6 +119,7 @@ jobs:
     with:
       config_file: .github/config/android14-6.1.json
       feature_set: ${{ inputs.feature_set || 'FULL' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}      
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
     secrets: inherit
@@ -114,6 +130,7 @@ jobs:
     with:
       config_file: .github/config/android15-6.6.json
       feature_set: ${{ inputs.feature_set || 'FULL' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}      
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
     secrets: inherit
@@ -124,6 +141,7 @@ jobs:
     with:
       config_file: .github/config/android16-6.12.json
       feature_set: ${{ inputs.feature_set || 'FULL' }}
+      ksu_variant: ${{ inputs.ksu_variant || 'Next' }}      
       use_repo: ${{ inputs.use_repo }}
       use_latest_commits: ${{ inputs.use_latest_commits }}
     secrets: inherit
@@ -221,7 +239,8 @@ jobs:
       contents: read
 
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      RELEASE_REPO: NerestKernels/GKI_KernelSU_SUSFS
       RELEASE_NOTES: .github/config/RELEASE_NOTES.md
       COMMITS_JSON: .github/config/commits.json
     steps:
@@ -235,51 +254,78 @@ jobs:
       run: |
         set -euo pipefail
 
-        KSUN_BRANCH="dev"
-
-        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
-          echo "Cloning KernelSU-Next from full branch tip: $KSUN_BRANCH"
-          git clone --branch "$KSUN_BRANCH" https://github.com/KernelSU-Next/KernelSU-Next.git /tmp/kernelsu-next
-        else
-          echo "Cloning KernelSU-Next from branch: $KSUN_BRANCH"
-          git clone --depth=1 --branch "$KSUN_BRANCH" https://github.com/KernelSU-Next/KernelSU-Next.git /tmp/kernelsu-next
-        fi
-
-        cd /tmp/kernelsu-next
-
-        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
-          KSUN_COMMIT=$(git rev-parse HEAD)
-        else
-          KSUN_COMMIT=$(jq -er '.kernelsu.dev' "$COMMITS_JSON_PATH")
-          echo "Checking out commit: $KSUN_COMMIT"
-          git fetch --depth=50 origin "$KSUN_COMMIT"
-          git checkout "$KSUN_COMMIT"
-        fi
-
-        COMMITS_COUNT=$(git rev-list --count HEAD)
+        KSU_VARIANT="${{ inputs.ksu_variant }}"
         BASE_VERSION=30000
-        KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
 
+        case "$KSU_VARIANT" in
+          Next)
+            KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git"
+            KSU_BRANCH="dev"
+            JSON_KEY=".kernelsu.dev"
+            ;;
+          KSU)
+            KSU_REPO="https://github.com/tiann/KernelSU.git"
+            KSU_BRANCH="main"
+            JSON_KEY=".ksu.main"
+            ;;
+          MKSU)
+            KSU_REPO="https://github.com/5ec1cff/KernelSU.git"
+            KSU_BRANCH="main"
+            JSON_KEY=".mksu.main"
+            ;;
+          KowSU)
+            KSU_REPO="https://github.com/KOWX712/KernelSU-Next.git"
+            KSU_BRANCH="master"
+            JSON_KEY=".kowsu.master"
+            ;;
+          ReSukiSU)
+            KSU_REPO="https://github.com/ReSukiSU/ReSukiSU.git"
+            KSU_BRANCH="main"
+            JSON_KEY=".resukisu.main"
+            BASE_VERSION=33275
+            ;;
+          WKSU)
+            KSU_REPO="https://github.com/WildKernels/Wild_KSU.git"
+            KSU_BRANCH="stable"
+            JSON_KEY=".wksu.stable"
+            ;;
+          *)
+            echo "Unknown ksu_variant: $KSU_VARIANT" >&2
+            exit 1
+            ;;
+        esac
+
+        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
+          echo "Cloning $KSU_VARIANT from branch tip: $KSU_BRANCH"
+          git clone --branch "$KSU_BRANCH" "$KSU_REPO" /tmp/ksu-source
+        else
+          echo "Cloning $KSU_VARIANT with deep history for pinned commit"
+          git clone "$KSU_REPO" /tmp/ksu-source
+        fi
+
+        cd /tmp/ksu-source
+
+        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
+          KSU_COMMIT=$(git rev-parse HEAD)
+        else
+          KSU_COMMIT=$(jq -er "$JSON_KEY" "$COMMITS_JSON_PATH" 2>/dev/null || git rev-parse HEAD)
+          echo "Checking out pinned commit: $KSU_COMMIT"
+          git fetch --depth=50 origin "$KSU_COMMIT"
+          git checkout "$KSU_COMMIT"
+        fi
+
+        COMMITS_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+        KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
         KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
 
-        MANAGER_RUN_ID=$(curl -fsSL "https://api.github.com/repos/KernelSU-Next/KernelSU-Next/actions/workflows/build-manager-ci.yml/runs?head_sha=${KSUN_COMMIT}" | jq -r '.workflow_runs[0].id // empty')
-        if [[ -n "${MANAGER_RUN_ID:-}" ]]; then
-          KSU_MANAGER="https://github.com/KernelSU-Next/KernelSU-Next/actions/runs/${MANAGER_RUN_ID}"
-        else
-          KSU_MANAGER="https://github.com/KernelSU-Next/KernelSU-Next/actions/workflows/build-manager-ci.yml"
-        fi
-
-        echo "Commits count: $COMMITS_COUNT"
+        echo "KSU Variant: $KSU_VARIANT"
         echo "KSU Version: $KSU_VERSION"
         echo "KSU Git Tag: $KSU_GIT_TAG"
-        echo "KSU Manager: $KSU_MANAGER"
 
-        echo "KSUN_BRANCH=$KSUN_BRANCH" >> $GITHUB_ENV
-        echo "KSUN_COMMIT=$KSUN_COMMIT" >> $GITHUB_ENV
-        echo "KSU_COMMITS_COUNT=$COMMITS_COUNT" >> $GITHUB_ENV
+        echo "KSU_VARIANT=$KSU_VARIANT" >> $GITHUB_ENV
+        echo "KSU_COMMIT=$KSU_COMMIT" >> $GITHUB_ENV
         echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> $GITHUB_ENV
-        echo "KSU_MANAGER=$KSU_MANAGER" >> $GITHUB_ENV
 
     - name: Set release body
       run: |
@@ -313,7 +359,8 @@ jobs:
     - build-android16-6-12
 
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      RELEASE_REPO: NerestKernels/GKI_KernelSU_SUSFS
       RELEASE_NOTES: .github/config/RELEASE_NOTES.md
       COMMITS_JSON: .github/config/commits.json
     outputs:
@@ -353,7 +400,7 @@ jobs:
 
     - name: Free Disk Space
       if: true
-      uses: endersonmenezes/free-disk-space@v3  # Use @main for latest, @v3 for stable
+      uses: endersonmenezes/free-disk-space@v3
       with:
         remove_android: true
         remove_dotnet: true
@@ -363,18 +410,22 @@ jobs:
         remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
         remove_packages_one_command: true
         remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-        rm_cmd: "rmz"  # Use 'rmz' for faster deletion (default: 'rm')
-        rmz_version: "3.1.1"  # Required when rm_cmd is 'rmz'
+        rm_cmd: "rmz"
+        rmz_version: "3.1.1"
         testing: false
 
     - name: Checkout code
       uses: actions/checkout@v5
-
+      with:
+        token: ${{ secrets.RELEASE_TOKEN || github.token }}
+        repository: ${{ env.RELEASE_REPO }}
+        fetch-depth: 0
+        
     - name: Generate New Tag
       id: tag
       if: inputs.release_type != 'Action'
       run: |
-        mapfile -t RELEASE_TAGS < <(gh api --paginate "repos/${{ github.repository }}/tags?per_page=100" --jq '.[].name' 2>/dev/null | grep -E '^r[0-9]+$' || true)
+        mapfile -t RELEASE_TAGS < <(gh api --paginate "repos/${{ env.RELEASE_REPO }}/tags?per_page=100" --jq '.[].name' 2>/dev/null | grep -E '^r[0-9]+$' || true)
 
         LATEST_REV=0
         for TAG in "${RELEASE_TAGS[@]}"; do
@@ -391,9 +442,9 @@ jobs:
         fi
 
         if [[ ${#RELEASE_TAGS[@]} -gt 0 ]]; then
-          echo "Latest r-tag: r${LATEST_REV}"
+          echo "Latest r-tag in ${{ env.RELEASE_REPO }}: r${LATEST_REV}"
         else
-          echo "No existing r-tags found; starting at r1"
+          echo "No existing r-tags found in ${{ env.RELEASE_REPO }}; starting at r1"
         fi
         echo "New tag: $NEW_TAG"
         echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
@@ -404,12 +455,11 @@ jobs:
       run: |
         set -euo pipefail
 
-        # Format release title: convert rN -> Release N
         if [[ "${NEW_TAG}" =~ ^r([0-9]+)$ ]]; then
           REV_NUM="${BASH_REMATCH[1]}"
-          release_title="Wild Kernels for GKI2 Devices 5.10+ Release ${REV_NUM}"
+          release_title="Nerest Kernels for GKI2 Devices 5.10+ Release ${REV_NUM}"
         else
-          release_title="Wild Kernels for GKI2 Devices 5.10+ Release ${NEW_TAG}"
+          release_title="Nerest Kernels for GKI2 Devices 5.10+ Release ${NEW_TAG}"
         fi
 
         echo "release_title=$release_title" >> "$GITHUB_OUTPUT"
@@ -421,55 +471,78 @@ jobs:
       run: |
         set -euo pipefail
 
-        KSUN_BRANCH="dev"
-
-        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
-          echo "Cloning KernelSU-Next from full branch tip: $KSUN_BRANCH"
-          git clone --branch "$KSUN_BRANCH" https://github.com/KernelSU-Next/KernelSU-Next.git /tmp/kernelsu-next
-        else
-          echo "Cloning KernelSU-Next from branch: $KSUN_BRANCH"
-          git clone --depth=1 --branch "$KSUN_BRANCH" https://github.com/KernelSU-Next/KernelSU-Next.git /tmp/kernelsu-next
-        fi
-
-        cd /tmp/kernelsu-next
-
-        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
-          KSUN_COMMIT=$(git rev-parse HEAD)
-        else
-          # Extract KernelSU commit and branch from commits config
-          KSUN_COMMIT=$(jq -er '.kernelsu.dev' "$COMMITS_JSON_PATH")
-          echo "Checking out commit: $KSUN_COMMIT"
-          git fetch --depth=50 origin "$KSUN_COMMIT"
-          git checkout "$KSUN_COMMIT"
-        fi
-
-        # Extract version info
-        COMMITS_COUNT=$(git rev-list --count HEAD)
+        KSU_VARIANT="${{ inputs.ksu_variant }}"
         BASE_VERSION=30000
-        KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
 
-        # Extract git tag
+        case "$KSU_VARIANT" in
+          Next)
+            KSU_REPO="https://github.com/KernelSU-Next/KernelSU-Next.git"
+            KSU_BRANCH="dev"
+            JSON_KEY=".kernelsu.dev"
+            ;;
+          KSU)
+            KSU_REPO="https://github.com/tiann/KernelSU.git"
+            KSU_BRANCH="main"
+            JSON_KEY=".ksu.main"
+            ;;
+          MKSU)
+            KSU_REPO="https://github.com/5ec1cff/KernelSU.git"
+            KSU_BRANCH="main"
+            JSON_KEY=".mksu.main"
+            ;;
+          KowSU)
+            KSU_REPO="https://github.com/KOWX712/KernelSU-Next.git"
+            KSU_BRANCH="master"
+            JSON_KEY=".kowsu.master"
+            ;;
+          ReSukiSU)
+            KSU_REPO="https://github.com/ReSukiSU/ReSukiSU.git"
+            KSU_BRANCH="main"
+            JSON_KEY=".resukisu.main"
+            BASE_VERSION=33275
+            ;;
+          WKSU)
+            KSU_REPO="https://github.com/WildKernels/Wild_KSU.git"
+            KSU_BRANCH="stable"
+            JSON_KEY=".wksu.stable"
+            ;;
+          *)
+            echo "Unknown ksu_variant: $KSU_VARIANT" >&2
+            exit 1
+            ;;
+        esac
+
+        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
+          echo "Cloning $KSU_VARIANT from branch tip: $KSU_BRANCH"
+          git clone --branch "$KSU_BRANCH" "$KSU_REPO" /tmp/ksu-source
+        else
+          echo "Cloning $KSU_VARIANT with deep history for pinned commit"
+          git clone "$KSU_REPO" /tmp/ksu-source
+        fi
+
+        cd /tmp/ksu-source
+
+        if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
+          KSU_COMMIT=$(git rev-parse HEAD)
+        else
+          KSU_COMMIT=$(jq -er "$JSON_KEY" "$COMMITS_JSON_PATH" 2>/dev/null || git rev-parse HEAD)
+          echo "Checking out pinned commit: $KSU_COMMIT"
+          git fetch --depth=50 origin "$KSU_COMMIT"
+          git checkout "$KSU_COMMIT"
+        fi
+
+        COMMITS_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+        KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
         KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
 
-        MANAGER_RUN_ID=$(curl -fsSL "https://api.github.com/repos/KernelSU-Next/KernelSU-Next/actions/workflows/build-manager-ci.yml/runs?head_sha=${KSUN_COMMIT}" | jq -r '.workflow_runs[0].id // empty')
-        if [[ -n "${MANAGER_RUN_ID:-}" ]]; then
-          KSU_MANAGER="https://github.com/KernelSU-Next/KernelSU-Next/actions/runs/${MANAGER_RUN_ID}"
-        else
-          KSU_MANAGER="https://github.com/KernelSU-Next/KernelSU-Next/actions/workflows/build-manager-ci.yml"
-        fi
-
-        echo "Commits count: $COMMITS_COUNT"
+        echo "KSU Variant: $KSU_VARIANT"
         echo "KSU Version: $KSU_VERSION"
         echo "KSU Git Tag: $KSU_GIT_TAG"
-        echo "KSU Manager: $KSU_MANAGER"
 
-        # Export as environment for next step
-        echo "KSUN_BRANCH=$KSUN_BRANCH" >> $GITHUB_ENV
-        echo "KSUN_COMMIT=$KSUN_COMMIT" >> $GITHUB_ENV
-        echo "KSU_COMMITS_COUNT=$COMMITS_COUNT" >> $GITHUB_ENV
+        echo "KSU_VARIANT=$KSU_VARIANT" >> $GITHUB_ENV
+        echo "KSU_COMMIT=$KSU_COMMIT" >> $GITHUB_ENV
         echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> $GITHUB_ENV
-        echo "KSU_MANAGER=$KSU_MANAGER" >> $GITHUB_ENV
 
     - name: Set release body
       run: |
@@ -492,7 +565,7 @@ jobs:
       uses: actions/download-artifact@v7
       with:
         path: release-assets
-        pattern: '*-AnyKernel3'
+        pattern: '*-AK3'
         merge-multiple: false
 
     - name: Zip AnyKernel3 for Release
@@ -500,7 +573,7 @@ jobs:
         set -e
         shopt -s nullglob
 
-        for dir in release-assets/*-AnyKernel3; do
+        for dir in release-assets/*-AK3; do
           zip_name="${dir}.zip"
           rm -f "$zip_name"
           cd "$dir"
@@ -511,6 +584,8 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
+        repository: ${{ env.RELEASE_REPO }}
+        token: ${{ secrets.RELEASE_TOKEN || github.token }}
         tag_name: ${{ steps.tag.outputs.new_tag }}
         name: ${{ steps.release_meta.outputs.release_title }}
         body_path: release_body.md
