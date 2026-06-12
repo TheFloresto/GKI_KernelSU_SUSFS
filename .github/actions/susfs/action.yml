@@ -71,6 +71,50 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
 
+    - name: Apply KSU SUSFS Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        KSU_VARIANT="${{ inputs.ksu_variant }}"
+        KSU_DIR="${KSU_DIR:-KernelSU-Next}"
+
+        case "$KSU_VARIANT" in
+          Next)
+            ;;
+          KSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          MKSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          KowSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          ReSukiSU)
+            ;;
+          WKSU)
+            PATCH_SRC="$(ls ${{ github.workspace }}/kernel_patches/wild/ksun-*-susfs-v2.1.0-*.patch 2>/dev/null | head -n1 || true)"
+            ;;
+          *)
+            PATCH_SRC=""
+            ;;
+        esac
+
+        if [ -z "$PATCH_SRC" ] || [ ! -f "$PATCH_SRC" ]; then
+          echo "::warning::No KSU SUSFS patch found for variant $KSU_VARIANT, skipping"
+          exit 0
+        fi
+
+        if [ ! -d "$KSU_DIR" ]; then
+          echo "::warning::$KSU_DIR not found; using KernelSU-Next as fallback"
+          KSU_DIR="KernelSU-Next"
+        fi
+
+        cd "$KSU_DIR"
+        cp "$PATCH_SRC" ./
+        patch -p1 < "$(basename "$PATCH_SRC")" || true
+
     - name: Apply Android 12 5.10 Fake Patches
       shell: bash
       if: inputs.version == 'android12-5.10'
