@@ -30,8 +30,8 @@ runs:
 
         if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
           KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
-          sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-Wild\"" >> scripts/setlocalversion
+          sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-TheFloresto\"" >> scripts/setlocalversion
         else
-          sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-Wild\"" >> scripts/setlocalversion
+          sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-TheFloresto\"" >> scripts/setlocalversion
         fi
         chmod +x scripts/setlocalversion
