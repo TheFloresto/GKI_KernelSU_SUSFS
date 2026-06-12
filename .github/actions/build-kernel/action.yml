@@ -178,13 +178,17 @@ runs:
         echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
         echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
 
-        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
-        echo "Kernel Uname: $KERNEL_UNAME"
-        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
-
         echo ""
         echo "ccache Post-Build Statistics"
         echo "============================================"
         ccache -s
         echo "============================================"
         echo "::endgroup::"
+
+    - name: 'Check name'
+      shell: bash
+      run: |
+        set -euo pipefail
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+        echo "Kernel Uname: $KERNEL_UNAME"
+        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
