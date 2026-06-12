@@ -20,6 +20,10 @@ inputs:
   sublevel:
     description: 'Kernel sublevel'
     required: true
+  ksu_variant:
+    description: 'KSU variant (Next, KSU, MKSU, KowSU, ReSukiSU, WKSU)'
+    required: false
+    default: Next    
 
 runs:
   using: composite
