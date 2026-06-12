@@ -11,214 +11,255 @@ inputs:
 runs:
   using: composite
   steps:
-  - name: 'Activate Bypass'
-    shell: bash
-    working-directory: ${{ github.workspace }}/kernel
-    run: |
-      set -euo pipefail
-      if [ "${{ inputs.bypass }}" = "true" ]; then
-        if [[ ${{ inputs.version }} == "android14-6.1" || ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
-          TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module/version.c"
+    - name: 'Activate Bypass'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.bypass }}" = "true" ]; then
+          if [[ ${{ inputs.version }} == "android14-6.1" || ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
+            TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module/version.c"
+          else
+            TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module.c"
+          fi
+
+          sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
+
+          if ! grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
+            echo "Patch failed! 'return 1;' not found at bad_version:"
+            grep -A 10 "bad_version:" "$TARGET_FILE" || true
+            exit 1
+          fi
         else
-          TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module.c"
+          echo "Bypass hack not applied as per input parameter."
         fi
 
-        sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
+    - name: Setup Kernel Configs
+      if: false
+      uses: ./.github/actions/set-kernel-config
+  
+    - name: 'Install Build Dependencies'
+      shell: bash
+      run: |
+        set -euo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          ccache \
+          flex bison \
+          libelf-dev libssl-dev libncurses-dev zlib1g-dev \
+          liblz4-tool libxml2-utils \
+          rsync unzip dwarves bc dos2unix kmod libdw-dev elfutils \
+          lld llvm cpio python3
+        ccache --version | head -n1
 
-        if ! grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
-          echo "Patch failed! 'return 1;' not found at bad_version:"
-          grep -A 10 "bad_version:" "$TARGET_FILE" || true
+    - name: 'Setup Greenforce Clang and Env'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
+
+        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+
+        if [ ! -x "$CLANG_DIR/bin/clang" ]; then
+          echo "::error::greenforce clang install failed or layout unexpected at $CLANG_DIR"
+          ls -la "$CLANG_DIR" || true
           exit 1
         fi
-      else
-        echo "Bypass hack not applied as per input parameter."
-      fi
 
-  - name: Setup Kernel Configs
-    if: false
-    uses: ./.github/actions/set-kernel-config
-  
-  - name: 'Build Kernel'
-    shell: bash
-    working-directory: ${{ github.workspace }}/kernel
-    env:
-      PYTHONWARNINGS: "ignore:invalid escape sequence"
-    run: |
-      set -euo pipefail
-      echo "::group::Build kernel with ccache optimization"
+        echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
+        echo "CLANG_BIN_PATH=$CLANG_DIR/bin" >> "$GITHUB_ENV"
 
-      KERNEL_ROOT="${{ github.workspace }}/kernel"
-      FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
+        CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1)
+        echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
+        echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
+        echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
 
-      : > "$KERNEL_ROOT/common/.scmversion"
+        "$CLANG_DIR/bin/clang" --version | head -2
 
-      export PYTHONWARNINGS="${PYTHONWARNINGS}"
+    - name: 'Build Kernel'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      env:
+        PYTHONWARNINGS: "ignore:invalid escape sequence"
+      run: |
+        set -euo pipefail
+        echo "::group::Build kernel with ccache optimization"
 
-      echo "Getting last commit timestamp from kernel source..."
-      COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
-      COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        KERNEL_ROOT="${{ github.workspace }}/kernel"
+        FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
 
-      WORKSPACE="${GITHUB_WORKSPACE}"
-      MAP="-fdebug-prefix-map=${WORKSPACE}=."
-      MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
-      FPMAP="-ffile-prefix-map=${WORKSPACE}=."
+        : > "$KERNEL_ROOT/common/.scmversion"
 
-      export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -D__ANDROID_COMMON_KERNEL__"
-      export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
+        export PYTHONWARNINGS="${PYTHONWARNINGS}"
 
-      export LLVM=1 LLVM_IAS=1
-      export ARCH=arm64 SUBARCH=arm64
-      export CROSS_COMPILE=aarch64-linux-gnu-
+        echo "Getting last commit timestamp from kernel source..."
+        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-      if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
-        export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
-      else
-        export PAHOLE="$(which pahole || true)"
-      fi
-      echo "Using pahole: $PAHOLE ($($PAHOLE --version 2>/dev/null || echo 'unknown version'))"
+        WORKSPACE="${GITHUB_WORKSPACE}"
+        MAP="-fdebug-prefix-map=${WORKSPACE}=."
+        MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
+        FPMAP="-ffile-prefix-map=${WORKSPACE}=."
 
-      export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm
-      export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+        export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -D__ANDROID_COMMON_KERNEL__"
+        export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
 
-      set +u
-      source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
-      set -u
+        export LLVM=1 LLVM_IAS=1
+        export ARCH=arm64 SUBARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
 
-      export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
-      export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
-      export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
-      export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
-      export KBUILD_BUILD_VERSION=1
-
-      echo "Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
-      echo "SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
-
-      export CC="ccache clang"
-      export CXX="ccache clang++"
-      export HOSTCC="ccache clang"
-      export HOSTCXX="ccache clang++"
-
-      export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
-
-      OUT="out"
-      mkdir -p "$OUT"
-
-      echo "============================================"
-      echo "Compiler & ccache Verification"
-      echo "which clang: $(which clang)"
-      echo "CC: $CC"
-      echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
-      ccache -s || true
-      echo "============================================"
-
-      # Отключаем проверку defconfig, как в оригинальном скрипте
-      sed -i 's/check_defconfig//' ./common/build.config.gki || true
-
-      make O="$OUT" gki_defconfig
-
-      # Merge thefloresto.fragment into .config
-      if [ -f "$FRAGMENT" ]; then
-        ./common/scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
-      else
-        echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
-      fi
-
-      # Извлекаем "android14" из "android14-6.1"
-      ANDROID_PREFIX=$(echo "${{ inputs.version }}" | cut -d'-' -f1)
-      LOCAL_LOCALVERSION="-${ANDROID_PREFIX}${CUSTOM_LOCALVERSION:--TheFloresto}"
-      
-      if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
-        ./common/scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
-        ./common/scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-        sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' ./common/scripts/setlocalversion || true
-      fi
-
-      ./common/scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
-      ./common/scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-      KCFLAGS_EXTRA="-O2"
-
-      ./common/scripts/config --file "$OUT/.config" -e LTO_CLANG
-      ./common/scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
-      ./common/scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
-      ./common/scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
-
-      make O="$OUT" olddefconfig
-
-      KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
-      KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
-
-      echo "============================================"
-      echo "Build Configuration"
-      echo "Kernel Version Input: ${{ inputs.version }}"
-      echo "Calculated LOCALVERSION: ${LOCAL_LOCALVERSION}"
-      echo "============================================"
-
-      BUILD_START=$(date +%s)
-      make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
-
-      BUILD_END=$(date +%s)
-      BUILD_TIME=$((BUILD_END - BUILD_START))
-      echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
-
-      IMG="$OUT/arch/arm64/boot/Image"
-      if [ ! -f "$IMG" ]; then
-        echo "::error::Kernel Image missing"
-        echo "::group::Last 100 lines of build log"
-        tail -n 100 build.log || echo "Build log not available"
-        echo "::endgroup::"
-        exit 1
-      fi
-
-      # Копируем собранный Image туда, где его ждет шаг 'Gather Build Artifacts'
-      mkdir -p /home/runner/out
-      cp "$IMG" /home/runner/out/Image
-
-      IMG_SIZE=$(stat -c%s "$IMG")
-      echo "============================================"
-      echo "Build Completed Successfully"
-      echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
-      echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
-
-      echo ""
-      echo "ccache Post-Build Statistics"
-      echo "============================================"
-      ccache -s
-      echo "============================================"
-      echo "::endgroup::"
-
-  - name: 'Gather Build Artifacts'
-    shell: bash
-    working-directory: ${{ github.workspace }}
-    run: |
-      set -euo pipefail
-      if [ -f "/home/runner/out/dist/Image" ]; then
-        echo "Found Image at /home/runner/out/dist/Image"
-        if [[ ${{ inputs.bypass }} == "true" ]]; then
-          cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+        if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
+          export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
         else
-          cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Image"
-          echo "Kernel Version:"
-          strings "/home/runner/out/dist/Image" | grep -m1 "^Linux version "
+          export PAHOLE="$(which pahole || true)"
         fi
+        echo "Using pahole: $PAHOLE ($($PAHOLE --version 2>/dev/null || echo 'unknown version'))"
+
+        export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm
+        export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+
+        set +u
+        source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
+        set -u
+
+        export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
+        export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
+        export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
+        export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
+        export KBUILD_BUILD_VERSION=1
+
+        echo "Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
+        echo "SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+
+        export CC="ccache clang"
+        export CXX="ccache clang++"
+        export HOSTCC="ccache clang"
+        export HOSTCXX="ccache clang++"
+
+        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+
+        OUT="out"
+        mkdir -p "$OUT"
+
+        echo "============================================"
+        echo "Compiler & ccache Verification"
+        echo "which clang: $(which clang)"
+        echo "CC: $CC"
+        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+        ccache -s || true
+        echo "============================================"
+
+        # Отключаем проверку defconfig, как в оригинальном скрипте
+        sed -i 's/check_defconfig//' ./common/build.config.gki || true
+
+        # Указываем kbuild искать исходники и Makefile сборки ядра внутри каталога common/
+        make -C common O="../$OUT" gki_defconfig
+
+        # Merge thefloresto.fragment into .config
+        if [ -f "$FRAGMENT" ]; then
+          ./common/scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
+        else
+          echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
+        fi
+
+        # Извлекаем "android14" из "android14-6.1"
+        ANDROID_PREFIX=$(echo "${{ inputs.version }}" | cut -d'-' -f1)
+        LOCAL_LOCALVERSION="-${ANDROID_PREFIX}${CUSTOM_LOCALVERSION:--TheFloresto}"
+        
+        if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
+          ./common/scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
+          ./common/scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' ./common/scripts/setlocalversion || true
+        fi
+
+        ./common/scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+        ./common/scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        KCFLAGS_EXTRA="-O2"
+
+        ./common/scripts/config --file "$OUT/.config" -e LTO_CLANG
+        ./common/scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
+        ./common/scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
+        ./common/scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
+
+        make -C common O="../$OUT" olddefconfig
+
+        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
+        KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+
+        echo "============================================"
+        echo "Build Configuration"
+        echo "Kernel Version Input: ${{ inputs.version }}"
+        echo "Calculated LOCALVERSION: ${LOCAL_LOCALVERSION}"
+        echo "============================================"
+
+        BUILD_START=$(date +%s)
+        make -C common -j"$(nproc --all)" O="../$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+
+        BUILD_END=$(date +%s)
+        BUILD_TIME=$((BUILD_END - BUILD_START))
+        echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+
+        IMG="$OUT/arch/arm64/boot/Image"
+        if [ ! -f "$IMG" ]; then
+          echo "::error::Kernel Image missing"
+          echo "::group::Last 100 lines of build log"
+          tail -n 100 build.log || echo "Build log not available"
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        # Копируем собранный Image туда, где его ждет шаг 'Gather Build Artifacts'
+        mkdir -p /home/runner/out
+        cp "$IMG" /home/runner/out/Image
+
+        IMG_SIZE=$(stat -c%s "$IMG")
+        echo "============================================"
+        echo "Build Completed Successfully"
+        echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
+        echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
+
+        echo ""
+        echo "ccache Post-Build Statistics"
+        echo "============================================"
+        ccache -s
+        echo "============================================"
+        echo "::endgroup::"
+
+    - name: 'Gather Build Artifacts'
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        if [ -f "/home/runner/out/dist/Image" ]; then
+          echo "Found Image at /home/runner/out/dist/Image"
+          if [[ ${{ inputs.bypass }} == "true" ]]; then
+            cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+          else
+            cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Image"
+            echo "Kernel Version:"
+            strings "/home/runner/out/dist/Image" | grep -m1 "^Linux version "
+          fi
           exit 0
         fi
-      if [ -f "/home/runner/out/Image" ]; then
-        echo "Found Image at /home/runner/out/Image"
-        if [[ ${{ inputs.bypass }} == "true" ]]; then
-          cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
-        else
-          cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Image"
+        if [ -f "/home/runner/out/Image" ]; then
+          echo "Found Image at /home/runner/out/Image"
+          if [[ ${{ inputs.bypass }} == "true" ]]; then
+            cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+          else
+            cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Image"
+          fi
+          exit 0
         fi
-        exit 0
-      fi
 
-      exit 1
+        exit 1
 
-  - name: 'Patch AnyKernel3 for Bypass Hack'
-    shell: bash
-    if: ${{ inputs.bypass == 'true' }}
-    working-directory: ${{ github.workspace }}/AnyKernel3
-    run: |
-      set -euo pipefail
-      cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
-      patch -p1 < bypass.patch
+    - name: 'Patch AnyKernel3 for Bypass Hack'
+      shell: bash
+      if: ${{ inputs.bypass == 'true' }}
+      working-directory: ${{ github.workspace }}/AnyKernel3
+      run: |
+        set -euo pipefail
+        cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
+        patch -p1 < bypass.patch
