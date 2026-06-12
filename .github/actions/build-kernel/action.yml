@@ -50,7 +50,7 @@ runs:
           libelf-dev libssl-dev libncurses-dev zlib1g-dev \
           liblz4-tool libxml2-utils \
           rsync unzip dwarves bc dos2unix kmod libdw-dev elfutils \
-          lld llvm cpio python3
+          lld llvm cpio python3 gcc-arm-linux-gnueabi
         ccache --version | head -n1
 
     - name: 'Setup Greenforce Clang and Env'
@@ -110,6 +110,7 @@ runs:
         export LLVM=1 LLVM_IAS=1
         export ARCH=arm64 SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
+        export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
         if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
           export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
