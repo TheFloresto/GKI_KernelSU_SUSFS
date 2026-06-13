@@ -330,6 +330,7 @@ jobs:
       with:
         version: ${{ inputs.version }}
         bypass: false
+        android_version: ${{ inputs.android_version }}     
 
     - name: Get Cache Stats
       uses: ./.github/actions/cache-stats
@@ -377,6 +378,7 @@ jobs:
       with:
         bypass: true
         version: ${{ inputs.version }}
+        android_version: ${{ inputs.android_version }}
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v7
