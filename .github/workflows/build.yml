@@ -175,6 +175,17 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         ksu_variant: ${{ inputs.ksu_variant }}
 
+    - name: Recompose File Name with KSU Version
+      id: filename
+      uses: ./.github/actions/extract-sublevel-file-name
+      with:
+        android_version: ${{ inputs.android_version }}
+        kernel_version: ${{ inputs.kernel_version }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
+        os_patch_level: ${{ inputs.os_patch_level }}
+        variant: ${{ inputs.variant }}
+        ksu_variant: ${{ inputs.ksu_variant }}
+
     - name: Baseband Guard
       if: (contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'FULL')
       uses: ./.github/actions/bbg
