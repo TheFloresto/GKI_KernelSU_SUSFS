@@ -7,6 +7,9 @@ inputs:
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
     required: true
+  android_version:
+    required: true
+    type: string   
 
 runs:
   using: composite
@@ -215,7 +218,7 @@ runs:
         BUILD_TIME=$((BUILD_END - BUILD_START))
         echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
-        IMG="$OUT/arch/arm64/boot/Image"
+        IMG="$OUT/arch/arm64/boot/Image" >> "$GITHUB_ENV"
         if [ ! -f "$IMG" ]; then
           echo "::error::Kernel Image missing"
           echo "::group::Last 100 lines of build log"
