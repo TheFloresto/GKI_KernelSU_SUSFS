@@ -6,15 +6,14 @@ inputs:
     required: true
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
-    required: true
+    required: true   
   android_version:
     description: 'android version'
-    required: true
+    required: true   
 
 runs:
   using: composite
   steps:
-
     - name: 'Activate Bypass'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
@@ -38,26 +37,61 @@ runs:
           echo "Bypass hack not applied as per input parameter."
         fi
 
+    - name: Setup Kernel Configs
+      if: false
+      uses: ./.github/actions/set-kernel-config
+  
     - name: 'Install Build Dependencies'
       shell: bash
       run: |
         set -euo pipefail
+        echo "::group::Install dependencies"
         sudo apt-get -o Acquire::Retries=3 update -qq
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
           git curl ca-certificates build-essential clang lld llvm llvm-dev flex bison \
           libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
           libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz
         sudo apt-get clean
+        echo "✅ Dependencies installed"
+        echo "::endgroup::"        
+
+    - name: 'Setup Greenforce Clang and Env'
+      if: false
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
+
+        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+
+        if [ ! -x "$CLANG_DIR/bin/clang" ]; then
+          echo "::error::greenforce clang install failed or layout unexpected at $CLANG_DIR"
+          ls -la "$CLANG_DIR" || true
+          exit 1
+        fi
+
+        echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
+        echo "CLANG_BIN_PATH=$CLANG_DIR/bin" >> "$GITHUB_ENV"
+
+        CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1)
+        echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
+        echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
+        echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
+
+        "$CLANG_DIR/bin/clang" --version | head -2
 
     - name: Customize Kernel Branding
       shell: bash
       run: |
         set -euo pipefail
-        ANDROID_VER="${{ inputs.android_version }}"
+        echo "Customize Kernel Branding"
+        
+        ANDROID_VER="${{ inputs.android_version }}" 
         CUSTOM_LOCALVERSION="-${ANDROID_VER}-TheFloresto"
         echo "CUSTOM_LOCALVERSION=${CUSTOM_LOCALVERSION}" >> "$GITHUB_ENV"
         echo "Branding set to: $CUSTOM_LOCALVERSION"
-
+        
     - name: 'Build Kernel'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
@@ -65,6 +99,7 @@ runs:
         PYTHONWARNINGS: "ignore:invalid escape sequence"
       run: |
         set -euo pipefail
+        echo "::group::Build kernel with ccache optimization"
 
         KERNEL_ROOT="${KERNEL_ROOT:-$GITHUB_WORKSPACE/kernel}"
         FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
@@ -72,12 +107,42 @@ runs:
         cd "$KERNEL_ROOT/common"
         : > "$KERNEL_ROOT/common/.scmversion"
 
+        export PYTHONWARNINGS="${PYTHONWARNINGS}"
+
+        echo "Getting last commit timestamp from kernel source..."
         COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
         COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+        WORKSPACE="${GITHUB_WORKSPACE}"
+        MAP="-fdebug-prefix-map=${WORKSPACE}=."
+        MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
+        FPMAP="-ffile-prefix-map=${WORKSPACE}=."
+
+        export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -D__ANDROID_COMMON_KERNEL__"
+        export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
 
         export LLVM=1 LLVM_IAS=1
         export ARCH=arm64 SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
+
+        if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
+          export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
+        else
+          export PAHOLE="$(which pahole || true)"
+        fi
+
+        export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm
+        export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+
+        set +u
+        source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
+        set -u
+
+        export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
+        export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
+        export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
+        export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
+        export KBUILD_BUILD_VERSION=1
 
         OUT=out
         mkdir -p "$OUT"
@@ -93,43 +158,53 @@ runs:
         scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
         sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion || true
 
+        scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+        scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        KCFLAGS_EXTRA="-O2"
+
+        scripts/config --file "$OUT/.config" -e LTO_CLANG
+        scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
+
         make O="$OUT" olddefconfig
 
+        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
+        KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+
         BUILD_START=$(date +%s)
-        make -j"$(nproc --all)" O="$OUT" 2>&1 | tee build.log
+        make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
         BUILD_END=$(date +%s)
-        echo "BUILD_TIME=$((BUILD_END - BUILD_START))" >> "$GITHUB_ENV"
+        BUILD_TIME=$((BUILD_END - BUILD_START))
+        echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
         echo "Searching for Image..."
 
-        # NEW GKI path
         FOUND_IMG=$(find "$KERNEL_ROOT" -type f -path "*/dist/Image" | head -n 1 || true)
 
-        # Legacy fallback
-        if [ -z "$FOUND_IMG" ] && [ -f "$OUT/arch/arm64/boot/Image" ]; then
-          FOUND_IMG="$OUT/arch/arm64/boot/Image"
-        fi
-
         if [ -z "$FOUND_IMG" ]; then
-          echo "::error::Kernel Image not found"
+          echo "::error::Kernel Image not found in any known location"
+          echo "::group::Last 100 lines of build log"
           tail -n 100 build.log || true
+          echo "::endgroup::"
           exit 1
         fi
 
-        echo "Found Image at: $FOUND_IMG"
-        echo "IMG=$FOUND_IMG" >> "$GITHUB_ENV"
-        export IMG="$FOUND_IMG"
+        IMG="$FOUND_IMG"
+        echo "Found Image at: $IMG"
+        echo "IMG=$IMG" >> "$GITHUB_ENV"
+
+        IMG_SIZE=$(stat -c%s "$IMG")
+        echo "Build Completed Successfully"
+        echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
+
+        echo "::endgroup::"
 
     - name: 'Check name'
       shell: bash
       run: |
         set -euo pipefail
-        if [ ! -f "$IMG" ]; then
-          echo "::warning::IMG file not found: $IMG"
-          KERNEL_UNAME=""
-        else
-          KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
-        fi
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
         echo "Kernel Uname: $KERNEL_UNAME"
         echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
 
@@ -143,7 +218,8 @@ runs:
             cp "$IMG" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
           else
             cp "$IMG" "${{ github.workspace }}/AnyKernel3/Image"
-            strings "$IMG" | grep -m1 "^Linux version " || true
+            echo "Kernel Version:"
+            strings "$IMG" | grep -m1 "^Linux version "
           fi
           exit 0
         fi
@@ -157,5 +233,5 @@ runs:
       working-directory: ${{ github.workspace }}/AnyKernel3
       run: |
         set -euo pipefail
-        cp ${{ github.action_path }}/patches/bypass.patch bypass.patch
+        cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
         patch -p1 < bypass.patch
