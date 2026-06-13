@@ -6,10 +6,10 @@ inputs:
     required: true
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
-    required: true   
+    required: true
   android_version:
     description: 'android version'
-    required: true   
+    required: true
 
 runs:
   using: composite
@@ -40,7 +40,7 @@ runs:
     - name: Setup Kernel Configs
       if: false
       uses: ./.github/actions/set-kernel-config
-  
+
     - name: 'Install Build Dependencies'
       shell: bash
       run: |
@@ -53,7 +53,7 @@ runs:
           libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz
         sudo apt-get clean
         echo "✅ Dependencies installed"
-        echo "::endgroup::"        
+        echo "::endgroup::"
 
     - name: 'Setup Greenforce Clang and Env'
       if: false
@@ -86,19 +86,13 @@ runs:
       run: |
         set -euo pipefail
         echo "Customize Kernel Branding"
-        
-        # Определяем переменные, если они не заданы в env
-        # Используем стандартные переменные GitHub или ваши параметры
-        ANDROID_VER="${{ inputs.android_version }}" 
-        
-        # Создаем кастомный локальный нейминг
+
+        ANDROID_VER="${{ inputs.android_version }}"
         CUSTOM_LOCALVERSION="-${ANDROID_VER}-TheFloresto"
-        
-        # Сохраняем для использования в других шагах (через GITHUB_ENV)
+
         echo "CUSTOM_LOCALVERSION=${CUSTOM_LOCALVERSION}" >> "$GITHUB_ENV"
-                
         echo "Branding set to: $CUSTOM_LOCALVERSION"
-        
+
     - name: 'Build Kernel'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
@@ -175,7 +169,6 @@ runs:
 
         make O="$OUT" gki_defconfig
 
-        # Merge thefloresto.fragment into .config
         if [ -f "$FRAGMENT" ]; then
           ./scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
         else
@@ -213,20 +206,28 @@ runs:
 
         BUILD_START=$(date +%s)
         make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
-
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - BUILD_START))
         echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
-        IMG="$OUT/arch/arm64/boot/Image"
-        if [ ! -f "$IMG" ]; then
-          echo "::error::Kernel Image missing"
+        echo "Searching for Image..."
+
+        FOUND_IMG=$(find "$KERNEL_ROOT" -type f -path "*/dist/Image" | head -n 1 || true)
+
+        if [ -z "$FOUND_IMG" ] && [ -f "$OUT/arch/arm64/boot/Image" ]; then
+          FOUND_IMG="$OUT/arch/arm64/boot/Image"
+        fi
+
+        if [ -z "$FOUND_IMG" ]; then
+          echo "::error::Kernel Image not found in any known location"
           echo "::group::Last 100 lines of build log"
           tail -n 100 build.log || echo "Build log not available"
           echo "::endgroup::"
           exit 1
         fi
 
+        echo "Found Image at: $FOUND_IMG"
+        IMG="$FOUND_IMG"
         echo "IMG=$IMG" >> "$GITHUB_ENV"
 
         IMG_SIZE=$(stat -c%s "$IMG")
@@ -246,7 +247,15 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+        if [ -z "${IMG:-}" ]; then
+          echo "::warning::IMG is not set in environment"
+        fi
+        if [ ! -f "$IMG" ]; then
+          echo "::warning::IMG file not found at: $IMG"
+          KERNEL_UNAME=""
+        else
+          KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+        fi
         echo "Kernel Uname: $KERNEL_UNAME"
         echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
 
@@ -255,27 +264,18 @@ runs:
       working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail
-        if [ -f "/home/runner/out/dist/Image" ]; then
-          echo "Found Image at /home/runner/out/dist/Image"
+        if [ -f "$IMG" ]; then
           if [[ ${{ inputs.bypass }} == "true" ]]; then
-            cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+            cp "$IMG" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
           else
-            cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Image"
+            cp "$IMG" "${{ github.workspace }}/AnyKernel3/Image"
             echo "Kernel Version:"
-            strings "/home/runner/out/dist/Image" | grep -m1 "^Linux version "
-          fi
-          exit 0
-        fi
-        if [ -f "/home/runner/out/Image" ]; then
-          echo "Found Image at /home/runner/out/Image"
-          if [[ ${{ inputs.bypass }} == "true" ]]; then
-            cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
-          else
-            cp "/home/runner/out/Image" "${{ github.workspace }}/AnyKernel3/Image"
+            strings "$IMG" | grep -m1 "^Linux version " || true
           fi
           exit 0
         fi
 
+        echo "::error::IMG variable is set but file not found: $IMG"
         exit 1
 
     - name: 'Patch AnyKernel3 for Bypass Hack'
