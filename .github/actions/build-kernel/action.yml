@@ -88,8 +88,11 @@ runs:
         echo "Customize Kernel Branding"
         
         ANDROID_VER="${{ inputs.android_version }}" 
+        
         CUSTOM_LOCALVERSION="-${ANDROID_VER}-TheFloresto"
+        
         echo "CUSTOM_LOCALVERSION=${CUSTOM_LOCALVERSION}" >> "$GITHUB_ENV"
+                
         echo "Branding set to: $CUSTOM_LOCALVERSION"
         
     - name: 'Build Kernel'
@@ -130,6 +133,7 @@ runs:
         else
           export PAHOLE="$(which pahole || true)"
         fi
+        echo "Using pahole: $PAHOLE ($($PAHOLE --version 2>/dev/null || echo 'unknown version'))"
 
         export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm
         export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
@@ -144,19 +148,41 @@ runs:
         export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
         export KBUILD_BUILD_VERSION=1
 
+        echo "Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
+        echo "SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+
+        export CC="ccache clang"
+        export CXX="ccache clang++"
+        export HOSTCC="ccache clang"
+        export HOSTCXX="ccache clang++"
+
+        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+
         OUT=out
         mkdir -p "$OUT"
+
+        echo "============================================"
+        echo "Compiler & ccache Verification"
+        echo "which clang: $(which clang)"
+        echo "CC: $CC"
+        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+        ccache -s || true
+        echo "============================================"
 
         make O="$OUT" gki_defconfig
 
         if [ -f "$FRAGMENT" ]; then
           ./scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
+        else
+          echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
         fi
 
         LOCAL_LOCALVERSION="${CUSTOM_LOCALVERSION:--TheFloresto}"
-        scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
-        scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
-        sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion || true
+        if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
+          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion || true
+        fi
 
         scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
         scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
@@ -172,32 +198,46 @@ runs:
         KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
 
+        echo "============================================"
+        echo "Build Configuration"
+        echo "Kernel: ${KERNEL_VERSION:-?}.${SUBLEVEL:-?}"
+        echo "Android: ${ANDROID_VERSION:-?}"
+        echo "Variant: ${INPUT_VARIANT:-unknown}"
+        echo "ksu_variant: ${INPUT_KSU_VARIANT:-unknown}"
+        echo "============================================"
+
         BUILD_START=$(date +%s)
         make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - BUILD_START))
         echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
-        echo "Searching for Image..."
-
-        FOUND_IMG=$(find "$KERNEL_ROOT" -type f -path "*/dist/Image" | head -n 1 || true)
-
-        if [ -z "$FOUND_IMG" ]; then
-          echo "::error::Kernel Image not found in any known location"
+        # Указываем АБСОЛЮТНЫЙ путь к файлу Image
+        IMG="$PWD/$OUT/arch/arm64/boot/Image"
+        
+        if [ ! -f "$IMG" ]; then
+          echo "::error::Kernel Image missing"
           echo "::group::Last 100 lines of build log"
-          tail -n 100 build.log || true
+          tail -n 100 build.log || echo "Build log not available"
           echo "::endgroup::"
           exit 1
         fi
 
-        IMG="$FOUND_IMG"
-        echo "Found Image at: $IMG"
+        # Экспортируем путь для следующих шагов
         echo "IMG=$IMG" >> "$GITHUB_ENV"
 
         IMG_SIZE=$(stat -c%s "$IMG")
+        echo "============================================"
         echo "Build Completed Successfully"
+        echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
         echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
 
+        echo ""
+        echo "ccache Post-Build Statistics"
+        echo "============================================"
+        ccache -s
+        echo "============================================"
         echo "::endgroup::"
 
     - name: 'Check name'
@@ -213,7 +253,10 @@ runs:
       working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail
+        
+        # Теперь скрипт ищет файл по точному пути, который мы передали из шага Build
         if [ -f "$IMG" ]; then
+          echo "Found Image at $IMG"
           if [[ ${{ inputs.bypass }} == "true" ]]; then
             cp "$IMG" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
           else
@@ -224,7 +267,7 @@ runs:
           exit 0
         fi
 
-        echo "::error::IMG variable is set but file not found: $IMG"
+        echo "::error::Image not found at $IMG"
         exit 1
 
     - name: 'Patch AnyKernel3 for Bypass Hack'
