@@ -4,12 +4,20 @@ inputs:
   bypass:
     description: 'Whether to add the bypass hack or not'
     required: true
+  kernel_version:
+    required: true
+  sublevel:
+    required: true
+  os_patch_level:
+    required: true    
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
     required: true   
   android_version:
     description: 'android version'
     required: true   
+  ksu_variant:
+    required: true
 
 runs:
   using: composite
