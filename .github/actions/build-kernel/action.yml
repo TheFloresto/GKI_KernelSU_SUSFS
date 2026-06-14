@@ -58,7 +58,8 @@ runs:
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
           git curl ca-certificates build-essential clang lld llvm llvm-dev flex bison \
           libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz
+          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz \
+          gcc-arm-linux-gnueabi libc6-dev-i386
         sudo apt-get clean
         echo "✅ Dependencies installed"
         echo "::endgroup::"        
@@ -136,6 +137,7 @@ runs:
         export ARCH=arm64 SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
         export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+        export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
         if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
           export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
@@ -201,6 +203,7 @@ runs:
 
         scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
         scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        
         KCFLAGS_EXTRA="-O2"
 
         scripts/config --file "$OUT/.config" -e LTO_CLANG
