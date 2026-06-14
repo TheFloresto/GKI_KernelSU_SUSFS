@@ -106,28 +106,31 @@ runs:
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
         echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"
 
-    - name: 'Fix KernelSU for 6.12'
+    - name: 'Fix KernelSU Headers for 6.12'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
-        echo "::group::Fix KernelSU Kbuild for 6.12"
+        
+        # Проверяем наличие 6.12 в версии
         if [[ "${{ inputs.version }}" == *"6.12"* ]]; then
-          echo "Kernel 6.12 detected. Applying Kbuild fixes..."
-          KBUILD_PATH="${{ github.workspace }}/kernel/${KSU_DIR}/kernel/Kbuild"
+          echo "Обнаружено ядро 6.12, применяю исправления для KSU..."
+          
+          # Путь к Kbuild в папке с KSU
+          KBUILD_PATH="${{ github.workspace }}/kernel/$KSU_DIR/kernel/Kbuild"
           
           if [ -f "$KBUILD_PATH" ]; then
-            echo "Patching $KBUILD_PATH"
-            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' "$KBUILD_PATH"
-            sed -i 's|$(src)|$(abspath $(src))|' "$KBUILD_PATH"
-            sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' "$KBUILD_PATH"
+            # Добавляем инклуд uapi, так как на 6.12 он требуется принудительно
+            if ! grep -q "include/uapi" "$KBUILD_PATH"; then
+              sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' "$KBUILD_PATH"
+              echo "Пути к заголовочным файлам исправлены."
+            fi
           else
-            echo "::warning::Kbuild not found at $KBUILD_PATH. Cannot apply 6.12 fixes."
+            echo "::warning::Файл $KBUILD_PATH не найден."
           fi
         else
-          echo "Kernel is not 6.12 (Input: ${{ inputs.version }}). Skipping KSU fix."
+          echo "Версия ядра ${{ inputs.version }} не требует патчей для KSU, пропускаем."
         fi
-        echo "::endgroup::"
 
     - name: 'Fix KernelSU-Next'
       if: ${{ inputs.ksu_variant == 'Next' }}
