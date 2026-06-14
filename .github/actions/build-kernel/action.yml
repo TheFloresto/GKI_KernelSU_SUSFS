@@ -50,7 +50,7 @@ runs:
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
           git curl ca-certificates build-essential clang lld llvm llvm-dev flex bison \
           libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz
         sudo apt-get clean
         echo "✅ Dependencies installed"
         echo "::endgroup::"        
@@ -127,7 +127,6 @@ runs:
         export LLVM=1 LLVM_IAS=1
         export ARCH=arm64 SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
-        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-   
 
         if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
           export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
@@ -143,6 +142,12 @@ runs:
         source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
         set -u
 
+        export LDCACHE_DIR="$GITHUB_WORKSPACE/lto_cache"
+        mkdir -p "$LDCACHE_DIR"
+        echo '#!/bin/bash' > "$KERNEL_ROOT/common/ld-wrapper"
+        echo 'ld.lld "$@" --thinlto-cache-dir=$LDCACHE_DIR --thinlto-jobs=$(nproc --all)' >> "$KERNEL_ROOT/common/ld-wrapper"
+        chmod +x "$KERNEL_ROOT/common/ld-wrapper"
+
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
         export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
         export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
@@ -155,8 +160,8 @@ runs:
         export CC="ccache clang"
         export CXX="ccache clang++"
         export HOSTCC="ccache clang"
-        export HOSTCXX="ccache clang++"        
-        
+        export HOSTCXX="ccache clang++"
+
         export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
 
         OUT=out
@@ -170,7 +175,7 @@ runs:
         ccache -s || true
         echo "============================================"
 
-        make O="$OUT" gki_defconfig
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" gki_defconfig
 
         if [ -f "$FRAGMENT" ]; then
           ./scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
@@ -194,7 +199,7 @@ runs:
         scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
         scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
 
-        make O="$OUT" olddefconfig
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" olddefconfig
 
         KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
@@ -208,13 +213,12 @@ runs:
         echo "============================================"
 
         BUILD_START=$(date +%s)
-        make -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
 
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - BUILD_START))
         echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
-        # Указываем АБСОЛЮТНЫЙ путь к файлу Image
         IMG="$PWD/$OUT/arch/arm64/boot/Image"
         
         if [ ! -f "$IMG" ]; then
@@ -225,7 +229,6 @@ runs:
           exit 1
         fi
 
-        # Экспортируем путь для следующих шагов
         echo "IMG=$IMG" >> "$GITHUB_ENV"
 
         IMG_SIZE=$(stat -c%s "$IMG")
@@ -255,7 +258,6 @@ runs:
       run: |
         set -euo pipefail
         
-        # Теперь скрипт ищет файл по точному пути, который мы передали из шага Build
         if [ -f "$IMG" ]; then
           echo "Found Image at $IMG"
           if [[ ${{ inputs.bypass }} == "true" ]]; then
