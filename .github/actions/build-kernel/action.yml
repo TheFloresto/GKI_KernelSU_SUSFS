@@ -73,15 +73,17 @@ runs:
         mkdir -p "$GITHUB_WORKSPACE/zycromerz-clang"
         cd "$GITHUB_WORKSPACE/zycromerz-clang"
         
-        # Получаем прямую ссылку на .tar.gz архив из указанного релиза
-        ASSET_URL=$(curl -s https://api.github.com/repos/ZyCromerZ/Clang/releases/tags/23.0.0git-20260130-release | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' | head -n 1)
+        # Обходим лимиты API GitHub, получая прямую ссылку из HTML-страницы релиза
+        ASSET_PATH=$(curl -sL https://github.com/ZyCromerZ/Clang/releases/expanded_assets/23.0.0git-20260130-release | grep -oP 'href="\K[^"]+\.tar\.gz' | head -n 1)
         
-        if [ -z "$ASSET_URL" ]; then
-          echo "::error::Не удалось найти .tar.gz архив в релизе ZyCromerZ Clang."
+        if [ -z "$ASSET_PATH" ]; then
+          echo "::error::Не удалось найти .tar.gz архив на странице релиза."
           exit 1
         fi
         
+        ASSET_URL="https://github.com$ASSET_PATH"
         echo "Downloading from: $ASSET_URL"
+        
         wget -qO clang.tar.gz "$ASSET_URL"
         tar -xf clang.tar.gz
         rm clang.tar.gz
