@@ -1,6 +1,9 @@
 name: 'Setup Wild KSU'
 description: 'Download and configure Wild KSU with version tracking'
 inputs:
+  version:
+    description: 'Kernel config version (e.g., android14-6.12) needed for Kbuild patching'
+    required: false
   use_latest_commits:
     description: 'Use the latest commit on the branch instead of the pinned commit'
     required: false
@@ -102,6 +105,29 @@ runs:
         echo "KSU_VERSION=$KSU_VERSION" >> "$GITHUB_ENV"
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
         echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"
+
+    - name: 'Fix KernelSU for 6.12'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        echo "::group::Fix KernelSU Kbuild for 6.12"
+        if [[ "${{ inputs.version }}" == *"6.12"* ]]; then
+          echo "Kernel 6.12 detected. Applying Kbuild fixes..."
+          KBUILD_PATH="${{ github.workspace }}/kernel/${KSU_DIR}/kernel/Kbuild"
+          
+          if [ -f "$KBUILD_PATH" ]; then
+            echo "Patching $KBUILD_PATH"
+            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' "$KBUILD_PATH"
+            sed -i 's|$(src)|$(abspath $(src))|' "$KBUILD_PATH"
+            sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' "$KBUILD_PATH"
+          else
+            echo "::warning::Kbuild not found at $KBUILD_PATH. Cannot apply 6.12 fixes."
+          fi
+        else
+          echo "Kernel is not 6.12 (Input: ${{ inputs.version }}). Skipping KSU fix."
+        fi
+        echo "::endgroup::"
 
     - name: 'Fix KernelSU-Next'
       if: ${{ inputs.ksu_variant == 'Next' }}
