@@ -58,24 +58,40 @@ runs:
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
           git curl ca-certificates build-essential clang lld llvm llvm-dev flex bison \
           libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
-          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz \
-          gcc-arm-linux-gnueabi libc6-dev-i386
+          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz
         sudo apt-get clean
         echo "✅ Dependencies installed"
         echo "::endgroup::"        
 
-    - name: 'Setup Greenforce Clang and Env'
+    - name: 'Setup ZyCromerZ Clang and Env'
       if: true
       shell: bash
       run: |
         set -euo pipefail
 
-        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
+        echo "::group::Downloading and extracting ZyCromerZ Clang"
+        mkdir -p "$GITHUB_WORKSPACE/zycromerz-clang"
+        cd "$GITHUB_WORKSPACE/zycromerz-clang"
+        
+        # Получаем прямую ссылку на .tar.gz архив из указанного релиза
+        ASSET_URL=$(curl -s https://api.github.com/repos/ZyCromerZ/Clang/releases/tags/23.0.0git-20260130-release | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' | head -n 1)
+        
+        if [ -z "$ASSET_URL" ]; then
+          echo "::error::Не удалось найти .tar.gz архив в релизе ZyCromerZ Clang."
+          exit 1
+        fi
+        
+        echo "Downloading from: $ASSET_URL"
+        wget -qO clang.tar.gz "$ASSET_URL"
+        tar -xf clang.tar.gz
+        rm clang.tar.gz
+        echo "::endgroup::"
 
-        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+        CLANG_DIR="$GITHUB_WORKSPACE/zycromerz-clang"
 
+        # Проверка, что бинарник на месте
         if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-          echo "::error::greenforce clang install failed or layout unexpected at $CLANG_DIR"
+          echo "::error::ZyCromerZ Clang install failed or layout unexpected at $CLANG_DIR"
           ls -la "$CLANG_DIR" || true
           exit 1
         fi
