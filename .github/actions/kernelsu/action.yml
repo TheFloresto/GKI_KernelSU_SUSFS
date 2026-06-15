@@ -110,28 +110,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        set -euo pipefail
-        
-        # Проверяем наличие 6.12 в версии (разворачивается на этапе шаблона)
-        if [[ "${{ inputs.version }}" == *"6.12"* ]]; then
-          echo "Обнаружено ядро 6.12, применяю исправления для KSU..."
-          
-          # Путь к Kbuild в папке с KSU
-          KBUILD_PATH="${{ github.workspace }}/kernel/$KSU_DIR/kernel/Kbuild"
-          
-          if [ -f "$KBUILD_PATH" ]; then
-            # Добавляем инклуд uapi, так как на 6.12 он требуется принудительно
-            if ! grep -q "include/uapi" "$KBUILD_PATH"; then
-              sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' "$KBUILD_PATH"
-              echo "Пути к заголовочным файлам исправлены."
-            fi
-          else
-            echo "::warning::Файл $KBUILD_PATH не найден."
-          fi
-        else
-          echo "Версия ядра ${{ inputs.version }} не требует патчей для KSU, пропускаем."
-        fi
-
+        set -euo pipefail      
         # Дополнительные правки для KSU-Next и Kbuild при KSU_VERSION > 33095 и ядре 6.12
         # KSU_VERSION доступна через переменные окружения, записанные в предыдущем шаге
         if [ "${KSU_VERSION:-0}" -gt 33095 ] && [[ "${{ inputs.version }}" == *"6.12"* ]]; then
