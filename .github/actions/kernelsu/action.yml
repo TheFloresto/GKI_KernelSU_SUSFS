@@ -111,18 +111,34 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail      
-        # Дополнительные правки для KSU-Next и Kbuild при KSU_VERSION > 33095 и ядре 6.12
-        # KSU_VERSION доступна через переменные окружения, записанные в предыдущем шаге
-        if [ "${KSU_VERSION:-0}" -gt 33095 ] && [[ "${{ inputs.version }}" == *"6.12"* ]]; then
-          echo "KSU_VERSION=${KSU_VERSION} > 33095 и ядро 6.12 — применяю дополнительные правки Kbuild..."
+
+        # Применяем фиксы для всех KSU_VERSION > 33095 (ядра 6.11–6.12+)
+        if [ "${KSU_VERSION:-0}" -gt 33095 ]; then
+          echo "KSU_VERSION=${KSU_VERSION} > 33095 — применяю обязательные правки Kbuild..."
+
           KBUILD_PATH="${{ github.workspace }}/kernel/$KSU_DIR/kernel/Kbuild"
+
           if [ -f "$KBUILD_PATH" ]; then
+            # Добавляем include/uapi
             sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' "$KBUILD_PATH"
+
+            # Исправляем пути на абсолютные
             sed -i 's|$(src)|$(abspath $(src))|' "$KBUILD_PATH"
             sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' "$KBUILD_PATH"
-            echo "Дополнительные правки Kbuild применены."
+
+            echo "Правки Kbuild применены."
           else
-            echo "::warning::Файл $KBUILD_PATH не найден для дополнительных правок."
+            echo "::warning::Файл $KBUILD_PATH не найден."
+          fi
+
+          # Создаём include/uapi, если отсутствует
+          UAPI_DIR="${{ github.workspace }}/kernel/$KSU_DIR/kernel/include/uapi"
+          mkdir -p "$UAPI_DIR"
+
+          # Создаём пустой app_profile.h, если его нет
+          if [ ! -f "$UAPI_DIR/app_profile.h" ]; then
+            echo "#pragma once" > "$UAPI_DIR/app_profile.h"
+            echo "Создан отсутствующий app_profile.h"
           fi
         fi
 
