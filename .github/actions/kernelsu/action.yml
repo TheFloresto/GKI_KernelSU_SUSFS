@@ -30,7 +30,7 @@ runs:
           Next)
             if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
               echo "Using latest KernelSU-Next from branch: $KSU_BRANCH"
-              curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
             else
               COMMITS_JSON="${{ github.workspace }}/.github/config/commits.json"
               KSU_SETUP_COMMIT=$(jq -er '.kernelsu.dev' "$COMMITS_JSON")
@@ -112,7 +112,7 @@ runs:
       run: |
         set -euo pipefail
         
-        # Проверяем наличие 6.12 в версии
+        # Проверяем наличие 6.12 в версии (разворачивается на этапе шаблона)
         if [[ "${{ inputs.version }}" == *"6.12"* ]]; then
           echo "Обнаружено ядро 6.12, применяю исправления для KSU..."
           
@@ -130,6 +130,21 @@ runs:
           fi
         else
           echo "Версия ядра ${{ inputs.version }} не требует патчей для KSU, пропускаем."
+        fi
+
+        # Дополнительные правки для KSU-Next и Kbuild при KSU_VERSION > 33095 и ядре 6.12
+        # KSU_VERSION доступна через переменные окружения, записанные в предыдущем шаге
+        if [ "${KSU_VERSION:-0}" -gt 33095 ] && [[ "${{ inputs.version }}" == *"6.12"* ]]; then
+          echo "KSU_VERSION=${KSU_VERSION} > 33095 и ядро 6.12 — применяю дополнительные правки Kbuild..."
+          KBUILD_PATH="${{ github.workspace }}/kernel/$KSU_DIR/kernel/Kbuild"
+          if [ -f "$KBUILD_PATH" ]; then
+            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' "$KBUILD_PATH"
+            sed -i 's|$(src)|$(abspath $(src))|' "$KBUILD_PATH"
+            sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' "$KBUILD_PATH"
+            echo "Дополнительные правки Kbuild применены."
+          else
+            echo "::warning::Файл $KBUILD_PATH не найден для дополнительных правок."
+          fi
         fi
 
     - name: 'Fix KernelSU-Next'
