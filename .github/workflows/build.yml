@@ -136,26 +136,35 @@ jobs:
 
     - name: Apply Remote Patches (CLIDR Fix)
       if: true
-      shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
+      shell: bash
       run: |
         set -euo pipefail
-
-        PATCH_URL="https://raw.githubusercontent.com/infectedmushi/kernel_patches/main/fix-clidr-uninitialized.patch"
-        PATCH_FILE="$(mktemp --suffix=.patch)"
-
-        if curl -fsSL "$PATCH_URL" -o "$PATCH_FILE"; then
-          if patch -p1 --dry-run -R < "$PATCH_FILE" >/dev/null 2>&1; then
-            echo "CLIDR patch already applied, skipping"
-          elif patch -p1 < "$PATCH_FILE"; then
-            echo "CLIDR patch applied"
+        echo "📋 Applying fix_libbpf_strchr_cast.patch"
+        if curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/refs/heads/main/.github/patches/global/fix_libbpf_strchr_cast.patch" \
+          -o /tmp/fix_libbpf_strchr_cast.patch; then
+          if patch -p1 --dry-run --forward < /tmp/fix_libbpf_strchr_cast.patch > /dev/null 2>&1; then
+            patch -p1 --forward < /tmp/fix_libbpf_strchr_cast.patch
+            echo "✅ Patch applied successfully"
           else
-            echo "::warning::Failed to apply CLIDR patch"
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
           fi
         else
-          echo "::warning::Could not download CLIDR patch from $PATCH_URL"
+          echo "⚠️ Failed to download remote patch, continuing anyway"
         fi
-        rm -f "$PATCH_FILE"
+
+        echo "📋 Applying fix-clidr-uninitialized.patch"
+        if curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/refs/heads/main/.github/patches/fix-clidr-uninitialized.patch" \
+          -o /tmp/fix-clidr.patch; then
+          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
+            patch -p1 --forward < /tmp/fix-clidr.patch
+            echo "✅ Patch applied successfully"
+          else
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "⚠️ Failed to download remote patch, continuing anyway"
+        fi
 
     - name: Setup KernelSU-Next
       if: contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL'
