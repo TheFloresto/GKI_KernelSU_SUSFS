@@ -204,6 +204,23 @@ runs:
         ccache -s || true
         echo "============================================"
 
+        # --- ФИКС ПУТЕЙ KernelSU ---
+        KSU_MAKEFILE="$KERNEL_ROOT/common/drivers/kernelsu/Makefile"
+        if [ -f "$KSU_MAKEFILE" ]; then
+          echo "Injecting include paths into KernelSU Makefile..."
+          
+          # Указываем пути поиска заголовочных файлов для всех подпапок KSU
+          echo 'ccflags-y += -I$(srctree)/drivers/kernelsu' >> "$KSU_MAKEFILE"
+          echo 'ccflags-y += -I$(srctree)/drivers/kernelsu/include' >> "$KSU_MAKEFILE"
+          echo 'subdir-ccflags-y += -I$(srctree)/drivers/kernelsu' >> "$KSU_MAKEFILE"
+          echo 'subdir-ccflags-y += -I$(srctree)/drivers/kernelsu/include' >> "$KSU_MAKEFILE"
+          
+          echo "✅ Inject successful."
+        else
+          echo "⚠️ Warning: KernelSU Makefile not found at $KSU_MAKEFILE"
+        fi
+        # ---------------------------
+
         make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" gki_defconfig
 
         if [ -f "$FRAGMENT" ]; then
