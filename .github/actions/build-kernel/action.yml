@@ -64,7 +64,7 @@ runs:
         echo "::endgroup::"        
 
     - name: 'Setup ZyCromerZ Clang and Env'
-      if: true
+      if: false
       shell: bash
       run: |
         set -euo pipefail
