@@ -106,42 +106,6 @@ runs:
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
         echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"
 
-    - name: 'Fix KernelSU Headers for Android 16 / 6.12'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        set -euo pipefail      
-
-        VERSION="${{ inputs.version }}"
-
-        # Универсальная проверка:
-        # Android 16 → ищем "16"
-        # Kernel 6.12 → ищем "6.12"
-        if [[ "$VERSION" == *"16"* ]] && [[ "$VERSION" == *"6.12"* ]]; then
-          echo "Обнаружено Android 16 + kernel 6.12 — применяю фиксы KernelSU-Next"
-
-          KBUILD_PATH="${{ github.workspace }}/kernel/$KSU_DIR/kernel/Kbuild"
-
-          if [ -f "$KBUILD_PATH" ]; then
-            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' "$KBUILD_PATH"
-            sed -i 's|$(src)|$(abspath $(src))|' "$KBUILD_PATH"
-            sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' "$KBUILD_PATH"
-            echo "Правки Kbuild применены."
-          else
-            echo "::warning::Файл $KBUILD_PATH не найден."
-          fi
-
-          UAPI_DIR="${{ github.workspace }}/kernel/$KSU_DIR/kernel/include/uapi"
-          mkdir -p "$UAPI_DIR"
-
-          if [ ! -f "$UAPI_DIR/app_profile.h" ]; then
-            echo "#pragma once" > "$UAPI_DIR/app_profile.h"
-            echo "Создан отсутствующий app_profile.h"
-          fi
-        else
-          echo "Версия не Android 16 / 6.12 — фиксы пропущены."
-        fi
-
     - name: 'Fix KernelSU-Next'
       if: ${{ inputs.ksu_variant == 'Next' }}
       shell: bash
