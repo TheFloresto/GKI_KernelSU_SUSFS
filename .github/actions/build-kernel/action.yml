@@ -1,24 +1,23 @@
 name: 'Build Kernel'
-description: 'Builds all kernel versions using direct Makefile targets with ZyCromerZ'
+description: 'Builds kernel using legacy build.sh or Bazel (kleaf)'
 inputs:
   bypass:
     description: 'Whether to add the bypass hack or not'
     required: true
+  kernel_version:
+    required: true
+  sublevel:
+    required: true
+  os_patch_level:
+    required: true    
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
-    required: true
+    required: true   
+  android_version:
+    description: 'android version'
+    required: true   
   ksu_variant:
-    description: 'KSU Variant name for logs'
-    required: false
-    default: 'default'
-  clean:
-    description: 'Run make clean before building to ensure a fresh build'
-    required: false
-    default: 'true'
-  make_jobs_override:
-    description: 'Override CPU threads count for build (auto or number)'
-    required: false
-    default: 'auto'
+    required: true
 
 runs:
   using: composite
@@ -46,6 +45,10 @@ runs:
           echo "Bypass hack not applied as per input parameter."
         fi
 
+    - name: Setup Kernel Configs
+      if: false
+      uses: ./.github/actions/set-kernel-config
+  
     - name: 'Install Build Dependencies'
       shell: bash
       run: |
@@ -61,6 +64,7 @@ runs:
         echo "::endgroup::"        
 
     - name: 'Setup ZyCromerZ Clang and Env'
+      if: true
       shell: bash
       run: |
         set -euo pipefail
@@ -69,14 +73,17 @@ runs:
         mkdir -p "$GITHUB_WORKSPACE/zycromerz-clang"
         cd "$GITHUB_WORKSPACE/zycromerz-clang"
         
-        ASSET_URL=$(curl -s https://api.github.com/repos/ZyCromerZ/Clang/releases/latest | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' | head -n 1)
+        # Обходим лимиты API GitHub, получая прямую ссылку из HTML-страницы релиза
+        ASSET_PATH=$(curl -sL https://github.com/ZyCromerZ/Clang/releases/expanded_assets/23.0.0git-20260130-release | grep -oP 'href="\K[^"]+\.tar\.gz' | head -n 1)
         
-        if [ -z "$ASSET_URL" ]; then
-          echo "::error::Не удалось найти .tar.gz архив через API релизов."
+        if [ -z "$ASSET_PATH" ]; then
+          echo "::error::Не удалось найти .tar.gz архив на странице релиза."
           exit 1
         fi
         
+        ASSET_URL="https://github.com$ASSET_PATH"
         echo "Downloading from: $ASSET_URL"
+        
         wget -qO clang.tar.gz "$ASSET_URL"
         tar -xf clang.tar.gz
         rm clang.tar.gz
@@ -84,8 +91,9 @@ runs:
 
         CLANG_DIR="$GITHUB_WORKSPACE/zycromerz-clang"
 
+        # Проверка, что бинарник на месте
         if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-          echo "::error::ZyCromerZ Clang install failed at $CLANG_DIR"
+          echo "::error::ZyCromerZ Clang install failed or layout unexpected at $CLANG_DIR"
           ls -la "$CLANG_DIR" || true
           exit 1
         fi
@@ -96,138 +104,183 @@ runs:
         CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1)
         echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
         echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
+        echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
 
-        echo "ARM64_TOOLCHAIN=aarch64-linux-gnu-" >> "$GITHUB_ENV"
-        echo "ARM32_TOOLCHAIN=arm-linux-gnueabi-" >> "$GITHUB_ENV"
+        "$CLANG_DIR/bin/clang" --version | head -2
 
-    - name: 'Build Kernel'
+    - name: Customize Kernel Branding
       shell: bash
-      working-directory: ${{ github.workspace }}
-      env:
-        KSU_VARIANT: ${{ inputs.ksu_variant }}
-        CLEAN_BUILD: ${{ inputs.clean }}
-        MAKE_JOBS_OVERRIDE: ${{ inputs.make_jobs_override }}
-        CLANG_BIN: ${{ env.CLANG_BIN_PATH }}
-        ARM64_TOOLCHAIN: ${{ env.ARM64_TOOLCHAIN }}
-        ARM32_TOOLCHAIN: ${{ env.ARM32_TOOLCHAIN }}
       run: |
         set -euo pipefail
-        mkdir -p logs
-        LOG_FILE="$GITHUB_WORKSPACE/logs/build-${KSU_VARIANT}.log"
-        exec > >(tee -a "$LOG_FILE") 2>&1
+        echo "Customize Kernel Branding"
+        
+        ANDROID_VER="${{ inputs.android_version }}" 
+        
+        CUSTOM_LOCALVERSION="-${ANDROID_VER}-TheFloresto"
+        
+        echo "CUSTOM_LOCALVERSION=${CUSTOM_LOCALVERSION}" >> "$GITHUB_ENV"
+                
+        echo "Branding set to: $CUSTOM_LOCALVERSION"
+        
+    - name: 'Build Kernel'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      env:
+        PYTHONWARNINGS: "ignore:invalid escape sequence"
+      run: |
+        set -euo pipefail
+        echo "::group::Build kernel with ccache optimization"
 
-        summarize_build_failure() {
-          if [ ! -f "$LOG_FILE" ]; then
-            return 0
-          fi
-          echo "::group::Build failure summary (${KSU_VARIANT})"
-          echo "📄 Last 200 lines of $LOG_FILE"
-          tail -n 200 "$LOG_FILE" || true
-          echo
-          echo "🔎 Matching error signatures"
-          grep -nE 'error:|fatal error:|undefined reference|No rule to make target|FAILED:' "$LOG_FILE" | tail -n 80 || echo "No common error signature matched."
-          echo "::endgroup::"
-        }
+        KERNEL_ROOT="${KERNEL_ROOT:-$GITHUB_WORKSPACE/kernel}"
+        FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
 
-        trap 'status=$?; if [ "$status" -ne 0 ]; then summarize_build_failure; fi; exit "$status"' EXIT
+        cd "$KERNEL_ROOT/common"
+        : > "$KERNEL_ROOT/common/.scmversion"
 
-        cd kernel
-        export ARCH=arm64
-        export PATH="${CLANG_BIN}:/usr/lib/ccache:$PATH"
-        export CROSS_COMPILE="${ARM64_TOOLCHAIN}"
-        export CROSS_COMPILE_COMPAT="${ARM32_TOOLCHAIN}"
-        export CCACHE_DIR="${LOG_FILE%/*}/.ccache"
-        export CC="ccache ${CLANG_BIN}/clang"
-        export CXX="ccache ${CLANG_BIN}/clang++"
-        export HOSTCC="ccache ${CLANG_BIN}/clang"
-        export HOSTCXX="ccache ${CLANG_BIN}/clang++"
-        export LD="${CLANG_BIN}/ld.lld"
-        export HOSTLD="${CLANG_BIN}/ld.lld"
-        export AR="${CLANG_BIN}/llvm-ar"
-        export HOSTAR="${CLANG_BIN}/llvm-ar"
-        export NM="${CLANG_BIN}/llvm-nm"
-        export OBJCOPY="${CLANG_BIN}/llvm-objcopy"
-        export OBJDUMP="${CLANG_BIN}/llvm-objdump"
-        export READELF="${CLANG_BIN}/llvm-readelf"
-        export STRIP="${CLANG_BIN}/llvm-strip"
-        export CLANG_TRIPLE="aarch64-linux-gnu-"
+        export PYTHONWARNINGS="${PYTHONWARNINGS}"
 
-        if [ "${MAKE_JOBS_OVERRIDE}" = "auto" ]; then
-          MAKE_JOBS="${BUILD_JOBS:-$(nproc)}"
+        echo "Getting last commit timestamp from kernel source..."
+        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+        WORKSPACE="${GITHUB_WORKSPACE}"
+        MAP="-fdebug-prefix-map=${WORKSPACE}=."
+        MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
+        FPMAP="-ffile-prefix-map=${WORKSPACE}=."
+
+        export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -D__ANDROID_COMMON_KERNEL__"
+        export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
+
+        export LLVM=1 LLVM_IAS=1
+        export ARCH=arm64 SUBARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+        export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+
+        if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
+          export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
         else
-          MAKE_JOBS="${MAKE_JOBS_OVERRIDE}"
+          export PAHOLE="$(which pahole || true)"
         fi
-        export TMPDIR="/tmp"
-        export TEMP="$TMPDIR"
-        export TMP="$TMPDIR"
-        export MAKEFLAGS="-j${MAKE_JOBS} -l$((MAKE_JOBS + 1))"
-        START_TIME=$SECONDS
+        echo "Using pahole: $PAHOLE ($($PAHOLE --version 2>/dev/null || echo 'unknown version'))"
 
-        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Очистка дерева ДО генерации конфигов
-        if [ "${CLEAN_BUILD}" = "true" ]; then
-          echo "🧹 Running make clean..."
-          rm -rf out/
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 clean
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 mrproper
+        export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm
+        export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+
+        set +u
+        source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
+        set -u
+
+        export LDCACHE_DIR="$GITHUB_WORKSPACE/lto_cache"
+        mkdir -p "$LDCACHE_DIR"
+        echo '#!/bin/bash' > "$KERNEL_ROOT/common/ld-wrapper"
+        echo 'ld.lld "$@" --thinlto-cache-dir=$LDCACHE_DIR --thinlto-jobs=$(nproc --all)' >> "$KERNEL_ROOT/common/ld-wrapper"
+        chmod +x "$KERNEL_ROOT/common/ld-wrapper"
+
+        export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
+        export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
+        export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
+        export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
+        export KBUILD_BUILD_VERSION=1
+
+        echo "Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
+        echo "SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+
+        export CC="ccache clang"
+        export CXX="ccache clang++"
+        export HOSTCC="ccache clang"
+        export HOSTCXX="ccache clang++"
+
+        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+
+        OUT=out
+        mkdir -p "$OUT"
+
+        echo "============================================"
+        echo "Compiler & ccache Verification"
+        echo "which clang: $(which clang)"
+        echo "CC: $CC"
+        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+        ccache -s || true
+        echo "============================================"
+
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" gki_defconfig
+
+        if [ -f "$FRAGMENT" ]; then
+          ./scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
+        else
+          echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
         fi
 
-        # Генерируем .config на основе gki_defconfig
-        make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-          CC="$CC" LD="$LD" AR="$AR" NM="$NM" OBJCOPY="$OBJCOPY" OBJDUMP="$OBJDUMP" \
-          READELF="$READELF" STRIP="$STRIP" HOSTCC="$HOSTCC" HOSTCXX="$HOSTCXX" \
-          HOSTLD="$HOSTLD" HOSTAR="$HOSTAR" CLANG_TRIPLE="$CLANG_TRIPLE" \
-          CROSS_COMPILE="$CROSS_COMPILE" CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
-          O=out gki_defconfig
-
-        # Вшиваем флаги оптимизации/LTO
-        cat << 'EOF' >> out/.config
-        CONFIG_LTO_CLANG_THIN=y
-        CONFIG_LTO_CLANG_FULL=n
-        CONFIG_DEBUG_INFO=y
-        CONFIG_DEBUG_INFO_BTF=y
-        CONFIG_DEBUG_INFO_REDUCED=n
-        CONFIG_DEBUG_INFO_COMPRESSED_NONE=y
-        EOF
-
-        make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-          CC="$CC" LD="$LD" AR="$AR" NM="$NM" OBJCOPY="$OBJCOPY" OBJDUMP="$OBJDUMP" \
-          READELF="$READELF" STRIP="$STRIP" HOSTCC="$HOSTCC" HOSTCXX="$HOSTCXX" \
-          HOSTLD="$HOSTLD" HOSTAR="$HOSTAR" CLANG_TRIPLE="$CLANG_TRIPLE" \
-          CROSS_COMPILE="$CROSS_COMPILE" CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
-          O=out syncconfig
-
-        if grep -q '^CONFIG_SECURITY_SELINUX=y$' out/.config; then
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-            CC="$CC" LD="$LD" AR="$AR" NM="$NM" OBJCOPY="$OBJCOPY" OBJDUMP="$OBJDUMP" \
-            READELF="$READELF" STRIP="$STRIP" HOSTCC="$HOSTCC" HOSTCXX="$HOSTCXX" \
-            HOSTLD="$HOSTLD" HOSTAR="$HOSTAR" CLANG_TRIPLE="$CLANG_TRIPLE" \
-            CROSS_COMPILE="$CROSS_COMPILE" CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
-            O=out security/selinux/
+        LOCAL_LOCALVERSION="${CUSTOM_LOCALVERSION:--TheFloresto}"
+        if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
+          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion || true
         fi
 
-        echo "::group::Config Validation"
-        if ! grep -q '^CONFIG_KSU=y' out/.config; then
-          echo "::error::CONFIG_KSU=y не найден в итоговом конфиге!"
+        scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
+        scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        
+        KCFLAGS_EXTRA="-O2"
+
+        scripts/config --file "$OUT/.config" -e LTO_CLANG
+        scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
+        scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
+
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" olddefconfig
+
+        KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
+        KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+
+        echo "============================================"
+        echo "Build Configuration"
+        echo "Kernel: ${KERNEL_VERSION:-?}.${SUBLEVEL:-?}"
+        echo "Android: ${ANDROID_VERSION:-?}"
+        echo "Variant: ${INPUT_VARIANT:-unknown}"
+        echo "ksu_variant: ${INPUT_KSU_VARIANT:-unknown}"
+        echo "============================================"
+
+        BUILD_START=$(date +%s)
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
+
+        BUILD_END=$(date +%s)
+        BUILD_TIME=$((BUILD_END - BUILD_START))
+        echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+
+        IMG="$PWD/$OUT/arch/arm64/boot/Image"
+        
+        if [ ! -f "$IMG" ]; then
+          echo "::error::Kernel Image missing"
+          echo "::group::Last 100 lines of build log"
+          tail -n 100 build.log || echo "Build log not available"
+          echo "::endgroup::"
           exit 1
         fi
-        echo "Config validation passed"
+
+        echo "IMG=$IMG" >> "$GITHUB_ENV"
+
+        IMG_SIZE=$(stat -c%s "$IMG")
+        echo "============================================"
+        echo "Build Completed Successfully"
+        echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
+        echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
+
+        echo ""
+        echo "ccache Post-Build Statistics"
+        echo "============================================"
+        ccache -s
+        echo "============================================"
         echo "::endgroup::"
 
-        # Запускаем компиляцию (старый блок удаления отсюда убран)
-        make -j$MAKE_JOBS O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-          CC="$CC" LD="$LD" AR="$AR" NM="$NM" OBJCOPY="$OBJCOPY" OBJDUMP="$OBJDUMP" \
-          READELF="$READELF" STRIP="$STRIP" HOSTCC="$HOSTCC" HOSTCXX="$HOSTCXX" \
-          HOSTLD="$HOSTLD" HOSTAR="$HOSTAR" CLANG_TRIPLE="$CLANG_TRIPLE" \
-          CROSS_COMPILE="$CROSS_COMPILE" CROSS_COMPILE_COMPAT="$CROSS_COMPILE_COMPAT" \
-          HOSTCFLAGS="-Wno-incompatible-pointer-types-discards-qualifiers" \
-          all
-
-        trap - EXIT
-
-        if [ -n "${GITHUB_ENV:-}" ]; then
-          echo "BUILD_TIME=$((SECONDS - START_TIME))s" >> "$GITHUB_ENV"
-        fi
-        ccache -s | grep -E "(Cacheable calls|Hits|Misses|Hit rate|cache size)" || true
+    - name: 'Check name'
+      shell: bash
+      run: |
+        set -euo pipefail
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+        echo "Kernel Uname: $KERNEL_UNAME"
+        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
 
     - name: 'Gather Build Artifacts'
       shell: bash
@@ -235,19 +288,19 @@ runs:
       run: |
         set -euo pipefail
         
-        if [ -f "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image" ]; then
-          echo "Found Image at kernel/out/arch/arm64/boot/Image"
-          if [ "${{ inputs.bypass }}" = "true" ]; then
-            cp "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+        if [ -f "$IMG" ]; then
+          echo "Found Image at $IMG"
+          if [[ ${{ inputs.bypass }} == "true" ]]; then
+            cp "$IMG" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
           else
-            cp "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image" "${{ github.workspace }}/AnyKernel3/Image"
+            cp "$IMG" "${{ github.workspace }}/AnyKernel3/Image"
             echo "Kernel Version:"
-            strings "${{ github.workspace }}/kernel/out/arch/arm64/boot/Image" | grep -m1 "^Linux version " || true
+            strings "$IMG" | grep -m1 "^Linux version "
           fi
           exit 0
         fi
 
-        echo "::error::Бинарник ядра (Image) не найден в out/arch/arm64/boot/!"
+        echo "::error::Image not found at $IMG"
         exit 1
 
     - name: 'Patch AnyKernel3 for Bypass Hack'
@@ -256,5 +309,5 @@ runs:
       working-directory: ${{ github.workspace }}/AnyKernel3
       run: |
         set -euo pipefail
-        cp "${{ github.action_path }}/patches/bypass.patch" "${{ github.workspace }}/AnyKernel3/bypass.patch"
+        cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
         patch -p1 < bypass.patch
