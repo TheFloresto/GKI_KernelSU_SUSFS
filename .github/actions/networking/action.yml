@@ -50,6 +50,9 @@ runs:
           CONFIG_NETFILTER_XT_MATCH_RECENT=y
           CONFIG_IP6_NF_NAT=y
           CONFIG_IP6_NF_TARGET_MASQUERADE=y
+          CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+          CONFIG_IP6_NF_TARGET_HL=y
+          CONFIG_IP6_NF_MATCH_HL=y
 
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config
