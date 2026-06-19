@@ -70,26 +70,32 @@ runs:
         set -euo pipefail
 
         echo "::group::Downloading Greenforce Clang"
-        mkdir -p "$GITHUB_WORKSPACE/greenforce-clang"
-        cd "$GITHUB_WORKSPACE/greenforce-clang"
+        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+        mkdir -p "$CLANG_DIR"
+        cd "$CLANG_DIR"
         
         # Загрузка и установка через скрипт Greenforce
         bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
         echo "::endgroup::"
 
-        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+        # Исправление структуры «матрёшки»: если появилась папка greenforce-clang/greenforce-clang
+        if [ -d "$CLANG_DIR/greenforce-clang" ]; then
+          echo "🔄 Раскрываем вложенную структуру компилятора..."
+          mv "$CLANG_DIR/greenforce-clang/"* "$CLANG_DIR/" 2>/dev/null || true
+          mv "$CLANG_DIR/greenforce-clang/."* "$CLANG_DIR/" 2>/dev/null || true
+          rm -rf "$CLANG_DIR/greenforce-clang"
+        fi
 
-        # Автоматический поиск исполняемого файла, если скрипт распаковал его во вложенную папку
-        if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-          FOUND_CLANG=$(find "$CLANG_DIR" -type f -executable -name clang | head -n 1)
-          if [ -n "$FOUND_CLANG" ]; then
-            CLANG_DIR=$(dirname $(dirname "$FOUND_CLANG"))
-            echo "Clang automatically found at: $CLANG_DIR"
-          else
-            echo "::error::Greenforce Clang install failed or layout unexpected at $CLANG_DIR"
-            find "$GITHUB_WORKSPACE/greenforce-clang" -maxdepth 3 || true
-            exit 1
-          fi
+        # Гарантируем права на исполнение бинарников
+        if [ -d "$CLANG_DIR/bin" ]; then
+          chmod +x "$CLANG_DIR/bin/"* 2>/dev/null || true
+        fi
+
+        # Строгая проверка корректности путей
+        if [ ! -f "$CLANG_DIR/bin/clang" ]; then
+          echo "::error::Greenforce Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
+          ls -la "$CLANG_DIR" || true
+          exit 1
         fi
 
         echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
@@ -248,6 +254,8 @@ runs:
         echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
         IMG="$PWD/$OUT/arch/arm64/boot/Image"
+        # Передаем переменную пути к образу в глобальное окружение для следующих шагов
+        echo "IMG=$IMG" >> "$GITHUB_ENV"
         
         if [ ! -f "$IMG" ]; then
           echo "::error::Kernel Image missing"
