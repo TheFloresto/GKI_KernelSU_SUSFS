@@ -151,13 +151,12 @@ runs:
         export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
         export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
-        if [ -x "$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole" ]; then
-          export PAHOLE="$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/pahole"
+        if [ -x "$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin/pahole" ]; then
+          export PAHOLE="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
         else
           export PAHOLE="$(which pahole || true)"
         fi
-        echo "Using pahole: $PAHOLE ($($PAHOLE --version 2>/dev/null || echo 'unknown version'))"
-
+        
         export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm
         export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
 
@@ -171,14 +170,17 @@ runs:
         echo 'ld.lld "$@" --thinlto-cache-dir=$LDCACHE_DIR --thinlto-jobs=$(nproc --all)' >> "$KERNEL_ROOT/common/ld-wrapper"
         chmod +x "$KERNEL_ROOT/common/ld-wrapper"
 
+        # Установка фиксированного таймстампа из коммита
         export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
         export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
+        
+        echo "EFFECTIVE_BUILD_TIMESTAMP=$KBUILD_BUILD_TIMESTAMP" >> "$GITHUB_ENV"
         export KBUILD_BUILD_USER="${BUILD_USER:-thefloresto-labs}"
         export KBUILD_BUILD_HOST="${BUILD_HOST:-ubuntu-build}"
         export KBUILD_BUILD_VERSION=1
-
-        echo "Build timestamp: $KBUILD_BUILD_TIMESTAMP (from commit $COMMIT_HASH)"
-        echo "SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+        
+        echo "🔢 SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+        echo "📅 Build timestamp: $KBUILD_BUILD_TIMESTAMP"
 
         export CC="ccache clang"
         export CXX="ccache clang++"
@@ -191,11 +193,13 @@ runs:
         mkdir -p "$OUT"
 
         echo "============================================"
-        echo "Compiler & ccache Verification"
+        echo "🔍 Compiler & ccache Verification"
+        echo "============================================"
+        echo "PATH: ${PATH:0:200}..."
         echo "which clang: $(which clang)"
         echo "CC: $CC"
-        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
-        ccache -s || true
+        echo "ccache pre-build status:"
+        ccache -s | head -n 20
         echo "============================================"
 
         make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" gki_defconfig
@@ -213,59 +217,51 @@ runs:
           sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion || true
         fi
 
-        scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE
-        scripts/config --file "$OUT/.config" -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
-        
+        # Оптимизация O2 и Thin LTO намертво
+        scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
         KCFLAGS_EXTRA="-O2"
 
-        scripts/config --file "$OUT/.config" -e LTO_CLANG
-        scripts/config --file "$OUT/.config" -e LTO_CLANG_THIN
-        scripts/config --file "$OUT/.config" -d LTO_CLANG_NONE
-        scripts/config --file "$OUT/.config" -d LTO_CLANG_FULL
+        scripts/config --file "$OUT/.config" -e LTO_CLANG -d LTO_CLANG_NONE -e LTO_CLANG_THIN -d LTO_CLANG_FULL
 
         make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" olddefconfig
 
         KCFLAGS="$KCFLAGS -Wno-error -pipe -fno-stack-protector -Wno-strict-prototypes -Wno-deprecated-non-prototype ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
 
-        echo "============================================"
-        echo "Build Configuration"
-        echo "Kernel: ${KERNEL_VERSION:-?}.${SUBLEVEL:-?}"
-        echo "Android: ${ANDROID_VERSION:-?}"
-        echo "Variant: ${INPUT_VARIANT:-unknown}"
-        echo "ksu_variant: ${INPUT_KSU_VARIANT:-unknown}"
-        echo "============================================"
+        # Логика прогрева ccache
+        if [ ! -d "${CCACHE_DIR:-}" ] || [ -z "$(find "${CCACHE_DIR:-}" -type f 2>/dev/null | head -n1)" ]; then
+          echo "🔥 Priming cache with header preprocessing..."
+          make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -C "$KERNEL_ROOT/common" O="$OUT" headers_install prepare 2>&1 | head -n 20 || true
+          echo ""
+        fi
 
         BUILD_START=$(date +%s)
+        set -o pipefail
+        
         make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
 
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - BUILD_START))
+        
+        echo "BUILD_START=$BUILD_START" >> "$GITHUB_ENV"
+        echo "BUILD_END=$BUILD_END" >> "$GITHUB_ENV"
         echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
         IMG="$PWD/$OUT/arch/arm64/boot/Image"
         
         if [ ! -f "$IMG" ]; then
           echo "::error::Kernel Image missing"
-          echo "::group::Last 100 lines of build log"
-          tail -n 100 build.log || echo "Build log not available"
-          echo "::endgroup::"
+          tail -n 100 build.log || true
           exit 1
         fi
 
-        echo "IMG=$IMG" >> "$GITHUB_ENV"
-
         IMG_SIZE=$(stat -c%s "$IMG")
         echo "============================================"
-        echo "Build Completed Successfully"
+        echo "✅ Build Completed Successfully"
         echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
         echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
-
-        echo ""
-        echo "ccache Post-Build Statistics"
         echo "============================================"
-        ccache -s
-        echo "============================================"
+        ccache -s || true
         echo "::endgroup::"
 
     - name: 'Check name'
