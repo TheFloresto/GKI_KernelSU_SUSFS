@@ -29,33 +29,29 @@ runs:
           CONFIG_TMPFS_POSIX_ACL=y
           CONFIG_KALLSYMS=y
           CONFIG_KALLSYMS_ALL=y
+          # Переключение HZ на 300 (выключаем дефолтные 250)
+          # CONFIG_HZ_250 is not set
           CONFIG_HZ_300=y
           CONFIG_HZ=300
           CONFIG_CPU_FREQ=y
           CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
           CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-          # Frame warn off
           CONFIG_FRAME_WARN=0
-          # Optimize inlining
           CONFIG_OPTIMIZE_INLINING=y
-          # Better I/O & filesystem performance
           CONFIG_SWAP=y
           CONFIG_BLK_DEV_ZRAM=y
           CONFIG_ZRAM_DEF_COMP_LZ4=y
           CONFIG_ZRAM_WRITEBACK=y
           CONFIG_ZRAM_MEMORY_TRACKING=y
-          # Modern I/O scheduler
           CONFIG_MQ_IOSCHED_DEADLINE=y
           CONFIG_DEFAULT_DEADLINE=y
-          # F2FS optimizations
           CONFIG_F2FS_FS=y
           CONFIG_F2FS_FS_XATTR=y
           CONFIG_F2FS_FS_POSIX_ACL=y
           CONFIG_F2FS_FS_COMPRESSION=y
-          # Memory management improvements
           CONFIG_LRU_GEN=y
           CONFIG_LRU_GEN_ENABLED=y
-          # Disable useless debugging configs for performance and resources
-          CONFIG_UBSAN=n
-          CONFIG_PAGE_OWNER=n
-          CONFIG_RCU_TRACE=n
+          # Правильное отключение отладки
+          # CONFIG_UBSAN is not set
+          # CONFIG_PAGE_OWNER is not set
+          # CONFIG_RCU_TRACE is not set
