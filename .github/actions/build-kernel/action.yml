@@ -63,45 +63,39 @@ runs:
         echo "✅ Dependencies installed"
         echo "::endgroup::"        
 
-    - name: 'Setup ZyCromerZ Clang and Env'
+    - name: 'Setup Greenforce Clang and Env'
       if: true
       shell: bash
       run: |
         set -euo pipefail
 
-        echo "::group::Downloading and extracting ZyCromerZ Clang"
-        mkdir -p "$GITHUB_WORKSPACE/zycromerz-clang"
-        cd "$GITHUB_WORKSPACE/zycromerz-clang"
+        echo "::group::Downloading Greenforce Clang"
+        mkdir -p "$GITHUB_WORKSPACE/greenforce-clang"
+        cd "$GITHUB_WORKSPACE/greenforce-clang"
         
-        # Обходим лимиты API GitHub, получая прямую ссылку из HTML-страницы релиза
-        ASSET_PATH=$(curl -sL https://github.com/ZyCromerZ/Clang/releases/expanded_assets/23.0.0git-20260130-release | grep -oP 'href="\K[^"]+\.tar\.gz' | head -n 1)
-        
-        if [ -z "$ASSET_PATH" ]; then
-          echo "::error::Не удалось найти .tar.gz архив на странице релиза."
-          exit 1
-        fi
-        
-        ASSET_URL="https://github.com$ASSET_PATH"
-        echo "Downloading from: $ASSET_URL"
-        
-        wget -qO clang.tar.gz "$ASSET_URL"
-        tar -xf clang.tar.gz
-        rm clang.tar.gz
+        # Загрузка и установка через скрипт Greenforce
+        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
         echo "::endgroup::"
 
-        CLANG_DIR="$GITHUB_WORKSPACE/zycromerz-clang"
+        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
 
-        # Проверка, что бинарник на месте
+        # Автоматический поиск исполняемого файла, если скрипт распаковал его во вложенную папку
         if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-          echo "::error::ZyCromerZ Clang install failed or layout unexpected at $CLANG_DIR"
-          ls -la "$CLANG_DIR" || true
-          exit 1
+          FOUND_CLANG=$(find "$CLANG_DIR" -type f -executable -name clang | head -n 1)
+          if [ -n "$FOUND_CLANG" ]; then
+            CLANG_DIR=$(dirname $(dirname "$FOUND_CLANG"))
+            echo "Clang automatically found at: $CLANG_DIR"
+          else
+            echo "::error::Greenforce Clang install failed or layout unexpected at $CLANG_DIR"
+            find "$GITHUB_WORKSPACE/greenforce-clang" -maxdepth 3 || true
+            exit 1
+          fi
         fi
 
         echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
         echo "CLANG_BIN_PATH=$CLANG_DIR/bin" >> "$GITHUB_ENV"
 
-        CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1)
+        CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1 || echo "unknown")
         echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
         echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
         echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
