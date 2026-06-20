@@ -63,37 +63,23 @@ runs:
         echo "✅ Dependencies installed"
         echo "::endgroup::"        
 
-    - name: 'Setup Greenforce Clang and Env'
-      if: true
+    - name: 'Setup Neutron Clang and Env'
       shell: bash
       run: |
         set -euo pipefail
 
-        echo "::group::Downloading Greenforce Clang"
-        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+        echo "::group::Downloading Neutron Clang"
+        CLANG_DIR="$GITHUB_WORKSPACE/neutron-clang"
         mkdir -p "$CLANG_DIR"
         cd "$CLANG_DIR"
         
-        # Загрузка и установка через скрипт Greenforce
-        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
+        # Скачиваем и запускаем AntMan (официальный менеджер тулчейна) для синхронизации последней версии
+        bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") -S
         echo "::endgroup::"
-
-        # Исправление структуры «матрёшки»: если появилась папка greenforce-clang/greenforce-clang
-        if [ -d "$CLANG_DIR/greenforce-clang" ]; then
-          echo "🔄 Раскрываем вложенную структуру компилятора..."
-          mv "$CLANG_DIR/greenforce-clang/"* "$CLANG_DIR/" 2>/dev/null || true
-          mv "$CLANG_DIR/greenforce-clang/."* "$CLANG_DIR/" 2>/dev/null || true
-          rm -rf "$CLANG_DIR/greenforce-clang"
-        fi
-
-        # Гарантируем права на исполнение бинарников
-        if [ -d "$CLANG_DIR/bin" ]; then
-          chmod +x "$CLANG_DIR/bin/"* 2>/dev/null || true
-        fi
 
         # Строгая проверка корректности путей
         if [ ! -f "$CLANG_DIR/bin/clang" ]; then
-          echo "::error::Greenforce Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
+          echo "::error::Neutron Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
           ls -la "$CLANG_DIR" || true
           exit 1
         fi
