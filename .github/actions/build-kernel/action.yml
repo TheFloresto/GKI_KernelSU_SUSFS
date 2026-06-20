@@ -243,9 +243,9 @@ runs:
 
         BUILD_START=$(date +%s)
         set -o pipefail
-        
-        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" 2>&1 | tee build.log
 
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" Image 2>&1 | tee build.log
+        
         BUILD_END=$(date +%s)
         BUILD_TIME=$((BUILD_END - BUILD_START))
         
