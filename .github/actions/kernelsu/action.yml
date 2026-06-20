@@ -12,6 +12,9 @@ inputs:
     description: 'KSU variant (Next, KSU, MKSU, KowSU, ReSukiSU, WKSU)'
     required: false
     default: Next    
+  kernel_version:
+    description: 'Kernel version (e.g., 6.12)'
+    required: true    
 
 runs:
   using: composite
