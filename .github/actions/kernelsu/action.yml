@@ -106,6 +106,48 @@ runs:
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
         echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"
 
+    - name: 'Apply KernelSU Kbuild & ksu.c Fixes (6.12+)'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        
+        # Determine the kernel base version from the input (e.g., extracting "6.12" from "android16-6.12")
+        INPUT_VERSION="${{ inputs.version }}"
+        KERNEL_VER=$(echo "$INPUT_VERSION" | grep -oE '[0-9]+\.[0-9]+' | head -n1 || echo "")
+        
+        echo "Detected Kernel Version: $KERNEL_VER"
+        echo "Current KSU_VERSION: $KSU_VERSION"
+        
+        TARGET_DIR="$KSU_DIR/kernel"
+        if [ ! -d "$TARGET_DIR" ]; then
+          echo "::warning::Cannot apply fixes, $TARGET_DIR does not exist."
+          exit 0
+        fi
+        
+        cd "$TARGET_DIR"
+        
+        echo "Applying ksu.c stack protector fixes..."
+        if [ -f ksu.c ]; then
+          sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
+        else
+          echo "ksu.c not found, skipping."
+        fi
+        
+        # Apply Kbuild fixes only if version condition is met
+        if [[ "$KSU_VERSION" -gt 33095 ]] && [[ "$KERNEL_VER" == "6.12" ]]; then
+          echo "Applying Kbuild include and path fixes for 6.12+..."
+          if [ -f Kbuild ]; then
+            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' Kbuild
+            sed -i 's|$(src)|$(abspath $(src))|' Kbuild
+            sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' Kbuild
+          else
+            echo "::warning::Kbuild file not found in $TARGET_DIR"
+          fi
+        else
+          echo "Kbuild fixes skipped. Condition not met (KSU_VERSION > 33095 and KERNEL_VER == 6.12)"
+        fi
+
     - name: 'Fix KernelSU-Next'
       if: ${{ inputs.ksu_variant == 'Next' }}
       shell: bash
