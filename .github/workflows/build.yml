@@ -171,6 +171,7 @@ jobs:
       uses: ./.github/actions/kernelsu
       with:
        ksu_variant: ${{ inputs.ksu_variant }}
+       kernel_version: ${{ inputs.kernel_version }}
 
     - name: SUSFS
       if: contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL'
