@@ -116,8 +116,7 @@ runs:
         set -euo pipefail
         
         # Determine the kernel base version from the input (e.g., extracting "6.12" from "android16-6.12")
-        INPUT_VERSION="${{ inputs.version }}"
-        KERNEL_VER=$(echo "$INPUT_VERSION" | grep -oE '[0-9]+\.[0-9]+' | head -n1 || echo "")
+        KERNEL_VER="${{ inputs.kernel_version }}"
         
         echo "Detected Kernel Version: $KERNEL_VER"
         echo "Current KSU_VERSION: $KSU_VERSION"
