@@ -138,9 +138,15 @@ runs:
         if [[ "$KSU_VERSION" -gt 33095 ]] && [[ "$KERNEL_VER" == "6.12" ]]; then
           echo "Applying Kbuild include and path fixes for 6.12+..."
           if [ -f Kbuild ]; then
-            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' Kbuild
-            sed -i 's|$(src)|$(abspath $(src))|' Kbuild
-            sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' Kbuild
+            # 1. Привязываем внутреннюю переменную KSU к корню исходников (для out-of-tree сборки)
+            sed -i 's|KSU_KERNEL_DIR = $(src)|KSU_KERNEL_DIR = $(srctree)/$(src)|g' Kbuild
+            
+            # 2. Обновляем флаги для старых версий KSU (если они используют KSU_KERNEL_DIR)
+            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|g' Kbuild
+            
+            # 3. Железобетонно добавляем правильные пути в конец файла для ядра 6.12
+            echo 'ccflags-y += -I$(srctree)/$(src)/include' >> Kbuild
+            echo 'ccflags-y += -I$(srctree)/$(src)/include/uapi' >> Kbuild
           else
             echo "::warning::Kbuild file not found in $TARGET_DIR"
           fi
