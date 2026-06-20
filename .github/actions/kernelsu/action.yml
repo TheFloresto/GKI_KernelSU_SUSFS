@@ -30,7 +30,7 @@ runs:
           Next)
             if [ "${{ inputs.use_latest_commits }}" = "true" ]; then
               echo "Using latest KernelSU-Next from branch: $KSU_BRANCH"
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+              curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
             else
               COMMITS_JSON="${{ github.workspace }}/.github/config/commits.json"
               KSU_SETUP_COMMIT=$(jq -er '.kernelsu.dev' "$COMMITS_JSON")
