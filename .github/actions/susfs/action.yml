@@ -374,3 +374,47 @@ runs:
         if [[ "$SHOW_PAD_FIX" = "1" ]]; then
           sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
         fi
+
+    - name: Apply KernelSU Kbuild & ksu.c Fixes (6.12+)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        
+        # Определяем директорию KSU динамически на основе инпута, если переменная окружения пуста
+        KSU_DIR_NAME="${KSU_DIR:-}"
+        if [ -z "$KSU_DIR_NAME" ]; then
+          case "${{ inputs.ksu_variant }}" in
+            Next) KSU_DIR_NAME="KernelSU-Next" ;;
+            KSU|MKSU|KowSU) KSU_DIR_NAME="KernelSU" ;;
+            ReSukiSU)
+              if [ -d "ReSukiSU" ]; then KSU_DIR_NAME="ReSukiSU"
+              elif [ -d "SukiSU-Ultra" ]; then KSU_DIR_NAME="SukiSU-Ultra"
+              else KSU_DIR_NAME="KernelSU"; fi ;;
+            WKSU) KSU_DIR_NAME="Wild_KSU" ;;
+            *) KSU_DIR_NAME="KernelSU-Next" ;;
+          esac
+        fi
+        
+        TARGET_DIR="$KSU_DIR_NAME/kernel"
+        
+        if [ -d "$TARGET_DIR" ]; then
+          cd "$TARGET_DIR"
+          
+          if [ -f ksu.c ]; then
+            sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
+          fi
+          
+          KSU_VER="${KSU_VERSION:-0}"
+          KERNEL_VER="${{ inputs.kernel_version }}"
+          
+          if [[ "$KSU_VER" -gt 33095 ]] && [[ "$KERNEL_VER" == "6.12" ]]; then
+            if [ -f Kbuild ]; then
+              sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|' Kbuild
+              sed -i 's|$(src)|$(abspath $(src))|' Kbuild
+              sed -i 's|$(srctree)/$(src)|$(abspath $(srctree)/$(src))|' Kbuild
+            fi
+          fi
+        else
+          echo "::warning::KSU folder not found at $TARGET_DIR, skipping Kbuild & ksu.c fixes."
+        fi
