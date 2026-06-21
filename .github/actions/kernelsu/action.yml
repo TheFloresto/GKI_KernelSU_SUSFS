@@ -109,57 +109,6 @@ runs:
         echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> "$GITHUB_ENV"
         echo "KSU_COMMIT=$KSU_COMMIT" >> "$GITHUB_ENV"
 
-    - name: 'Apply KernelSU Kbuild & ksu.c Fixes (6.12+)'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel
-      run: |
-        set -euo pipefail
-        
-        KERNEL_VER="${{ inputs.kernel_version }}"
-        echo "Detected Kernel Version: $KERNEL_VER"
-        echo "Current KSU_VERSION: $KSU_VERSION"
-        
-        TARGET_DIR="$KSU_DIR/kernel"
-        if [ ! -d "$TARGET_DIR" ]; then
-          echo "::warning::Cannot apply fixes, $TARGET_DIR does not exist."
-          exit 0
-        fi
-        
-        cd "$TARGET_DIR"
-        
-        echo "Applying ksu.c stack protector fixes..."
-        # В KernelSU-Next файл ksu.c находится в подпапке core/
-        if [ -f core/ksu.c ]; then
-          sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' core/ksu.c
-        elif [ -f ksu.c ]; then
-          sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
-        else
-          echo "ksu.c not found, skipping."
-        fi
-        
-        # Накатываем фиксы путей для Kbuild на ядрах 6.12+
-        if [[ "$KSU_VERSION" -gt 33095 ]] && [[ "$KERNEL_VER" == "6.12" ]]; then
-          echo "Applying Kbuild include and path fixes for 6.12+..."
-          if [ -f Kbuild ]; then
-            # Получаем чистый абсолютный путь к корню драйвера KernelSU-Next
-            KSU_ABS_PATH=$(pwd)
-            echo "[+] Родной абсолютный путь KSU: $KSU_ABS_PATH"
-            
-            # 1. Внедряем пути в самое начало Kbuild через LINUXINCLUDE (гарантия для подпапок)
-            sed -i "1i LINUXINCLUDE := -I${KSU_ABS_PATH} -I${KSU_ABS_PATH}/uapi \$(LINUXINCLUDE)" Kbuild
-            
-            # 2. Дублируем в ccflags-y и subdir-ccflags-y в конец файла для полной уверенности
-            echo "ccflags-y += -I${KSU_ABS_PATH} -I${KSU_ABS_PATH}/uapi" >> Kbuild
-            echo "subdir-ccflags-y += -I${KSU_ABS_PATH} -I${KSU_ABS_PATH}/uapi" >> Kbuild
-            
-            echo "[+] Kbuild successfully patched with absolute paths and LINUXINCLUDE."
-          else
-            echo "::warning::Kbuild file not found in $TARGET_DIR"
-          fi
-        else
-          echo "Kbuild fixes skipped. Condition not met (KSU_VERSION > 33095 and KERNEL_VER == 6.12)"
-        fi
-
     - name: 'Fix KernelSU-Next'
       if: ${{ inputs.ksu_variant == 'Next' }}
       shell: bash
