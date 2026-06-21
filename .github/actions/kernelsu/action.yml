@@ -115,9 +115,7 @@ runs:
       run: |
         set -euo pipefail
         
-        # Determine the kernel base version from the input (e.g., extracting "6.12" from "android16-6.12")
         KERNEL_VER="${{ inputs.kernel_version }}"
-        
         echo "Detected Kernel Version: $KERNEL_VER"
         echo "Current KSU_VERSION: $KSU_VERSION"
         
@@ -130,29 +128,30 @@ runs:
         cd "$TARGET_DIR"
         
         echo "Applying ksu.c stack protector fixes..."
-        if [ -f ksu.c ]; then
+        # В KernelSU-Next файл ksu.c находится в подпапке core/
+        if [ -f core/ksu.c ]; then
+          sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' core/ksu.c
+        elif [ -f ksu.c ]; then
           sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
         else
           echo "ksu.c not found, skipping."
         fi
         
-        # Apply Kbuild fixes only if version condition is met
+        # Накатываем фиксы путей для Kbuild на ядрах 6.12+
         if [[ "$KSU_VERSION" -gt 33095 ]] && [[ "$KERNEL_VER" == "6.12" ]]; then
           echo "Applying Kbuild include and path fixes for 6.12+..."
           if [ -f Kbuild ]; then
-            # 1. Исправляем пути KSU
-            sed -i 's|KSU_KERNEL_DIR = $(src)|KSU_KERNEL_DIR = $(srctree)/$(src)|g' Kbuild
+            # Железобетонно прокидываем пути к корню исходников KernelSU-Next для out-of-tree сборки
+            # В KernelSU-Next папка uapi находится прямо в корне драйвера, а не в include/
+            echo 'ccflags-y += -I$(srctree)/$(src)' >> Kbuild
+            echo 'ccflags-y += -I$(srctree)/$(src)/uapi' >> Kbuild
             
-            # 2. Добавляем пути в CFLAGS принудительно (это решит проблему с app_profile.h)
-            # Мы используем -I$(srctree)/$(src)/include для поиска заголовков KSU
-            echo 'ccflags-y += -I$(srctree)/$(src)/include' >> Kbuild
-            echo 'ccflags-y += -I$(srctree)/$(src)/include/uapi' >> Kbuild
-            
-            # 3. Дополнительная мера: экспорт путей для kbuild, чтобы он искал заголовки в дереве KSU
-            echo 'ccflags-y += -DCONFIG_KSU=y' >> Kbuild
+            echo "[+] Kbuild successfully patched for 6.12 root source trees."
           else
             echo "::warning::Kbuild file not found in $TARGET_DIR"
           fi
+        else
+          echo "Kbuild fixes skipped. Condition not met (KSU_VERSION > 33095 and KERNEL_VER == 6.12)"
         fi
 
     - name: 'Fix KernelSU-Next'
