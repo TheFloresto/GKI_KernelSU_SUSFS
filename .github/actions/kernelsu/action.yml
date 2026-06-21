@@ -141,12 +141,18 @@ runs:
         if [[ "$KSU_VERSION" -gt 33095 ]] && [[ "$KERNEL_VER" == "6.12" ]]; then
           echo "Applying Kbuild include and path fixes for 6.12+..."
           if [ -f Kbuild ]; then
-            # Железобетонно прокидываем пути к корню исходников KernelSU-Next для out-of-tree сборки
-            # В KernelSU-Next папка uapi находится прямо в корне драйвера, а не в include/
-            echo 'ccflags-y += -I$(srctree)/$(src)' >> Kbuild
-            echo 'ccflags-y += -I$(srctree)/$(src)/uapi' >> Kbuild
+            # Получаем чистый абсолютный путь к корню драйвера KernelSU-Next
+            KSU_ABS_PATH=$(pwd)
+            echo "[+] Родной абсолютный путь KSU: $KSU_ABS_PATH"
             
-            echo "[+] Kbuild successfully patched for 6.12 root source trees."
+            # 1. Внедряем пути в самое начало Kbuild через LINUXINCLUDE (гарантия для подпапок)
+            sed -i "1i LINUXINCLUDE := -I${KSU_ABS_PATH} -I${KSU_ABS_PATH}/uapi \$(LINUXINCLUDE)" Kbuild
+            
+            # 2. Дублируем в ccflags-y и subdir-ccflags-y в конец файла для полной уверенности
+            echo "ccflags-y += -I${KSU_ABS_PATH} -I${KSU_ABS_PATH}/uapi" >> Kbuild
+            echo "subdir-ccflags-y += -I${KSU_ABS_PATH} -I${KSU_ABS_PATH}/uapi" >> Kbuild
+            
+            echo "[+] Kbuild successfully patched with absolute paths and LINUXINCLUDE."
           else
             echo "::warning::Kbuild file not found in $TARGET_DIR"
           fi
