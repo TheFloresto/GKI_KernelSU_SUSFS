@@ -140,20 +140,19 @@ runs:
         if [[ "$KSU_VERSION" -gt 33095 ]] && [[ "$KERNEL_VER" == "6.12" ]]; then
           echo "Applying Kbuild include and path fixes for 6.12+..."
           if [ -f Kbuild ]; then
-            # 1. Привязываем внутреннюю переменную KSU к корню исходников (для out-of-tree сборки)
+            # 1. Исправляем пути KSU
             sed -i 's|KSU_KERNEL_DIR = $(src)|KSU_KERNEL_DIR = $(srctree)/$(src)|g' Kbuild
             
-            # 2. Обновляем флаги для старых версий KSU (если они используют KSU_KERNEL_DIR)
-            sed -i 's|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include|ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_KERNEL_DIR)/include/uapi|g' Kbuild
-            
-            # 3. Железобетонно добавляем правильные пути в конец файла для ядра 6.12
+            # 2. Добавляем пути в CFLAGS принудительно (это решит проблему с app_profile.h)
+            # Мы используем -I$(srctree)/$(src)/include для поиска заголовков KSU
             echo 'ccflags-y += -I$(srctree)/$(src)/include' >> Kbuild
             echo 'ccflags-y += -I$(srctree)/$(src)/include/uapi' >> Kbuild
+            
+            # 3. Дополнительная мера: экспорт путей для kbuild, чтобы он искал заголовки в дереве KSU
+            echo 'ccflags-y += -DCONFIG_KSU=y' >> Kbuild
           else
             echo "::warning::Kbuild file not found in $TARGET_DIR"
           fi
-        else
-          echo "Kbuild fixes skipped. Condition not met (KSU_VERSION > 33095 and KERNEL_VER == 6.12)"
         fi
 
     - name: 'Fix KernelSU-Next'
