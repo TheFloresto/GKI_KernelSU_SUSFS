@@ -166,6 +166,7 @@ runs:
         if [ "${{ inputs.sublevel }}" -ge "197" ]; then
           echo "Applying namespace.c Android 13 5.15 Fake Patch"
           sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
+          sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
         fi
         if [ "${{ inputs.sublevel }}" -ge "206" ]; then
           echo "Applying task_mmu.c Android 13 5.15 Fake Patch"
@@ -243,7 +244,7 @@ runs:
           echo "Applying task_mmu.c Android 16 6.12 Fake Patch"
           sed -i 's/vma_data_pages/vma_pages/g' fs/proc/task_mmu.c
         fi
-
+        
     - name: Apply Kernel SUSFS Patches
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
@@ -300,6 +301,7 @@ runs:
         if [ "${{ inputs.sublevel }}" -ge "197" ]; then
           echo "Reverting namespace.c Android 13 5.15 Fake Patch"
           sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
+          sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
         fi
         if [ "${{ inputs.sublevel }}" -ge "206" ]; then
           echo "Reverting task_mmu.c Android 13 5.15 Fake Patch"
