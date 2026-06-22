@@ -418,6 +418,12 @@ jobs:
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
+
+    - name: Checkout release repo
+      uses: actions/checkout@v5
+      with:
+       repository: NerestKernels/GKI_KernelSU_SUSFS
+       path: release_repo
         
     - name: Generate New Tag
       id: tag
