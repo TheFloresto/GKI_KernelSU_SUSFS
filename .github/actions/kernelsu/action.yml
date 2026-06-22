@@ -43,7 +43,7 @@ runs:
               git -C KernelSU-Next/kernel checkout "$KSU_SETUP_COMMIT"
             fi       
             KSU_DIR="KernelSU-Next"
-            BASE_VERSION=29991
+            BASE_VERSION=29992
             ;;
           KSU)
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
