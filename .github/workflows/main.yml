@@ -417,8 +417,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
       with:
-        token: ${{ secrets.RELEASE_TOKEN || github.token }}
-        repository: ${{ env.RELEASE_REPO }}
         fetch-depth: 0
         
     - name: Generate New Tag
