@@ -7,7 +7,7 @@ Join the telegram here: https://t.me/NerestKernels
 
 # Features
 - [KernelSU-Next](#kernelsu-next)
-- [SUSFS v2.1.0](#susfs-v210)
+- [SUSFS v2.2.0](#susfs-v220)
 - [Baseband Guard (BBG)](#baseband-guard-bbg)
 - [DroidSpaces-OSS](#droidspaces-oss)
 - [Networking Improvements](#networking)
@@ -36,7 +36,7 @@ Manager: {{KSU_MANAGER}}
 **Commit**  
 `{{KSUN_COMMIT}}`
 
-## [SUSFS v2.1.0](https://gitlab.com/simonpunk/susfs4ksu)
+## [SUSFS v2.2.0](https://gitlab.com/simonpunk/susfs4ksu)
 
 A KSU addon for hiding root using kernel patches and a userspace module!
 
