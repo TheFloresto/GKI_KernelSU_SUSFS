@@ -6,35 +6,31 @@
 Join the telegram here: https://t.me/NerestKernels
 
 # Features
-- [KernelSU-Next](#kernelsu-next)
+- [{{KSU_NAME}}](#kernelsu)
 - [SUSFS v2.2.0](#susfs-v220)
 - [Baseband Guard (BBG)](#baseband-guard-bbg)
 - [DroidSpaces-OSS](#droidspaces-oss)
 - [Networking Improvements](#networking)
 
-## [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)
+## [{{KSU_NAME}}]({{KSU_URL}})
 
 A kernel-based root solution for Android devices.
 
 > [!WARNING]
-> This release uses the [pershoot/KernelSU-Next](https://github.com/pershoot/KernelSU-Next) fork. The fork maintainer has said it is not ready for production use, so treat it as use at your own risk.
+> This release uses the {{KSU_NAME}} fork. Ensure you use the specific manager app required for this variant. Treat experimental forks as use at your own risk.
 
 Manager: {{KSU_MANAGER}}
 
 > [!IMPORTANT]
 > For best compatiblity ensure your Manager Version and Kernel Version match eg. 30100 = 30100.
 
-**Version**  
-`{{KSU_VERSION}}`
+**Version** `{{KSU_VERSION}}`
 
-**Tag**  
-`{{KSU_GIT_TAG}}`
+**Tag** `{{KSU_GIT_TAG}}`
 
-**Branch**  
-`{{KSUN_BRANCH}}`
+**Branch** `{{KSUN_BRANCH}}`
 
-**Commit**  
-`{{KSUN_COMMIT}}`
+**Commit** `{{KSUN_COMMIT}}`
 
 ## [SUSFS v2.2.0](https://gitlab.com/simonpunk/susfs4ksu)
 
@@ -96,8 +92,8 @@ b. KSU LKM (boot/init_boot/vendor_boot‑patched): Flash back the stock boot/ini
 c. KSU GKI: if you are 100% sure you already flashed stock init_boot/boot/vendor_boot, no action is needed; otherwise, follow the same steps as KSU LKM.
 d. APatch: remove /data/adb contents to avoid leftover root conflicts after flashing the AnyKernel3 ZIP.
 Flash the ZIP to the active slot using Kernel Flasher.
-Install the KernelSU‑Next Manager APK, same version as mentioned in the release notes.
-Open the KernelSU‑Next app.
+Install the {{KSU_NAME}} Manager APK, same version as mentioned in the release notes.
+Open the {{KSU_NAME}} app.
 Reboot the device if you performed any cleanup in step 2
 
 ## Force Load Kernel Modules (Bypass) — flashing with `Bypass-Image`
