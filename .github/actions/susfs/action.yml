@@ -23,7 +23,7 @@ inputs:
   ksu_variant:
     description: 'KSU variant (Next, KSU, MKSU, KowSU, ReSukiSU, WKSU)'
     required: false
-    default: Next    
+    default: Next
 
 runs:
   using: composite
@@ -62,16 +62,8 @@ runs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
 
-    - name: Apply Kernel SUSFS Patches
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        # Apply base SUSFS patches
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
-        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
-
     - name: Apply KSU SUSFS Patches
+      if: true
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
@@ -115,6 +107,15 @@ runs:
         cd "$KSU_DIR"
         cp "$PATCH_SRC" ./
         patch -p1 < "$(basename "$PATCH_SRC")" || true
+
+    - name: Apply Kernel SUSFS Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |   
+        # Apply base SUSFS patches
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
+        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
 
     - name: Apply Android 12 5.10 Fake Patches
       shell: bash
@@ -166,9 +167,8 @@ runs:
         if [ "${{ inputs.sublevel }}" -ge "197" ]; then
           echo "Applying namespace.c Android 13 5.15 Fake Patch"
           sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
-          sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
         fi
-        if [ "${{ inputs.sublevel }}" -ge "206" ]; then
+        if [ "${{ inputs.sublevel }}" -ge "197" ]; then
           echo "Applying task_mmu.c Android 13 5.15 Fake Patch"
           sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
         fi
@@ -244,7 +244,7 @@ runs:
           echo "Applying task_mmu.c Android 16 6.12 Fake Patch"
           sed -i 's/vma_data_pages/vma_pages/g' fs/proc/task_mmu.c
         fi
-        
+
     - name: Apply Kernel SUSFS Patches
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
@@ -301,7 +301,6 @@ runs:
         if [ "${{ inputs.sublevel }}" -ge "197" ]; then
           echo "Reverting namespace.c Android 13 5.15 Fake Patch"
           sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
-          sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
         fi
         if [ "${{ inputs.sublevel }}" -ge "206" ]; then
           echo "Reverting task_mmu.c Android 13 5.15 Fake Patch"
@@ -379,6 +378,7 @@ runs:
 
     - name: Apply KernelSU Kbuild & ksu.c Fixes (6.12+)
       shell: bash
+      if: true
       working-directory: ${{ github.workspace }}/kernel
       run: |
         set -euo pipefail
@@ -419,4 +419,5 @@ runs:
           fi
         else
           echo "::warning::KSU folder not found at $TARGET_DIR, skipping Kbuild & ksu.c fixes."
-        fi
+        fi        
+        
