@@ -10,17 +10,57 @@ inputs:
   android_version:
     description: 'Android version (e.g., android14)'
     required: true
+  sublevel:
+    description: 'Kernel sublevel'
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Patch with BBRv3
-      if: ${{ inputs.kernel_version == '6.1' && false }}
+    - name: 'Apply BBRv3'
       shell: bash
+      if: true
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
-        curl -L https://raw.githubusercontent.com/ahmed-alnassif/GKI-Duchamp/dev/kernel-patches/bbrv3/bbrv3.patch | patch -p1
+        if [[ ${{ inputs.version }} == "android16-6.12" ]]; then
+          cp "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch" temp.patch
+          #patch -p1 -F 3 < temp.patch
+          rm temp.patch
+        elif [[ ${{ inputs.version }} == "android15-6.6" ]]; then
+          cp "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch" temp.patch
+          patch -p1 -F 3 < temp.patch
+          rm temp.patch
+        elif [[ ${{ inputs.version }} == "android14-6.1" ]]; then
+          cp "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android14-6.1.patch" temp.patch
+          patch -p1 -F 3 < temp.patch
+          rm temp.patch
+        elif [[ ${{ inputs.version }} == "android14-5.15" ]]; then
+          cp "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch" temp.patch
+          patch -p1 -F 3 < temp.patch
+          rm temp.patch
+        elif [[ ${{ inputs.version }} == "android13-5.15" && ${{ inputs.sublevel }} -ge "74" ]]; then
+          cp "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch" temp.patch
+          patch -p1 -F 3 < temp.patch
+          rm temp.patch
+        elif [[ ${{ inputs.version }} == "android13-5.10" && ${{ inputs.sublevel }} -ge "186" ]]; then
+          cp "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch" temp.patch
+          patch -p1 -F 3 < temp.patch
+          rm temp.patch
+        elif [[ ${{ inputs.version }} == "android12-5.10" && ${{ inputs.sublevel }} -ge "185" ]]; then
+          cp "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch" temp.patch
+          patch -p1 -F 3 < temp.patch
+          rm temp.patch
+        fi
+        
+        echo "✅ BBRv3 patches applied"
+
+    - name: Enable Kernel Configs
+      if: true
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_TCP_CONG_BBR3=y
 
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config
@@ -50,9 +90,6 @@ runs:
           CONFIG_NETFILTER_XT_MATCH_RECENT=y
           CONFIG_IP6_NF_NAT=y
           CONFIG_IP6_NF_TARGET_MASQUERADE=y
-          CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-          CONFIG_IP6_NF_TARGET_HL=y
-          CONFIG_IP6_NF_MATCH_HL=y
 
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config
@@ -68,6 +105,8 @@ runs:
           CONFIG_DEFAULT_TCP_CONG="bbr"
           CONFIG_NET_SCH_FQ=y
           CONFIG_NET_SCH_FQ_CODEL=y
+          CONFIG_NET_ACT_CONNMARK=y
+          CONFIG_NET_SCH_CAKE=y
         
     - name: Apply Kernel Config for 5.10
       shell: bash
@@ -76,31 +115,21 @@ runs:
       run: |
         sed -i 's/CONFIG_IP_SET_MAX/65534/g' net/netfilter/ipset/ip_set_core.c
 
-    - name: 'Apply BBRv3'
-      if: false
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        set -euo pipefail
-        cp ${{ github.action_path }}/patches/bbrv3-android14-6.1.patch "${{ github.workspace }}/kernel/common/bbrv3-android14-6.1.patch"
-        patch -p1 < bbrv3-android14-6.1.patch
-
     - name: Apply NTSync Patch
-      if: false
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
 
         echo "Using patch: $(basename $NTSYNC_PATCH)"
-        if [[ ${{ inputs.versi0n }} = "android16-6.12" ]}; then
+        if [[ ${{ inputs.version }} = "android16-6.12" ]]; then
           echo "Removing pre-existing ntsync files for android16-6.12"
           rm -f include/uapi/linux/ntsync.h
           rm -f drivers/misc/ntsync.c
         fi
 
-        cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${{ inputs.versi0n }}.patch ${{ github.workspace }}/kernel/common
-        patch -p1 ntsync_compat_${{ inputs.versi0n }}.patch
+        cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${{ inputs.version }}.patch ${{ github.workspace }}/kernel/common
+        patch -p1 ntsync_compat_${{ inputs.version }}.patch
         
         cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_base.patch ${{ github.workspace }}/kernel/common
         patch -p1 < ntsync_base.patch
