@@ -32,6 +32,7 @@ runs:
 
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config
+      if: false
       with:
         config_list: |
           CONFIG_CIFS=y
@@ -42,7 +43,7 @@ runs:
 
     - name: Apply Other Patches
       shell: bash
-      if: true
+      if: false
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
