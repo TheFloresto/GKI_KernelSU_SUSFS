@@ -207,6 +207,7 @@ jobs:
         version: ${{ inputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
         android_version: ${{ inputs.android_version }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: DroidSpaces-OSS Patches
       if: contains(inputs.feature_set, 'DS') || inputs.feature_set == 'FULL'
