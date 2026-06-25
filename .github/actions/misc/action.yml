@@ -31,8 +31,8 @@ runs:
           CONFIG_KALLSYMS_ALL=y
 
     - name: Enable Kernel Configs
+      if: false  
       uses: ./.github/actions/set-kernel-config
-      if: false
       with:
         config_list: |
           CONFIG_CIFS=y
