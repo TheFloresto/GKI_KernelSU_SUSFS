@@ -21,4 +21,4 @@ runs:
         # Commit changes to avoid dirty state during build
         cd ${{ github.workspace }}/kernel/common
         git add .
-        git commit -m "Wild: Clean Dirty Flag"
+        git commit -m "TheFloresto: Clean Dirty Flag"
