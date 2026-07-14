@@ -116,7 +116,7 @@ runs:
       echo "::group::Build kernel with ccache optimization"
 
       KERNEL_ROOT="${KERNEL_ROOT:-$GITHUB_WORKSPACE/kernel}"
-      FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
+      FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto_gki.fragment}"
 
       cd "$KERNEL_ROOT/common"
       : > "$KERNEL_ROOT/common/.scmversion"
