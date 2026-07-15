@@ -101,7 +101,8 @@ runs:
         set -euo pipefail
         if [[ ${{ inputs.version }} == "android16-6.12" ]]; then
           #patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
-          patch -p1 < ${{ github.action_path }}/patches/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch
+          #patch -p1 < ${{ github.action_path }}/patches/0001-net-tcp-backport-BBRv3-to-android16-6.12.patch
+          echo "skipped"
         elif [[ ${{ inputs.version }} == "android15-6.6" ]]; then
           patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"
         elif [[ ${{ inputs.version }} == "android14-6.1" ]]; then
