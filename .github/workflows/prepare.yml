@@ -24,7 +24,7 @@ on:
 
 jobs:
   generate-matrix:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.final.outputs.matrix }}
     steps:
