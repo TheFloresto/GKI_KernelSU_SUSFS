@@ -88,7 +88,7 @@ runs:
       CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1 || echo "unknown")
       echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
       echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
-      echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
+      echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto_gki.fragment" >> "$GITHUB_ENV"
 
       "$CLANG_DIR/bin/clang" --version | head -2
 
