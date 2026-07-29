@@ -26,9 +26,13 @@ runs:
           rm -f drivers/misc/ntsync.c
         fi
 
-        # Apply lockdep_assert_none_held_once() for android12-5.10 only
-        if [[ ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "209" ]]; then
-          patch -p1 -N < ${{ github.action_path }}/patches/0003-lockdep-assert-none-held.patch
+        # Apply lockdep prerequisites for android12-5.10 (2022-01 baseline)
+        if [[ ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "66" ]]; then
+          patch -p1 -N < ${{ github.action_path }}/patches/0001-lockdep-detect-recursive-read.patch
+        fi
+
+        if [[ ( "${{ inputs.version }}" == "android12-5.10" && "${{ inputs.sublevel }}" -le "209" ) || ( "${{ inputs.version }}" == "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
+          patch -p1 -N < ${{ github.action_path }}/patches/0002-lockdep-assert-none-held.patch
         fi
 
         if [[ ${{ inputs.version }} = "android13-5.10" ]]; then
