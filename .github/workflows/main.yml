@@ -59,6 +59,10 @@ on:
         description: "SUSFS"
         type: boolean
         default: true
+      use_vpnhide:
+        description: "VPNHide"
+        type: boolean
+        default: true
       use_nomount:
         description: "NoMount"
         type: boolean
@@ -416,6 +420,7 @@ jobs:
 
           FEATURES=""
           [ "${{ inputs.use_susfs }}" = "true" ] && FEATURES="${FEATURES}SUSFS+"
+          [ "${{ inputs.use_vpnhide }}" = "true" ] && FEATURES="${FEATURES}VPNHIDE+"
           [ "${{ inputs.use_nomount }}" = "true" ] && FEATURES="${FEATURES}NoMount+"
           [ "${{ inputs.use_bbg }}" = "true" ] && FEATURES="${FEATURES}BBG+"
           [ "${{ inputs.use_net }}" = "true" ] && FEATURES="${FEATURES}NET+"
@@ -1612,4 +1617,3 @@ jobs:
           path: release_body.md
           retention-days: 7
           if-no-files-found: warn
-

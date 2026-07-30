@@ -258,6 +258,13 @@ jobs:
           echo "[-] KVER $KVER < 6.6"
         fi
 
+    - name: Setup VPNHide
+      if: contains(inputs.feature_set, 'VPNHIDE')
+      uses: ./.github/actions/vpnhide
+      with:
+        token: ${{ secrets.VPNHIDE_PRIVATE_TOKEN }}
+        version: ${{ inputs.version }}
+
     - name: Baseband Guard
       if: (contains(inputs.feature_set, 'BBG') || inputs.feature_set == 'All')
       uses: ./.github/actions/bbg

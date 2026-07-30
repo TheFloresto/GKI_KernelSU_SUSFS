@@ -4,3 +4,7 @@ kernel-manifests/
 kernels/
 bbr/
 __pycache__/
+kernel*
+Kernel*
+artifacts
+artifacts/*
