@@ -61,23 +61,23 @@ runs:
         echo "✅ Dependencies installed"
         echo "::endgroup::"        
 
-    - name: 'Setup Neutron Clang and Env'
+    - name: 'Setup Greenforce Clang and Env'
       shell: bash
       run: |
         set -euo pipefail
 
-        echo "::group::Downloading Neutron Clang"
-        CLANG_DIR="$GITHUB_WORKSPACE/neutron-clang"
+        echo "::group::Downloading Greenforce Clang"
+        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
         mkdir -p "$CLANG_DIR"
         cd "$CLANG_DIR"
         
-        # Скачиваем и запускаем AntMan (официальный менеджер тулчейна) для синхронизации последней версии
-        bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") -S
+        # Скачиваем и распаковываем Greenforce Clang
+        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
         echo "::endgroup::"
 
         # Строгая проверка корректности путей
         if [ ! -f "$CLANG_DIR/bin/clang" ]; then
-          echo "::error::Neutron Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
+          echo "::error::Greenforce Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
           ls -la "$CLANG_DIR" || true
           exit 1
         fi
