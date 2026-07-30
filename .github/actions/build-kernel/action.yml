@@ -71,14 +71,32 @@ runs:
         mkdir -p "$CLANG_DIR"
         cd "$CLANG_DIR"
         
-        # Скачиваем и распаковываем Greenforce Clang
+        # Скачиваем скрипт и запускаем его
         bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
+        
+        # Если файлы распаковались во вложенную папку, поднимаем их на уровень выше в $CLANG_DIR
+        if [ -d "$CLANG_DIR/greenforce_clang" ]; then
+          mv "$CLANG_DIR/greenforce_clang/"* "$CLANG_DIR/" 2>/dev/null || true
+          rm -rf "$CLANG_DIR/greenforce_clang"
+        elif [ -d "$CLANG_DIR/clang" ]; then
+          mv "$CLANG_DIR/clang/"* "$CLANG_DIR/" 2>/dev/null || true
+          rm -rf "$CLANG_DIR/clang"
+        fi
+
+        # Ищем папку, где лежит бинарник clang, если он глубже
+        FOUND_CLANG_BIN=$(find "$CLANG_DIR" -type f -name "clang" -path "*/bin/*" | head -n 1)
+        if [ -n "$FOUND_CLANG_BIN" ]; then
+          REAL_BIN_DIR=$(dirname "$FOUND_CLANG_BIN")
+          CLANG_DIR=$(dirname "$REAL_BIN_DIR")
+        fi
+
         echo "::endgroup::"
 
         # Строгая проверка корректности путей
         if [ ! -f "$CLANG_DIR/bin/clang" ]; then
           echo "::error::Greenforce Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
           ls -la "$CLANG_DIR" || true
+          find "$CLANG_DIR" -maxdepth 3 || true
           exit 1
         fi
 
