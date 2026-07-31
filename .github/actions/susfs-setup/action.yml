@@ -38,5 +38,22 @@ runs:
         git remote add pershoot https://gitlab.com/pershoot/susfs4ksu.git
         git fetch pershoot gki-android14-6.1-dev
 
-        git cherry-pick "$COMMIT1"
-        git cherry-pick "$COMMIT2"
+        # Функция для безопасного применения коммитов
+        safe_cherry_pick() {
+          echo "Attempting to cherry-pick $1..."
+          if ! git cherry-pick "$1"; then
+            if git status | grep -q "nothing to commit"; then
+              echo "⚠️ Commit $1 is already applied (empty patch). Skipping..."
+              git cherry-pick --skip
+            else
+              echo "❌ Real merge conflict or error on commit $1! Manual intervention required."
+              exit 1
+            fi
+          else
+            echo "✅ Successfully picked $1"
+          fi
+        }
+
+        # Применяем коммиты через безопасную функцию
+        safe_cherry_pick "$COMMIT1"
+        safe_cherry_pick "$COMMIT2"
