@@ -142,6 +142,7 @@ runs:
 
         echo "Getting last commit timestamp from kernel source..."
         COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        COMMIT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S')           
         COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
         WORKSPACE="${GITHUB_WORKSPACE}"
@@ -155,8 +156,6 @@ runs:
         export LLVM=1 LLVM_IAS=1
         export ARCH=arm64 SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
-        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-        export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
         if [ -x "$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin/pahole" ]; then
           export PAHOLE="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
