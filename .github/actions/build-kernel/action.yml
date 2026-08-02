@@ -61,41 +61,24 @@ runs:
         echo "✅ Dependencies installed"
         echo "::endgroup::"        
 
-    - name: 'Setup Greenforce Clang and Env'
+    - name: 'Setup Neutron Clang and Env'
       shell: bash
       run: |
         set -euo pipefail
 
-        echo "::group::Downloading Greenforce Clang"
-        CLANG_DIR="$GITHUB_WORKSPACE/greenforce-clang"
+        echo "::group::Downloading Neutron Clang"
+        CLANG_DIR="$GITHUB_WORKSPACE/neutron-clang"
         mkdir -p "$CLANG_DIR"
         cd "$CLANG_DIR"
         
-        # Скачиваем скрипт и запускаем его
-        bash <(wget -qO- https://raw.githubusercontent.com/greenforce-project/greenforce_clang/refs/heads/main/get_clang.sh)
-        
-        # Исправляем вложенность: если появилась папка-дублер, поднимаем её содержимое на уровень выше
-        for sub in greenforce-clang greenforce_clang clang; do
-          if [ -d "$CLANG_DIR/$sub" ]; then
-            mv "$CLANG_DIR/$sub/"* "$CLANG_DIR/" 2>/dev/null || true
-            rm -rf "$CLANG_DIR/$sub"
-          fi
-        done
-
-        # Дополнительный поиск реального расположения bin/clang, если структура отличается
-        FOUND_CLANG_BIN=$(find "$CLANG_DIR" -type f -name "clang" -path "*/bin/*" | head -n 1)
-        if [ -n "$FOUND_CLANG_BIN" ]; then
-          REAL_BIN_DIR=$(dirname "$FOUND_CLANG_BIN")
-          CLANG_DIR=$(dirname "$REAL_BIN_DIR")
-        fi
-
+        # Скачиваем и запускаем AntMan (официальный менеджер тулчейна) для синхронизации последней версии
+        bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") -S
         echo "::endgroup::"
 
         # Строгая проверка корректности путей
         if [ ! -f "$CLANG_DIR/bin/clang" ]; then
-          echo "::error::Greenforce Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
+          echo "::error::Neutron Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
           ls -la "$CLANG_DIR" || true
-          find "$CLANG_DIR" -maxdepth 3 || true
           exit 1
         fi
 
