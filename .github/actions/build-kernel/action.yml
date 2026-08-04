@@ -11,6 +11,17 @@ inputs:
 runs:
   using: composite
   steps:
+  - name: 'Activate Bypass'
+    shell: bash
+    working-directory: ${{ github.workspace }}/kernel
+    run: |
+      set -euo pipefail
+      if [ "${{ inputs.bypass }}" = "true" ]; then
+        python3 ${{ github.workspace }}/.github/scripts/bypass_module_checks.py "${{ github.workspace }}/kernel/common"
+      else
+        echo "Bypass hack not applied as per input parameter."
+      fi
+
   - name: Setup Kernel Configs
     if: false
     uses: ./.github/actions/set-kernel-config
@@ -75,7 +86,7 @@ runs:
 
   - name: 'Patch AnyKernel3 for Bypass Hack'
     shell: bash
-    if: inputs.bypass == 'true'
+    if: ${{ inputs.bypass == 'true' }}
     working-directory: ${{ github.workspace }}/AnyKernel3
     run: |
       set -euo pipefail
