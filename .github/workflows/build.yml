@@ -142,7 +142,7 @@ jobs:
         os_patch_level: ${{ inputs.os_patch_level }}
 
     - name: Apply Remote Patches (CLIDR Fix)
-      if: false
+      if: true
       working-directory: ${{ github.workspace }}/kernel/common
       shell: bash
       run: |
