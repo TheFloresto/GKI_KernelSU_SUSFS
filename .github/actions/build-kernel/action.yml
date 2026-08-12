@@ -174,6 +174,8 @@ runs:
         source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
         set -u
         
+        export LDCACHE_DIR="$GITHUB_WORKSPACE/lto_cache"
+        mkdir -p "$LDCACHE_DIR"
         echo '#!/bin/bash' > "$KERNEL_ROOT/common/ld-wrapper"
         echo 'ld.lld "$@" --thinlto-cache-dir=$LDCACHE_DIR --thinlto-jobs=$(nproc --all)' >> "$KERNEL_ROOT/common/ld-wrapper"
         chmod +x "$KERNEL_ROOT/common/ld-wrapper"
@@ -196,6 +198,7 @@ runs:
         export HOSTCXX="ccache clang++"
         
         echo "🧹 Clean build mode"
+        export CCACHE_DIR="${CCACHE_DIR:-$HOME/.ccache}"
 
         export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
             
