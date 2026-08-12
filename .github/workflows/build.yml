@@ -383,6 +383,7 @@ jobs:
       uses: ./.github/actions/build-kernel
       with:
         version: ${{ inputs.version }}
+        android_version: ${{ inputs.android_version }}
         bypass: false
 
     - name: Get Cache Stats
@@ -420,6 +421,7 @@ jobs:
       with:
         bypass: true
         version: ${{ inputs.version }}
+        android_version: ${{ inputs.android_version }}
 
     - name: 📋 Consolidated Build Summary
       if: ${{ always() }}
