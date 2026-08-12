@@ -141,6 +141,38 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
+    - name: Apply Remote Patches (CLIDR Fix)
+      if: false
+      working-directory: ${{ github.workspace }}/kernel/common
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "📋 Applying fix_libbpf_strchr_cast.patch"
+        if curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/refs/heads/main/.github/patches/global/fix_libbpf_strchr_cast.patch" \
+          -o /tmp/fix_libbpf_strchr_cast.patch; then
+          if patch -p1 --dry-run --forward < /tmp/fix_libbpf_strchr_cast.patch > /dev/null 2>&1; then
+            patch -p1 --forward < /tmp/fix_libbpf_strchr_cast.patch
+            echo "✅ Patch applied successfully"
+          else
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "⚠️ Failed to download remote patch, continuing anyway"
+        fi
+
+        echo "📋 Applying fix-clidr-uninitialized.patch"
+        if curl -LSs "https://raw.githubusercontent.com/deepongi-labs/android14-6.1.162-common-2026-03/refs/heads/main/.github/patches/fix-clidr-uninitialized.patch" \
+          -o /tmp/fix-clidr.patch; then
+          if patch -p1 --dry-run --forward < /tmp/fix-clidr.patch > /dev/null 2>&1; then
+            patch -p1 --forward < /tmp/fix-clidr.patch
+            echo "✅ Patch applied successfully"
+          else
+            echo "⏭️  Patch skipped (likely already applied or not needed)"
+          fi
+        else
+          echo "⚠️ Failed to download remote patch, continuing anyway"
+        fi
+
     - name: Setup KernelSU-Next
       if: contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL'
       uses: ./.github/actions/kernelsu
@@ -342,7 +374,7 @@ jobs:
         clear_stats: true
 
     - name: Initialize Config Fragment
-      run: touch "${{ github.workspace }}/wild_gki.fragment"
+      run: touch "${{ github.workspace }}/thefloresto.fragment"
 
     - name: Build Normal Kernel
       env:
@@ -466,7 +498,19 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.extract.outputs.file_name }}-AnyKernel3
+        name: ${{ steps.extract.outputs.file_name }}-AK3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
         compression-level: 9
+
+    - name: Upload Build Logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.extract.outputs.file_name }}-logs
+        path: |
+          ${{ github.workspace }}/kernel/common/build.log
+          ${{ github.workspace }}/kernel/common/out/.config
+        if-no-files-found: ignore
+        compression-level: 9
+        retention-days: 7
