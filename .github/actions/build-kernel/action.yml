@@ -7,7 +7,7 @@ inputs:
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
     required: true
-   kernel_version:
+  kernel_version:
     required: true
   sublevel:
     required: true
@@ -15,8 +15,7 @@ inputs:
     required: true
   android_version:
     description: 'android version'
-    required: true   
-
+    required: true
 runs:
   using: composite
   steps:
@@ -59,7 +58,7 @@ runs:
           libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz
         sudo apt-get clean
         echo "✅ Dependencies installed"
-        echo "::endgroup::"        
+        echo "::endgroup::"
 
     - name: 'Setup ZyCromerZ Clang and Env'
       shell: bash
