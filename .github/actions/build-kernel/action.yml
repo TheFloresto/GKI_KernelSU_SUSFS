@@ -7,100 +7,322 @@ inputs:
   version:
     description: 'Kernel config version (e.g., android14-6.1)'
     required: true
+   kernel_version:
+    required: true
+  sublevel:
+    required: true
+  os_patch_level:
+    required: true
+  android_version:
+    description: 'android version'
+    required: true   
 
 runs:
   using: composite
   steps:
-  - name: 'Activate Bypass'
-    shell: bash
-    working-directory: ${{ github.workspace }}/kernel
-    run: |
-      set -euo pipefail
-      if [ "${{ inputs.bypass }}" = "true" ]; then
-        if [[ ${{ inputs.version }} == "android14-6.1" || ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
-          TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module/version.c"
+    - name: 'Activate Bypass'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.bypass }}" = "true" ]; then
+          if [[ ${{ inputs.version }} == "android14-6.1" || ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
+            TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module/version.c"
+          else
+            TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module.c"
+          fi
+
+          sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
+
+          if ! grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
+            echo "Patch failed! 'return 1;' not found at bad_version:"
+            grep -A 10 "bad_version:" "$TARGET_FILE" || true
+            exit 1
+          fi
         else
-          TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module.c"
+          echo "Bypass hack not applied as per input parameter."
         fi
 
-        sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
+    - name: Setup Kernel Configs
+      if: false
+      uses: ./.github/actions/set-kernel-config
+    
+    - name: Install Minimal Dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "::group::Install dependencies"
+        sudo apt-get -o Acquire::Retries=3 update -qq
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          git curl ca-certificates build-essential clang lld flex bison \
+          libelf-dev libssl-dev libncurses-dev zlib1g-dev liblz4-tool \
+          libxml2-utils rsync unzip dwarves file python3 ccache jq bc dos2unix kmod libdw-dev elfutils pigz
+        sudo apt-get clean
+        echo "✅ Dependencies installed"
+        echo "::endgroup::"        
 
-        if ! grep -A 5 "bad_version:" "$TARGET_FILE" | grep -q "return 1;"; then
-          echo "Patch failed! 'return 1;' not found at bad_version:"
-          grep -A 10 "bad_version:" "$TARGET_FILE" || true
+    - name: 'Setup ZyCromerZ Clang and Env'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "::group::Downloading ZyCromerZ Clang"
+        CLANG_DIR="$GITHUB_WORKSPACE/zycromerz-clang"
+        mkdir -p "$CLANG_DIR"
+        cd "$CLANG_DIR"
+        
+        # Скачиваем последний готовый релиз ZyCromerZ Clang
+        DOWNLOAD_URL=$(curl -s https://api.github.com/repos/ZyCromerZ/Clang/releases/latest | grep "browser_download_url.*tar.gz" | cut -d : -f 2,3 | tr -d \" | xargs)
+        
+        if [ -z "$DOWNLOAD_URL" ]; then
+          echo "::error::Failed to fetch ZyCromerZ download URL!"
           exit 1
         fi
-      else
-        echo "Bypass hack not applied as per input parameter."
-      fi
+        
+        echo "Downloading Clang from: $DOWNLOAD_URL"
+        curl -L "$DOWNLOAD_URL" -o clang.tar.gz
+        tar -xzf clang.tar.gz
+        rm clang.tar.gz
+        echo "::endgroup::"
 
-  - name: Setup Kernel Configs
-    if: false
-    uses: ./.github/actions/set-kernel-config
-  
-  - name: 'Build Kernel'
-    shell: bash
-    working-directory: ${{ github.workspace }}/kernel
-    run: |
-      sed -i 's/check_defconfig//' ./common/build.config.gki
-      if [ -f "build/build.sh" ]; then
-        BUILD_GKI_ARTIFACTS="" \
-        BUILD_GKI_CERTIFICATION_TOOLS=0 \
-        BUILD_SYSTEM_DLKM=0 \
-        SKIP_VENDOR_BOOT=1 \
-        SKIP_EXT_MODULES=1 \
-        SKIP_CP_KERNEL_HDR=1 \
-        OUT_DIR="/home/runner/out" \
-        LTO=thin \
-        BUILD_CONFIG=common/build.config.gki.aarch64 \
-        build/build.sh -j"$(nproc)" \
-        CC="/usr/bin/ccache clang" \
-        CXX="/usr/bin/ccache clang+" \
-        HOSTCC="/usr/bin/ccache clang" \
-        HOSTCXX="/usr/bin/ccache clang+"
-      else
-        if [ "${{ inputs.bypass }}" = "false" ]; then
-          sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
+        # Строгая проверка корректности путей
+        if [ ! -f "$CLANG_DIR/bin/clang" ]; then
+          echo "::error::ZyCromerZ Clang install failed! Executable not found at $CLANG_DIR/bin/clang"
+          ls -la "$CLANG_DIR" || true
+          exit 1
         fi
-        tools/bazel build \
-          --config=fast \
-          --config=stamp \
-          --disk_cache=/home/runner/.cache/bazel \
-          //common:kernel_aarch64/Image
-      fi
 
-  - name: 'Gather Build Artifacts'
-    shell: bash
-    working-directory: ${{ github.workspace }}/kernel
-    run: |
-      set -euo pipefail
-      if [ -f "bazel-bin/common/kernel_aarch64/Image" ]; then
-        echo "Found Image at bazel-bin/common/kernel_aarch64/Image"
-        if [[ ${{ inputs.bypass }} == "true" ]]; then
-          cp "bazel-bin/common/kernel_aarch64/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+        echo "$CLANG_DIR/bin" >> "$GITHUB_PATH"
+        echo "CLANG_BIN_PATH=$CLANG_DIR/bin" >> "$GITHUB_ENV"
+
+        CLANG_VER=$("$CLANG_DIR/bin/clang" --version | grep -oP 'version \K[0-9.]+' | head -n1 || echo "unknown")
+        echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
+        echo "KERNEL_ROOT=$GITHUB_WORKSPACE/kernel" >> "$GITHUB_ENV"
+        echo "FRAGMENT=$GITHUB_WORKSPACE/thefloresto.fragment" >> "$GITHUB_ENV"
+
+        "$CLANG_DIR/bin/clang" --version | head -2
+
+    - name: 🏷️ Set Build Identity (Hardcoded)
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "::group::Set build user/host"
+                
+        BUILD_USER="thefloresto-labs"
+        BUILD_HOST="ubuntu-build"
+        
+        echo "BUILD_USER=$BUILD_USER" >> "$GITHUB_ENV"
+        echo "BUILD_HOST=$BUILD_HOST" >> "$GITHUB_ENV"
+        
+        echo ""
+        echo "✅ Build identity configured:"
+        echo "   User: $BUILD_USER"
+        echo "   Host: $BUILD_HOST"
+        echo "::endgroup::"
+
+    - name: Customize Kernel Branding
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Customize Kernel Branding"
+        
+        ANDROID_VER="${{ inputs.android_version }}" 
+        
+        CUSTOM_LOCALVERSION="-${ANDROID_VER}-TheFloresto"
+        
+        echo "CUSTOM_LOCALVERSION=${CUSTOM_LOCALVERSION}" >> "$GITHUB_ENV"
+                
+        echo "Branding set to: $CUSTOM_LOCALVERSION"
+
+    - name: Build Kernel
+      id: build_kernel_step
+      shell: bash
+      env:
+        PYTHONWARNINGS: "ignore:invalid escape sequence"
+      run: |
+        set -euo pipefail
+        echo "::group::Build kernel with ccache optimization"
+        
+        KERNEL_ROOT="${KERNEL_ROOT:-$GITHUB_WORKSPACE/kernel}"
+        FRAGMENT="${FRAGMENT:-$GITHUB_WORKSPACE/thefloresto.fragment}"
+
+        cd "$KERNEL_ROOT/common"
+        : > "$KERNEL_ROOT/common/.scmversion"
+        
+        export PYTHONWARNINGS="${PYTHONWARNINGS}"
+        
+        echo "Getting last commit timestamp from kernel source..."
+        COMMIT_TIMESTAMP=$(git log -1 --format=%ct 2>/dev/null || echo "$(date +%s)")
+        COMMIT_DATE=$(git log -1 --format=%cd --date=format:'%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S')
+        COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        
+        WORKSPACE="${GITHUB_WORKSPACE}"
+        MAP="-fdebug-prefix-map=${WORKSPACE}=."
+        MPMAP="-fmacro-prefix-map=${WORKSPACE}=."
+        FPMAP="-ffile-prefix-map=${WORKSPACE}=."
+        
+        export KCFLAGS="${KCFLAGS:-} $MAP $MPMAP $FPMAP -no-canonical-prefixes -fdiagnostics-color=never -Qunused-arguments -Wno-unused-command-line-argument -D__ANDROID_COMMON_KERNEL__"
+        export KCPPFLAGS="${KCPPFLAGS:-} $MAP $MPMAP $FPMAP"
+        
+        export LLVM=1 LLVM_IAS=1
+        export ARCH=arm64 SUBARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export PAHOLE="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin/pahole"
+        export LD=ld.lld HOSTLD=ld.lld AR=llvm-ar NM=llvm-nm 
+        export OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip
+        
+        set +u
+        source "$KERNEL_ROOT/build/kernel/_setup_env.sh" 2>/dev/null || true
+        set -u
+        
+        echo '#!/bin/bash' > "$KERNEL_ROOT/common/ld-wrapper"
+        echo 'ld.lld "$@" --thinlto-cache-dir=$LDCACHE_DIR --thinlto-jobs=$(nproc --all)' >> "$KERNEL_ROOT/common/ld-wrapper"
+        chmod +x "$KERNEL_ROOT/common/ld-wrapper"
+        
+        KERNEL_BUILD_DATE=$(date -u)
+        export SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP
+        export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@$COMMIT_TIMESTAMP" '+%a %b %e %H:%M:%S UTC %Y')}"
+        echo "📅 Using current UTC build timestamp: $KBUILD_BUILD_TIMESTAMP"
+        echo "EFFECTIVE_BUILD_TIMESTAMP=$KBUILD_BUILD_TIMESTAMP" >> "$GITHUB_ENV"
+        export KBUILD_BUILD_USER="${BUILD_USER:-kernel}"
+        export KBUILD_BUILD_HOST="${BUILD_HOST:-kleaf}"
+        export KBUILD_BUILD_VERSION=1
+        echo "🔢 SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+        echo "👤 Build user: $KBUILD_BUILD_USER"
+        echo "🖥️  Build host: $KBUILD_BUILD_HOST"
+        
+        export CC="ccache clang"
+        export CXX="ccache clang++"
+        export HOSTCC="ccache clang"
+        export HOSTCXX="ccache clang++"
+        
+        echo "🧹 Clean build mode"
+
+        export PATH="/usr/lib/ccache:${CLANG_BIN_PATH:-}:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux-x86/bin/:${KERNEL_ROOT}/prebuilts/kernel-build-tools/linux_musl-x86/bin/:${PATH}"
+            
+        OUT=out
+        mkdir -p "$OUT"
+
+        echo "============================================"
+        echo "🔍 Compiler & ccache Verification"
+        echo "============================================"
+        echo "PATH: ${PATH:0:200}..."
+        echo "which clang: $(which clang)"
+        echo "CC: $CC"
+        echo "CXX: $CXX"
+        echo "CCACHE_BASEDIR: ${CCACHE_BASEDIR:-not set}"
+        echo ""
+        
+        echo "ccache wrapper test:"
+        clang --version 2>&1 | head -n1 || true
+        echo ""
+        echo "ccache configuration:"
+        ccache -p | grep -E "(compression|direct_mode|readonly_direct|depend|sloppiness)" || true
+        echo ""
+        echo "ccache pre-build status:"
+        ccache -s | head -n 20
+        echo "============================================"
+        
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" gki_defconfig
+
+        if [ -f "$FRAGMENT" ]; then
+          ./scripts/kconfig/merge_config.sh -m -O "$OUT" "$OUT/.config" "$FRAGMENT"
         else
-          cp "bazel-bin/common/kernel_aarch64/Image" "${{ github.workspace }}/AnyKernel3/Image"
+          echo "::warning::Fragment not found at $FRAGMENT, skipping merge_config"
         fi
-        exit 0
+        
+        LOCAL_LOCALVERSION="${CUSTOM_LOCALVERSION:--TheFloresto}"
+        if [ -n "${LOCAL_LOCALVERSION:-}" ]; then
+          scripts/config --file "$OUT/.config" --set-str LOCALVERSION "${LOCAL_LOCALVERSION}"
+          scripts/config --file "$OUT/.config" -d LOCALVERSION_AUTO || true
+          sed -i 's/scm_version="$(scm_version --short)"/scm_version=""/' scripts/setlocalversion
         fi
-      if [ -f "/home/runner/out/dist/Image" ]; then
-        echo "Found Image at /home/runner/out/dist/Image"
-        if [[ ${{ inputs.bypass }} == "true" ]]; then
-          cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
-        else
-          cp "/home/runner/out/dist/Image" "${{ github.workspace }}/AnyKernel3/Image"
+        
+        scripts/config --file "$OUT/.config" -e CC_OPTIMIZE_FOR_PERFORMANCE -d CC_OPTIMIZE_FOR_PERFORMANCE_O3
+        KCFLAGS_EXTRA="-O2"
+
+        scripts/config --file "$OUT/.config" -e LTO_CLANG -d LTO_CLANG_NONE -e LTO_CLANG_THIN -d LTO_CLANG_FULL        
+        
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" O="$OUT" olddefconfig
+        
+        KCFLAGS="$KCFLAGS -Wno-error -pipe ${KCFLAGS_EXTRA}"
+        KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+        
+
+        if [ ! -d "$CCACHE_DIR" ] || [ -z "$(find "$CCACHE_DIR" -maxdepth 2 -type f -print -quit 2>/dev/null)" ]; then
+          echo "🔥 Priming cache with header preprocessing..."
+          make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -C "$KERNEL_ROOT/common" O="$OUT" headers_install prepare 2>&1 | head -n 20 || true
+          echo ""
         fi
-        exit 0
-      fi
+        
+        BUILD_START=$(date +%s)
+        set -o pipefail
+        
+        make LD="$KERNEL_ROOT/common/ld-wrapper" HOSTLD="$KERNEL_ROOT/common/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" Image 2>&1 | tee build.log
+        
+        BUILD_END=$(date +%s)
+        BUILD_TIME=$((BUILD_END - BUILD_START))
+        
+        echo "BUILD_START=$BUILD_START" >> "$GITHUB_ENV"
+        echo "BUILD_END=$BUILD_END" >> "$GITHUB_ENV"
+        echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+        
+        IMG="$PWD/$OUT/arch/arm64/boot/Image"
+        echo "IMG=$IMG" >> "$GITHUB_ENV"
+        if [ ! -f "$IMG" ]; then
+          echo "::error::Kernel Image missing"
+          echo "::group::Last 100 lines of build log"
+          tail -n 100 build.log || echo "Build log not available"
+          echo "::endgroup::"
+          exit 1
+        fi
+        
+        IMG_SIZE=$(stat -c%s "$IMG")
+        
+        echo "============================================"
+        echo "✅ Build Completed Successfully"
+        echo "============================================"
+        echo "Duration: $((BUILD_TIME / 60))m $((BUILD_TIME % 60))s"
+        echo "Image: $(numfmt --to=iec-i --suffix=B "$IMG_SIZE")"
+        
+        echo ""
+        echo "📊 ccache Post-Build Statistics"
+        echo "============================================"
+        ccache -s
+        echo "============================================"
+        echo "::endgroup::"
 
-      exit 1
+    - name: 'Check name'
+      shell: bash
+      run: |
+        set -euo pipefail
+        KERNEL_UNAME=$(strings "$IMG" | grep -E 'Linux version.*#' | tail -n1 || true)
+        echo "Kernel Uname: $KERNEL_UNAME"
+        echo "KERNEL_UNAME=$KERNEL_UNAME" >> "$GITHUB_ENV"
 
-  - name: 'Patch AnyKernel3 for Bypass Hack'
-    shell: bash
-    if: ${{ inputs.bypass == 'true' }}
-    working-directory: ${{ github.workspace }}/AnyKernel3
-    run: |
-      set -euo pipefail
-      cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
-      patch -p1 < bypass.patch
+    - name: 'Gather Build Artifacts'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        if [ -f "$IMG" ]; then
+          echo "Found Image at $IMG"
+          if [[ ${{ inputs.bypass }} == "true" ]]; then
+            cp "$IMG" "${{ github.workspace }}/AnyKernel3/Bypass-Image"
+          else
+            cp "$IMG" "${{ github.workspace }}/AnyKernel3/Image"
+            echo "Kernel Version:"
+            strings "$IMG" | grep -m1 "^Linux version "
+          fi
+          exit 0
+        fi
+        exit 1
 
+    - name: 'Patch AnyKernel3 for Bypass Hack'
+      shell: bash
+      if: ${{ inputs.bypass == 'true' }}
+      working-directory: ${{ github.workspace }}/AnyKernel3
+      run: |
+        set -euo pipefail
+        cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
+        patch -p1 < bypass.patch
