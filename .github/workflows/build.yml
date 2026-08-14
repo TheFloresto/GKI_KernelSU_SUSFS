@@ -178,6 +178,7 @@ jobs:
       uses: ./.github/actions/kernelsu
       with:
         ksu_branch: ${{ inputs.ksu_branch }}
+        version: ${{ inputs.version }}
 
     - name: SUSFS
       if: contains(inputs.feature_set, 'SUSFS') || inputs.feature_set == 'FULL'
