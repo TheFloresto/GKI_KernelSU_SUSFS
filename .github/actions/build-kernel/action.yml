@@ -71,7 +71,7 @@ runs:
         cd "$CLANG_DIR"
         
         # Скачиваем последний готовый релиз ZyCromerZ Clang
-        DOWNLOAD_URL=$(curl -s https://api.github.com/repos/ZyCromerZ/Clang/releases/latest | grep "browser_download_url.*tar.gz" | cut -d : -f 2,3 | tr -d \" | xargs)
+        DOWNLOAD_URL=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors https://api.github.com/repos/ZyCromerZ/Clang/releases/latest | grep "browser_download_url.*tar.gz" | cut -d : -f 2,3 | tr -d \" | xargs)
         
         if [ -z "$DOWNLOAD_URL" ]; then
           echo "::error::Failed to fetch ZyCromerZ download URL!"
@@ -79,7 +79,7 @@ runs:
         fi
         
         echo "Downloading Clang from: $DOWNLOAD_URL"
-        curl -L "$DOWNLOAD_URL" -o clang.tar.gz
+        curl -Lf --retry 5 --retry-delay 5 --retry-all-errors "$DOWNLOAD_URL" -o clang.tar.gz
         tar -xzf clang.tar.gz
         rm clang.tar.gz
         echo "::endgroup::"
