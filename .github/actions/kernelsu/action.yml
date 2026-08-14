@@ -5,6 +5,10 @@ inputs:
     description: 'KernelSU branch or commit (empty = latest dev-susfs branch tip)'
     required: false
     default: ""
+  version:
+    description: 'Kernel version tag, e.g. android16-6.12 (used to scope version-specific fixes)'
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -63,6 +67,60 @@ runs:
 
         KSU_GIT_TAG="$(git describe --tags --abbrev=0 $BASE_COMMIT 2>/dev/null || echo "v0.0.1")"
         sed -i "s/^KSU_VERSION_TAG_FALLBACK := v0.0.1$/KSU_VERSION_TAG_FALLBACK := ${KSU_GIT_TAG}/" Kbuild
+
+    - name: 'Fix missing headers pulled in from outside kernel/ (e.g. uapi/, klog.h)'
+      shell: bash
+      # Only seen on android16-6.12 so far (pershoot/KernelSU-Next officially only
+      # supports up to 6.6, and 6.1-6.6 builds compile the driver fine as of now).
+      # Scoped here rather than left unconditional at the user's request - note this
+      # means if the same upstream regression later shows up on 6.1-6.6 too, this
+      # step won't catch it there; the build will just fail with the raw compiler
+      # error again like before.
+      if: ${{ inputs.version == 'android16-6.12' }}
+      working-directory: ${{ github.workspace }}/kernel/KernelSU-Next
+      run: |
+        set -euo pipefail
+        # setup.sh only symlinks the "kernel/" subdirectory of the KernelSU-Next
+        # repo into drivers/kernelsu. Some recent upstream commits moved shared
+        # headers (e.g. the top-level uapi/app_profile.h) out of kernel/ into
+        # sibling repo-root directories, which the relative #include "uapi/..."
+        # inside kernel/policy/allowlist.h can no longer see once only kernel/
+        # is exposed to the build. Re-link any such repo-root dirs referenced
+        # by #include "X/..." from inside kernel/ back into kernel/ so they
+        # resolve again, regardless of exact upstream layout.
+        MISSING=0
+        for inc in $(grep -rhoP '#include\s+"\K[^"]+(?=")' kernel/ 2>/dev/null | sort -u); do
+          # Only care about includes that reference a subdirectory (e.g. uapi/x.h)
+          case "$inc" in
+            */*) : ;;
+            *) continue ;;
+          esac
+          if [ -f "kernel/$inc" ]; then
+            continue
+          fi
+          TOPDIR="${inc%%/*}"
+          if [ -d "$TOPDIR" ] && [ ! -e "kernel/$TOPDIR" ]; then
+            echo "[INFO] kernel/$inc missing but found repo-root '$TOPDIR/' - linking kernel/$TOPDIR -> ../$TOPDIR"
+            ln -s "../$TOPDIR" "kernel/$TOPDIR"
+          fi
+        done
+        # Verify every #include "..." used inside kernel/ now resolves; fail
+        # loudly and early (instead of deep inside the kernel build) if not.
+        for inc in $(grep -rhoP '#include\s+"\K[^"]+(?=")' kernel/ 2>/dev/null | sort -u); do
+          case "$inc" in
+            */*) : ;;
+            *) continue ;;
+          esac
+          if [ ! -f "kernel/$inc" ]; then
+            echo "::warning::kernel/$inc is #included from KernelSU-Next sources but does not exist anywhere in the checked-out tree. This looks like an upstream regression on the pinned KernelSU-Next branch/commit (KSU_VERSION=${KSU_VERSION:-unknown}), not a problem with this workflow. Consider pinning ksu_branch to an older known-good commit until upstream fixes it."
+            MISSING=1
+          fi
+        done
+        if [ "$MISSING" -eq 1 ]; then
+          echo "KERNELSU_HEADER_GAP=true" >> "$GITHUB_ENV"
+        else
+          echo "KERNELSU_HEADER_GAP=false" >> "$GITHUB_ENV"
+        fi
     
     - name: Extract KSU Version Info
       id: ksu-version
