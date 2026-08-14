@@ -88,6 +88,12 @@ runs:
 
     - name: 'Fix certs/extract-cert.c key_pass build error (OpenSSL 3 without ENGINE support)'
       shell: bash
+      # Confirmed present on android14-6.1 and android15-6.6 (5.10/5.15/6.1/6.6 share
+      # the old certs/extract-cert.c). Confirmed ABSENT on android16-6.12 - that tree's
+      # extract-cert.c has already moved on, and the grep guard below would just skip
+      # it anyway - this condition just avoids running the step (and its grep scan) at
+      # all on 6.12.
+      if: ${{ inputs.kernel_version != '6.12' }}
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         set -euo pipefail
