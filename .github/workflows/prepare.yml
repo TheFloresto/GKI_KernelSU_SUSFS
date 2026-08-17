@@ -7,10 +7,34 @@ on:
         description: "Path to the JSON config file"
         required: true
         type: string
-      feature_set:
-        description: "Feature Set"
+      enable_kernelsu:
         required: false
-        type: string
+        type: boolean
+        default: true
+      enable_susfs:
+        required: false
+        type: boolean
+        default: true
+      enable_vpnhide:
+        required: false
+        type: boolean
+        default: true
+      enable_nomount:
+        required: false
+        type: boolean
+        default: true
+      enable_bbg:
+        required: false
+        type: boolean
+        default: true
+      enable_networking:
+        required: false
+        type: boolean
+        default: true
+      enable_droidspaces:
+        required: false
+        type: boolean
+        default: true
       ksu_branch:
         description: "KernelSU branch or commit (empty = latest dev)"
         required: false
@@ -164,7 +188,13 @@ jobs:
       sublevel: ${{ matrix.sublevel }}
       os_patch_level: ${{ matrix.os_patch_level }}
       variant: ${{ matrix.variant }}
-      feature_set: ${{ inputs.feature_set }}
+      enable_kernelsu: ${{ inputs.enable_kernelsu }}
+      enable_susfs: ${{ inputs.enable_susfs }}
+      enable_vpnhide: ${{ inputs.enable_vpnhide }}
+      enable_nomount: ${{ inputs.enable_nomount }}
+      enable_bbg: ${{ inputs.enable_bbg }}
+      enable_networking: ${{ inputs.enable_networking }}
+      enable_droidspaces: ${{ inputs.enable_droidspaces }}
       ksu_branch: ${{ inputs.ksu_branch }}
       susfs_commit: ${{ inputs.susfs_commit }}
       root_flavor: ${{ inputs.root_flavor }}
