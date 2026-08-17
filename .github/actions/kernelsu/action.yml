@@ -5,6 +5,10 @@ inputs:
     description: 'KernelSU branch or commit (empty = latest dev-susfs branch tip)'
     required: false
     default: ""
+  enable_susfs:
+    description: 'Use the SUSFS-compatible KernelSU branch when enabled'
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -30,19 +34,24 @@ runs:
 
         KSU_REPO="https://github.com/pershoot/KernelSU-Next.git"
         KSU_INPUT="${{ inputs.ksu_branch }}"
+        KSU_DEFAULT_BRANCH="dev"
+        if [ "${{ inputs.enable_susfs }}" = "true" ]; then
+          KSU_DEFAULT_BRANCH="dev-susfs"
+        fi
         if [ -z "$KSU_INPUT" ]; then
-          KSU_INPUT="dev-susfs"
+          KSU_INPUT="$KSU_DEFAULT_BRANCH"
         fi
 
         # Try as branch first, fall back to commit
         if retry git ls-remote --heads "$KSU_REPO" "$KSU_INPUT" | grep -q .; then
           echo "Using KernelSU-Next branch: $KSU_INPUT"
-          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+          KSU_SETUP_BRANCH="$KSU_INPUT"
+          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/pershoot/KernelSU-Next/${KSU_SETUP_BRANCH}/kernel/setup.sh" | bash -s "$KSU_SETUP_BRANCH"
           retry git -C KernelSU-Next/kernel fetch --depth=50 origin "$KSU_INPUT"
           git -C KernelSU-Next/kernel checkout "origin/$KSU_INPUT"
         else
           echo "Using KernelSU-Next commit: $KSU_INPUT"
-          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/pershoot/KernelSU-Next/${KSU_DEFAULT_BRANCH}/kernel/setup.sh" | bash -s "$KSU_DEFAULT_BRANCH"
           retry git -C KernelSU-Next/kernel fetch --depth=50 origin "$KSU_INPUT"
           git -C KernelSU-Next/kernel checkout "$KSU_INPUT"
         fi
