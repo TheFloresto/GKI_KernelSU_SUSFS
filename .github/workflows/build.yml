@@ -253,7 +253,6 @@ jobs:
       if: contains(inputs.feature_set, 'VPNHIDE')
       uses: ./.github/actions/vpnhide
       with:
-        token: ${{ secrets.VPNHIDE_PRIVATE_TOKEN }}
         version: ${{ inputs.version }}
 
     - name: Baseband Guard
