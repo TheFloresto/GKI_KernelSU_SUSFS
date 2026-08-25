@@ -647,7 +647,7 @@ jobs:
         }
 
         read -r kernel_artifact_url kernel_artifact_sha256 < <(
-          resolve_artifact "${{ steps.extract.outputs.file_name }}-AnyKernel3"
+          resolve_artifact "${{ steps.extract.outputs.file_name }}-AK3"
         )
         read -r nomount_module_url nomount_module_sha256 < <(
           resolve_artifact "NoMount-Metamodule"
