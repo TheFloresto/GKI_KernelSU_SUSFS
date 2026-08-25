@@ -19,7 +19,7 @@ inputs:
   brand_name:
     description: 'Branding text appended to the version (e.g., Wild)'
     required: false
-    default: Wild
+    default: TheFloresto
 
 runs:
   using: "composite"
