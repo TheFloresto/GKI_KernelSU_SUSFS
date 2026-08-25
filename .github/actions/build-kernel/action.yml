@@ -51,7 +51,7 @@ runs:
         SKIP_EXT_MODULES=1 \
         SKIP_CP_KERNEL_HDR=1 \
         OUT_DIR="/home/runner/out" \
-        LTO=thin \
+        LTO=full \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
         build/build.sh -j"$(nproc)" \
         CC="/usr/bin/ccache clang" \
@@ -63,6 +63,7 @@ runs:
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
         fi
         tools/bazel build \
+          --action_env=LTO=full \
           --config=fast \
           --config=stamp \
           --disk_cache=/home/runner/.cache/bazel \
@@ -103,4 +104,3 @@ runs:
       set -euo pipefail
       cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
       patch -p1 < bypass.patch
-
