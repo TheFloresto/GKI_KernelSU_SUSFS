@@ -68,6 +68,8 @@ runs:
           --cxxopt=-flto=full \
           --linkopt=-flto=full \
           --linkopt=-fuse-ld=lld \
+          --subcommands \
+          --verbose_failures \
           --config=fast \
           --config=stamp \
           --disk_cache=/home/runner/.cache/bazel \
