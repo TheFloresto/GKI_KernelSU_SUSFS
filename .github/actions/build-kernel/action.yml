@@ -62,28 +62,14 @@ runs:
         if [ "${{ inputs.bypass }}" = "false" ]; then
           sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
         fi
-
-        # If in-tree build.config files request lto=fast, replace with lto=full
-        for cfg in ./common/build.config.gki ./common/build.config.gki.aarch64; do
-          if [ -f "$cfg" ]; then
-            sed -i 's/lto=fast;/lto=full;/g' "$cfg" || true
-            sed -i 's/lto=fast/lto=full/g' "$cfg" || true
-          fi
-        done
-
-        tools/bazel build \
-          --action_env=LTO=full \
-          --copt=-flto=full \
-          --cxxopt=-flto=full \
-          --linkopt=-flto=full \
-          --linkopt=-fuse-ld=lld \
-          --subcommands \
-          --verbose_failures \
+       tools/bazel build \
           --config=fast \
           --config=stamp \
+          --lto=full \
           --disk_cache=/home/runner/.cache/bazel \
           //common:kernel_aarch64/Image
       fi
+
 
   - name: 'Gather Build Artifacts'
     shell: bash
