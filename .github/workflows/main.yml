@@ -451,7 +451,7 @@ jobs:
         shell: bash
         env:
           MANAGER_LIST: ${{ needs.resolve-sources.outputs.manager_list }}
-          TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           OUT_APKS="${GITHUB_WORKSPACE:-$PWD}/manager_apks"
