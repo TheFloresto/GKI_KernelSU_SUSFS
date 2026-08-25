@@ -1169,7 +1169,7 @@ jobs:
       uses: actions/download-artifact@v7
       with:
         path: release-assets
-        pattern: '*-AnyKernel3'
+        pattern: '*-AK3'
         merge-multiple: false
 
     - name: Download NoMount metamodule
@@ -1185,7 +1185,7 @@ jobs:
         set -e
         shopt -s nullglob
 
-        for dir in release-assets/*-AnyKernel3; do
+        for dir in release-assets/*-AK3; do
           zip_name="${dir}.zip"
           rm -f "$zip_name"
           cd "$dir"
