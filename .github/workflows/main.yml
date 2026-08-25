@@ -335,7 +335,7 @@ jobs:
                 # Manager is built from the official dev-tip commit (grabbed at run start).
                 stock="${{ steps.resolve.outputs.kernelsu_commit }}"
                 run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+                  -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
                   "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   | jq -r '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
