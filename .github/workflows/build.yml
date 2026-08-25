@@ -593,7 +593,7 @@ jobs:
       id: kernel-artifact
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.extract.outputs.file_name }}-AnyKernel3
+        name: ${{ steps.extract.outputs.file_name }}-AK3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
         compression-level: 9
@@ -742,3 +742,15 @@ jobs:
         path: /tmp/build-summary-${{ env.SUMMARY_BASE }}.md
         if-no-files-found: warn
         compression-level: 9
+
+    - name: Upload Build Logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.extract.outputs.file_name }}-logs
+        path: |
+          ${{ github.workspace }}/kernel/common/build.log
+          ${{ github.workspace }}/kernel/common/out/.config
+        if-no-files-found: ignore
+        compression-level: 9
+        retention-days: 7
