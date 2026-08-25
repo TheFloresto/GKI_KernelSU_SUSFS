@@ -59,9 +59,6 @@ runs:
         HOSTCC="/usr/bin/ccache clang" \
         HOSTCXX="/usr/bin/ccache clang+"
       else
-        if [ "${{ inputs.bypass }}" = "false" ]; then
-          sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
-        fi
         tools/bazel build \
           --action_env=LTO=full \
           --copt=-flto=full \
