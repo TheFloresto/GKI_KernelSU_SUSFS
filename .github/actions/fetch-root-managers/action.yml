@@ -43,7 +43,7 @@ runs:
         RUN_ID="${{ inputs.run_id }}"
         WANT="${{ inputs.want }}"
         OUT_ABS="${{ inputs.output_dir }}"
-        TOKEN="${{ inputs.token }}"
+        GH_TOKEN="${{ inputs.token }}"
         mkdir -p "$OUT_ABS" manager-dl
         (
           cd manager-dl
@@ -59,7 +59,7 @@ runs:
           else
             echo "Downloading $REPO manager from run $RUN_ID"
             ARTIFACTS_JSON=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-              -H "Authorization: Bearer $TOKEN" \
+              -H "Authorization: Bearer $GH_TOKEN" \
               "https://api.github.com/repos/${OWNER}/${REPO}/actions/runs/${RUN_ID}/artifacts")
             if [ -z "$WANT" ]; then
               ARTIFACT_IDS=$(echo "$ARTIFACTS_JSON" | jq -r '.artifacts[].id')
@@ -71,7 +71,7 @@ runs:
             echo "$ARTIFACT_IDS" | while read -r AID; do
               [ -n "$AID" ] || continue
               curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                -H "Authorization: Bearer $TOKEN" \
+                -H "Authorization: Bearer $GH_TOKEN" \
                 -o "_${AID}.zip" \
                 "https://api.github.com/repos/${OWNER}/${REPO}/actions/artifacts/${AID}/zip"
               mkdir -p "_${AID}"

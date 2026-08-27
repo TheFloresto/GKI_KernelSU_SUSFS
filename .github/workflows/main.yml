@@ -335,7 +335,7 @@ jobs:
                 # Manager is built from the official dev-tip commit (grabbed at run start).
                 stock="${{ steps.resolve.outputs.kernelsu_commit }}"
                 run_id=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+                  -H "Authorization: Bearer ${{ github.token }}" \
                   "https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   | jq -r '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
@@ -451,7 +451,7 @@ jobs:
         shell: bash
         env:
           MANAGER_LIST: ${{ needs.resolve-sources.outputs.manager_list }}
-          TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           OUT_APKS="${GITHUB_WORKSPACE:-$PWD}/manager_apks"
@@ -480,7 +480,7 @@ jobs:
                 done
               else
                 AJSON=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                  -H "Authorization: Bearer ${TOKEN}" \
+                  -H "Authorization: Bearer ${GH_TOKEN}" \
                   "https://api.github.com/repos/${OWNER}/${REPO}/actions/runs/${RUN_ID}/artifacts")
                 if [ -z "$WANT" ]; then
                   ART_IDS=$(echo "$AJSON" | jq -r '.artifacts[].id')
@@ -492,7 +492,7 @@ jobs:
                 echo "$ART_IDS" | while read -r AID; do
                   [ -n "$AID" ] || continue
                   curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
-                    -H "Authorization: Bearer ${TOKEN}" \
+                    -H "Authorization: Bearer ${GH_TOKEN}" \
                     -o "_${AID}.zip" \
                     "https://api.github.com/repos/${OWNER}/${REPO}/actions/artifacts/${AID}/zip"
                   mkdir -p "_${AID}"
@@ -803,7 +803,7 @@ jobs:
     - uses: actions/checkout@v7
       with:
         ref: ${{ github.ref }}
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ github.token }}
 
     - name: Promote verified pins on success
       id: promote
