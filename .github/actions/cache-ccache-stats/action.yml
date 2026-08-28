@@ -21,7 +21,7 @@ runs:
         echo "===================="
 
         if ! command -v ccache >/dev/null 2>&1; then
-          echo "⚠️  ccache not installed, skipping ccache stats"
+          echo "[!]  ccache not installed, skipping ccache stats"
           echo "===================="
           exit 0
         fi
@@ -56,6 +56,6 @@ runs:
 
           if [ -d /home/runner/.ccache ] && find /home/runner/.ccache -type f -print -quit 2>/dev/null | grep -q .; then
             find /home/runner/.ccache -type f -exec touch -t $(date -d "1 day ago" +%Y%m%d%H%M) {} +
-            echo "✅ ccache atime updated"
+            echo "[+] ccache atime updated"
           fi
         fi

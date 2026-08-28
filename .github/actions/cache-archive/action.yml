@@ -67,7 +67,7 @@ runs:
 
         # Check if path exists
         if [ ! -d "${{ inputs.cache_path }}" ] && [ ! -f "${{ inputs.cache_path }}" ]; then
-          echo "⚠️ Target path not found. Skipping cache save."
+          echo "[!] Target path not found. Skipping cache save."
           exit 0
         fi
 

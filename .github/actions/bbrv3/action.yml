@@ -55,7 +55,7 @@ runs:
           fi
         fi
 
-        echo "✅ BBRv3 patches applied"
+        echo "[+] BBRv3 patches applied"
 
     - name: Enable BBRv3 Kernel Config
       uses: ./.github/actions/set-kernel-config

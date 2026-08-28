@@ -43,7 +43,7 @@ runs:
           DEPRECATED=false
           if grep -q deprecated <<< "$REMOTE_BRANCH"; then
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" "$DEFAULT_MANIFEST_PATH"
-            echo "⚠ Note: Branch ${FORMATTED_BRANCH} is considered deprecated."
+            echo "[!] Note: Branch ${FORMATTED_BRANCH} is considered deprecated."
             DEPRECATED=true
           fi
           echo "deprecated=$DEPRECATED" >> $GITHUB_OUTPUT
@@ -102,7 +102,7 @@ runs:
     #       echo "Fetched manifest from $MAIN_MANIFEST_URL"
     #     else
     #       echo "Main manifest fetch failed, trying deprecated branch."
-    #       echo "⚠ Note: Branch common-${FORMATTED_BRANCH} is considered deprecated."
+    #       echo "[!] Note: Branch common-${FORMATTED_BRANCH} is considered deprecated."
     #       if curl -fsSL "$DEPRECATED_MANIFEST_URL" | base64 -d > manifest.xml; then
     #         echo "Fetched manifest from $DEPRECATED_MANIFEST_URL"
     #       else

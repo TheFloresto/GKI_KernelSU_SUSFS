@@ -79,4 +79,4 @@ runs:
         echo "Patching use_unlikely_wrap_cpufreq.patch"
         patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/use_unlikely_wrap_cpufreq.patch"
 
-        echo "✅ Other patches applied"
+        echo "[+] Other patches applied"

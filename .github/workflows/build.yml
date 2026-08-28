@@ -78,7 +78,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v7
 
-    - name: 🧹 Emergency Disk Cleanup
+    - name: [CLEAN] Emergency Disk Cleanup
       if: false
       uses: ./.github/actions/disk-cleanup
 
@@ -503,7 +503,7 @@ jobs:
         bypass: true
         version: ${{ inputs.version }}
 
-    - name: 📋 Consolidated Build Summary
+    - name: [SUMMARY] Consolidated Build Summary
       if: ${{ always() }}
       shell: bash
       run: |
@@ -520,9 +520,9 @@ jobs:
         
         # Determine build status
         if [ "${{ job.status }}" = "success" ]; then
-          STATUS="✅ Success"
+          STATUS="[+] Success"
         else
-          STATUS="❌ Failed"
+          STATUS="[-] Failed"
         fi
         
         # Get kernel version from Image if available
@@ -583,7 +583,7 @@ jobs:
           
           # Kernel Fixes
           if [ -f /tmp/kernel-fixes-summary.md ]; then
-            echo "### 🔧 Kernel Fixes"
+            echo "### [FIX] Kernel Fixes"
             cat /tmp/kernel-fixes-summary.md
             echo
           fi

@@ -26,10 +26,10 @@ runs:
       working-directory: ${{ github.workspace }}/kernel
       run: |
         if grep -q "baseband_guard" common/security/Kconfig; then
-          echo "✓ SUCCESS: baseband_guard found in common/security/Kconfig"
+          echo "[+] SUCCESS: baseband_guard found in common/security/Kconfig"
           grep -n "baseband_guard" common/security/Kconfig || true
         else
-          echo "✗ FAILED: baseband_guard not found in common/security/Kconfig"
+          echo "[-] FAILED: baseband_guard not found in common/security/Kconfig"
           exit 1
         fi
     

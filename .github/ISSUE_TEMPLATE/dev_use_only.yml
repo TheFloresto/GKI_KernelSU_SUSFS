@@ -1,4 +1,4 @@
-name: "🔧 Developer Use Only"
+name: "[FIX] Developer Use Only"
 description: "This template is reserved for developer use only. Do not use for regular bug reports or feature requests."
 title: "[DEV] "
 labels: ["dev-only"]
@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## ⚠️ Developer Use Only
+        ## [!] Developer Use Only
         
         This issue template is reserved for internal development purposes only.
         
