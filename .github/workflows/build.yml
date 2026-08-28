@@ -218,7 +218,7 @@ jobs:
         set -euo pipefail
         KVER="${{ inputs.kernel_version }}"
         if [ "$(printf '%s\n' "6.6" "$KVER" | sort -V | head -n1)" = "6.6" ]; then
-          echo "[INFO] KVER $KVER >= 6.6, patching selinux_hide.c (all flavors/branches)"
+          echo "[*] KVER $KVER >= 6.6, patching selinux_hide.c (all flavors/branches)"
           for f in $(find "${{ github.workspace }}" -name selinux_hide.c 2>/dev/null); do
             # After SUSFS 10_enable (kernelsu only) the declaration becomes
             #   extern void security_dump_masked_av_fn(...)   (a function)
@@ -227,35 +227,35 @@ jobs:
             # For the function form,  &func != NULL  silences both (clang note).
             # For the pointer form (resukisu/next, no 10_enable) we want ptr != NULL.
             if grep -q "extern void security_dump_masked_av_fn" "$f"; then
-              echo "[INFO] $f is extern-function form (10_enable applied), patching with &"
+              echo "[*] $f is extern-function form (10_enable applied), patching with &"
               sed -i 's/if (security_dump_masked_av_fn)/if (\&security_dump_masked_av_fn)/g' "$f"
               sed -i 's/if (security_dump_masked_av_fn != NULL)/if (\&security_dump_masked_av_fn != NULL)/g' "$f"
               sed -i 's/if (context_struct_compute_av_fn)/if (\&context_struct_compute_av_fn)/g' "$f"
               sed -i 's/if (context_struct_compute_av_fn != NULL)/if (\&context_struct_compute_av_fn != NULL)/g' "$f"
-              echo "[OK] Patched $f (function form)"
+              echo "[+] Patched $f (function form)"
             elif grep -q "if (security_dump_masked_av_fn" "$f"; then
-              echo "[INFO] $f is pointer form, patching with != NULL"
+              echo "[*] $f is pointer form, patching with != NULL"
               sed -i 's/if (security_dump_masked_av_fn)/if (security_dump_masked_av_fn != NULL)/g' "$f"
               sed -i 's/if (context_struct_compute_av_fn)/if (context_struct_compute_av_fn != NULL)/g' "$f"
-              echo "[OK] Patched $f (pointer form)"
+              echo "[+] Patched $f (pointer form)"
             else
-              echo "[INFO] $f already patched"
+              echo "[*] $f already patched"
             fi
             # Next (and tiann without 10_enable fallback) declares the 3 helpers as
             # static on 6.6, but kernel hooks.c/selinuxfs.c reference them as extern
             # after SUSFS (ReSukiSU uses __maybe_static -> global). Strip static so
             # the linker can resolve security_context_to_sid_with_policy etc.
             if grep -q "^static int security_context_to_sid_with_policy" "$f"; then
-              echo "[INFO] Stripping static from $f helpers (Next 6.6)"
+              echo "[*] Stripping static from $f helpers (Next 6.6)"
               sed -i 's/^static int security_context_to_sid_with_policy/int security_context_to_sid_with_policy/g' "$f"
               sed -i 's/^static int security_sid_to_context_with_policy/int security_sid_to_context_with_policy/g' "$f"
               sed -i 's/^static void security_compute_av_user_with_policy/void security_compute_av_user_with_policy/g' "$f"
               # also forward decls (same prefix, same sed covers them)
-              echo "[OK] Stripped static from $f"
+              echo "[+] Stripped static from $f"
             fi
           done
         else
-          echo "[SKIP] KVER $KVER < 6.6"
+          echo "[-] KVER $KVER < 6.6"
         fi
 
     - name: Baseband Guard

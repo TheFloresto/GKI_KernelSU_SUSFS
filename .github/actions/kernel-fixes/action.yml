@@ -26,26 +26,26 @@ runs:
       run: |
         set -euo pipefail
         GLIBC_VERSION="$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')"
-        echo "[INFO] Detected GLIBC version: $GLIBC_VERSION"
+        echo "[*] Detected GLIBC version: $GLIBC_VERSION"
         if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n 1)" = "2.38" ]; then
-          echo "[INFO] GLIBC >= 2.38, attempting Makefile fix."
+          echo "[*] GLIBC >= 2.38, attempting Makefile fix."
           # Check if the pattern that needs fixing actually exists
           if grep -q '\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)' tools/bpf/resolve_btfids/Makefile; then
-            echo "[INFO] Found pattern to fix, applying sed."
+            echo "[*] Found pattern to fix, applying sed."
             sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile
             MAKEFILE_FIXED="true"
           elif grep -q 'EXTRA_CFLAGS' tools/bpf/resolve_btfids/Makefile; then
-            echo "[INFO] EXTRA_CFLAGS already present, no fix needed."
+            echo "[*] EXTRA_CFLAGS already present, no fix needed."
             MAKEFILE_FIXED="already_fixed"
           else
-            echo "[WARN] Neither pattern found in Makefile."
+            echo "[!] Neither pattern found in Makefile."
             MAKEFILE_FIXED="false"
           fi
           echo "MAKEFILE_FIXED=$MAKEFILE_FIXED" >> $GITHUB_ENV
            if [[ "${{ inputs.version }}" == "android13-5.10" && "${{ inputs.sublevel }}" -le 186 ]] || \
              [[ "${{ inputs.version }}" == "android13-5.15" && "${{ inputs.sublevel }}" -le 119 ]] || \
              [[ "${{ inputs.version }}" == "android14-5.15" && "${{ inputs.sublevel }}" -le 110 ]]; then
-            echo "[INFO] Applying parse-options.c fixes."
+            echo "[*] Applying parse-options.c fixes."
             sed -i '/char \*buf = NULL;/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
             sed -i 's/for (int i = 0; subcommands\[i\]; i++) {/for (i = 0; subcommands[i]; i++) {/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
             sed -i '/if (subcommands) {/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
@@ -55,7 +55,7 @@ runs:
             echo "PARSE_OPTIONS_FIXED=false" >> $GITHUB_ENV
           fi
         else
-          echo "[SKIP] GLIBC version < 2.38, skipping Makefile fix."
+          echo "[-] GLIBC version < 2.38, skipping Makefile fix."
         fi
 
     - name: 'Apply mmap.c fix for specific versions'
@@ -63,16 +63,16 @@ runs:
       if: ${{ inputs.version == 'android15-6.6' && inputs.sublevel <= '58' }}
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        echo "[INFO] Checking for android15 + kernel 6.6 include fix..."
+        echo "[*] Checking for android15 + kernel 6.6 include fix..."
         if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
-          echo "[MATCH] android15 + 6.6, checking for fs.h include."
+          echo "[+] android15 + 6.6, checking for fs.h include."
           cd "${{ github.workspace }}/kernel/common"
           if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
-            echo "[INFO] Adding missing #include <trace/hooks/fs.h> to fs/namespace.c."
+            echo "[*] Adding missing #include <trace/hooks/fs.h> to fs/namespace.c."
             sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
             echo "MMAP_NAMESPACE_FIX=true" >> "$GITHUB_ENV"
           else
-            echo "[INFO] #include <trace/hooks/fs.h> already present."
+            echo "[*] #include <trace/hooks/fs.h> already present."
             echo "MMAP_NAMESPACE_FIX=already_present" >> "$GITHUB_ENV"
           fi
         fi
@@ -82,7 +82,7 @@ runs:
       if: ${{ (inputs.version == 'android12-5.10' && inputs.sublevel == 226) || (inputs.version == 'android13-5.10' && inputs.sublevel == 223) || (inputs.version == 'android13-5.15' && inputs.sublevel == 167) || (inputs.version == 'android14-5.15' && inputs.sublevel == 167) }}
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        echo "[INFO] Applying mmap.c fix for specific version combo."
+        echo "[*] Applying mmap.c fix for specific version combo."
         sed -i 's/\s*vm_flags_clear(new_vma, VM_PAD_MASK);/                new_vma->vm_flags \&= ~VM_PAD_MASK;/' mm/mmap.c
         echo "MMAP_VM_FLAGS_FIX=true" >> "$GITHUB_ENV"
 
