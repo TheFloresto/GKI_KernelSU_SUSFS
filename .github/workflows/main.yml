@@ -390,10 +390,10 @@ jobs:
             *) echo "Skipping manager resolution (no root flavor / none)." ;;
           esac
           if [ -n "$LIST" ]; then
-            echo "manager_list=[$LIST]" >> "$GITHUB_OUTPUT"
+            echo "manager_list=$LIST" >> "$GITHUB_OUTPUT"
             echo "Manager sources resolved."
           else
-            echo "manager_list=" >> "$GITHUB_OUTPUT"
+            echo "manager_list=[]" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Compose requested feature set
