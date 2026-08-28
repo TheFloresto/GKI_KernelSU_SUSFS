@@ -17,7 +17,7 @@ runs:
     - name: Apply libbpf feature-detection fix (android12-5.10)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      if: ${{ inputs.version == 'android12-5.10' }}
+      if: inputs.version == 'android12-5.10'
       run: |
         set -euo pipefail
         patch -p1 -N < ${{ github.action_path }}/patches/0001-libbpf-remove-feature-detection-BTF.patch
@@ -25,7 +25,7 @@ runs:
     - name: Apply resolve_btfids linker-flag fix (android12-5.10)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      if: ${{ inputs.version == 'android12-5.10' }}
+      if: inputs.version == 'android12-5.10'
       run: |
         set -euo pipefail
         patch -p1 -N < ${{ github.action_path }}/patches/0002-resolve_btfids-inherit-host-linker-flags.patch
@@ -33,7 +33,7 @@ runs:
     - name: Apply ANDROID_KABI_USE macro fix (android12-5.10, sublevel 43)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      if: ${{ inputs.version == 'android12-5.10' && inputs.sublevel == '43' }}
+      if: inputs.version == 'android12-5.10' && inputs.sublevel == '43'
       run: |
         set -euo pipefail
         # Rework ANDROID_KABI_USE() to drop __UNIQUE_ID(android_kabi_hide).
@@ -46,7 +46,7 @@ runs:
     # - name: Apply xdp_buff BTF-emit fix (android12-5.10)
     #   shell: bash
     #   working-directory: ${{ github.workspace }}/kernel/common
-    #   if: ${{ inputs.version == 'android12-5.10' }}
+    #   if: inputs.version == 'android12-5.10'
     #   run: |
     #     set -euo pipefail
     #     # bpf_types.h references struct xdp_buff via
@@ -64,7 +64,7 @@ runs:
     # - name: Apply resolve_btfids ELF_T_WORD endian fix (android12-5.10)
     #   shell: bash
     #   working-directory: ${{ github.workspace }}/kernel/common
-    #   if: ${{ inputs.version == 'android12-5.10' }}
+    #   if: inputs.version == 'android12-5.10'
     #   run: |
     #     set -euo pipefail
     #     # Backport of upstream 61e8aeda9398 ("bpf: Fix libelf endian handling
@@ -85,7 +85,7 @@ runs:
     - name: Expose host dd for hermetic BTF generation (android12-5.10)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      if: ${{ inputs.version == 'android12-5.10' }}
+      if: inputs.version == 'android12-5.10'
       run: |
         set -euo pipefail
         # The hermetic toolchain PATH (build.config.common -> HERMETIC_TOOLCHAIN=1)
@@ -101,7 +101,7 @@ runs:
     - name: Build and use pahole >=1.26 for hermetic BTF generation (android12-5.10)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
-      if: ${{ inputs.version == 'android12-5.10' }}
+      if: inputs.version == 'android12-5.10'
       run: |
         set -euo pipefail
         # android12-5.10 pins prebuilt pahole v1.19, which fails to recode the

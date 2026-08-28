@@ -24,14 +24,14 @@ runs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
 
     - name: Enable SUSFS Open Redirect (no NoMount)
-      if: ${{ inputs.nomount_enabled != 'true' }}
+      if: inputs.nomount_enabled != 'true'
       uses: ./.github/actions/set-kernel-config
       with:
         config_list: |
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
 
     - name: Disable SUSFS Open Redirect (NoMount integrated)
-      if: ${{ inputs.nomount_enabled == 'true' }}
+      if: inputs.nomount_enabled == 'true'
       uses: ./.github/actions/set-kernel-config
       with:
         config_list: |

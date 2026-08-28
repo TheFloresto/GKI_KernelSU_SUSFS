@@ -12,7 +12,7 @@ runs:
   using: "composite"
   steps:
     - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI Devices
-      if: ${{ inputs.version == 'android15-6.6' }}
+      if: inputs.version == 'android15-6.6'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
@@ -30,7 +30,7 @@ runs:
         echo "obj-y += min_kdp.o" >> drivers/Makefile
 
     - name: Fix WiFi and Bluetooth on Xiaomi 6.6 GKI Devices
-      if: ${{ inputs.version == 'android15-6.6' }}
+      if: inputs.version == 'android15-6.6'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |

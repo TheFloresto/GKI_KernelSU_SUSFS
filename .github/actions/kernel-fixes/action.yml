@@ -60,7 +60,7 @@ runs:
 
     - name: 'Apply mmap.c fix for specific versions'
       shell: bash
-      if: ${{ inputs.version == 'android15-6.6' && inputs.sublevel <= '58' }}
+      if: inputs.version == 'android15-6.6' && inputs.sublevel <= '58'
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         echo "[*] Checking for android15 + kernel 6.6 include fix..."
@@ -79,7 +79,7 @@ runs:
 
     - name: 'Apply mmap.c fix for specific versions'
       shell: bash
-      if: ${{ (inputs.version == 'android12-5.10' && inputs.sublevel == 226) || (inputs.version == 'android13-5.10' && inputs.sublevel == 223) || (inputs.version == 'android13-5.15' && inputs.sublevel == 167) || (inputs.version == 'android14-5.15' && inputs.sublevel == 167) }}
+      if: (inputs.version == 'android12-5.10' && inputs.sublevel == 226) || (inputs.version == 'android13-5.10' && inputs.sublevel == 223) || (inputs.version == 'android13-5.15' && inputs.sublevel == 167) || (inputs.version == 'android14-5.15' && inputs.sublevel == 167)
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         echo "[*] Applying mmap.c fix for specific version combo."
