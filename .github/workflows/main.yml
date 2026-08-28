@@ -938,8 +938,11 @@ jobs:
     - publish-manager-artifacts
 
     env:
-      GH_TOKEN: ${{ github.token }}
+      # Use RELEASE_TOKEN so releases are created in the target repository
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       RELEASE_NOTES: .github/config/RELEASE_NOTES.md
+      # Target repository for tags + releases
+      RELEASE_REPO: NerestKernels/GKI_KernelSU_SUSFS
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
@@ -998,7 +1001,8 @@ jobs:
       id: tag
       if: inputs.release_type != 'Action'
       run: |
-        mapfile -t RELEASE_TAGS < <(gh api --paginate "repos/${{ github.repository }}/tags?per_page=100" --jq '.[].name' 2>/dev/null | grep -E '^r[0-9]+$' || true)
+        # Look up existing rN tags in the *target* release repository
+        mapfile -t RELEASE_TAGS < <(gh api --paginate "repos/${RELEASE_REPO}/tags?per_page=100" --jq '.[].name' 2>/dev/null | grep -E '^r[0-9]+$' || true)
 
         LATEST_REV=0
         for TAG in "${RELEASE_TAGS[@]}"; do
@@ -1015,9 +1019,9 @@ jobs:
         fi
 
         if [[ ${#RELEASE_TAGS[@]} -gt 0 ]]; then
-          echo "Latest r-tag: r${LATEST_REV}"
+          echo "Latest r-tag in ${RELEASE_REPO}: r${LATEST_REV}"
         else
-          echo "No existing r-tags found; starting at r1"
+          echo "No existing r-tags found in ${RELEASE_REPO}; starting at r1"
         fi
         echo "New tag: $NEW_TAG"
         echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
@@ -1209,6 +1213,9 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
+        # Publish into the separate NerestKernels repository using RELEASE_TOKEN
+        token: ${{ secrets.RELEASE_TOKEN }}
+        repository: ${{ env.RELEASE_REPO }}
         tag_name: ${{ steps.tag.outputs.new_tag }}
         name: ${{ steps.release_meta.outputs.release_title }}
         body_path: release_body.md
@@ -1253,4 +1260,3 @@ jobs:
           path: release_body.md
           retention-days: 7
           if-no-files-found: warn
-
