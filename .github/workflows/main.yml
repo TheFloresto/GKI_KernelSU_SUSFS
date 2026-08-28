@@ -383,10 +383,10 @@ jobs:
           echo "Root flavor: ${FLAVORS}"
           LIST=""
           case "${FLAVORS}" in
-            All) LIST="$(resolve_one next),$(resolve_one kernelsu),$(resolve_one resukisu)" ;;
-            KernelSU-Next) LIST="$(resolve_one next)" ;;
-            KernelSU) LIST="$(resolve_one kernelsu)" ;;
-            ReSukiSU) LIST="$(resolve_one resukisu)" ;;
+            All) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)"$'\n'"$(resolve_one kernelsu)"$'\n'"$(resolve_one resukisu)") ;;
+            KernelSU-Next) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one next)") ;;
+            KernelSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one kernelsu)") ;;
+            ReSukiSU) LIST=$(jq -c -n '[inputs]' <<< "$(resolve_one resukisu)") ;;
             *) echo "Skipping manager resolution (no root flavor / none)." ;;
           esac
           if [ -n "$LIST" ]; then
