@@ -454,6 +454,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          MANAGER_LIST=$(echo "$MANAGER_LIST" | sed 's/^\[,/[/')
+          if ! echo "$MANAGER_LIST" | jq empty 2>/dev/null; then
+            echo "ERROR: Invalid MANAGER_LIST JSON"
+            echo "Raw: $MANAGER_LIST"
+            exit 0
+          fi
           OUT_APKS="${GITHUB_WORKSPACE:-$PWD}/manager_apks"
           MANIFEST="${GITHUB_WORKSPACE:-$PWD}/manifest.txt"
           rm -rf "$OUT_APKS" "$MANIFEST"
@@ -519,6 +525,7 @@ jobs:
           echo "apk_list=${APK_JSON}" >> "$GITHUB_OUTPUT"
           echo "Found $(wc -l < "$MANIFEST") manager APKs"
           ls -1 "$OUT_APKS"
+
       - name: Upload all manager APKs as one cross-blob
         uses: actions/upload-artifact@v7
         with:
