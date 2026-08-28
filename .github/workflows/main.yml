@@ -531,7 +531,7 @@ jobs:
         with:
           name: manager-apks
           path: manager_apks/
-          if-no-files-found: error
+          if-no-files-found: warn
 
   publish-manager-artifacts:
     needs: list-manager-apks
