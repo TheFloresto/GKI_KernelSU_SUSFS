@@ -485,7 +485,7 @@ jobs:
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
         cache_bucket: "ccache-cache"
         compression_level: 9
-        github_token: ${{ secrets.MY_GITHUB_TOKEN }}
+        github_token: ${{ github.token }}
 
     - name: Save bazel-cache
       continue-on-error: true
@@ -496,7 +496,7 @@ jobs:
         cache_key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
         cache_bucket: "bazel-cache"
         compression_level: 9
-        github_token: ${{ secrets.MY_GITHUB_TOKEN }}
+        github_token: ${{ github.token }}
 
     - name: Build Bypass Kernel
       if: ${{ inputs.build_bypass }}
