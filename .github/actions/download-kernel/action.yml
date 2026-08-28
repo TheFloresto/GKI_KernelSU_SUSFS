@@ -37,7 +37,12 @@ runs:
         FORMATTED_BRANCH="${ANDROID_PART}-${KERNEL_PART}-${{ inputs.os_patch_level }}"
 
         init_repo() {
-          repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --depth=1 || { echo "ERROR: repo init failed" >&2; return 1; }
+          local depth="$1"
+          local depth_flag=""
+          if [ "$depth" != "0" ]; then
+            depth_flag="--depth=${depth}"
+          fi
+          repo init -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} ${depth_flag} || { echo "ERROR: repo init failed" >&2; return 1; }
           REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH}) || { echo "ERROR: git ls-remote failed" >&2; return 1; }
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
           DEPRECATED=false
@@ -53,10 +58,12 @@ runs:
         RETRY_DELAY_SHORT=15
         SYNC_TIMEOUT="15m"
         attempt=1
+        DEPTHS=(1 50 0)
 
         while [ $attempt -le $MAX_RETRIES ]; do
-          echo "Attempt $attempt/$MAX_RETRIES: initialize and sync kernel repository (sync timeout $SYNC_TIMEOUT)..."
-          if init_repo; then
+          CURRENT_DEPTH="${DEPTHS[$((attempt-1))]}"
+          echo "Attempt $attempt/$MAX_RETRIES: initialize and sync kernel repository (depth=${CURRENT_DEPTH}, sync timeout $SYNC_TIMEOUT)..."
+          if init_repo "$CURRENT_DEPTH"; then
             # Use minimal-shallow variant: current-branch, shallow init done above, reduce files downloaded
             if timeout $SYNC_TIMEOUT repo sync -c --current-branch --no-clone-bundle --no-tags --jobs-checkout=4 -j4; then
               echo "Kernel repository initialization and sync succeeded on attempt $attempt."
