@@ -78,7 +78,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v7
 
-    - name: [CLEAN] Emergency Disk Cleanup
+    - name: Emergency Disk Cleanup
       if: false
       uses: ./.github/actions/disk-cleanup
 
@@ -503,7 +503,7 @@ jobs:
         bypass: true
         version: ${{ inputs.version }}
 
-    - name: [SUMMARY] Consolidated Build Summary
+    - name: Consolidated Build Summary
       if: ${{ always() }}
       shell: bash
       run: |
