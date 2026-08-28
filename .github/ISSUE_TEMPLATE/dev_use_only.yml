@@ -1,4 +1,4 @@
-name: "[FIX] Developer Use Only"
+name: "Developer Use Only"
 description: "This template is reserved for developer use only. Do not use for regular bug reports or feature requests."
 title: "[DEV] "
 labels: ["dev-only"]

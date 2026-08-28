@@ -583,7 +583,7 @@ jobs:
           
           # Kernel Fixes
           if [ -f /tmp/kernel-fixes-summary.md ]; then
-            echo "### [FIX] Kernel Fixes"
+            echo "### Kernel Fixes"
             cat /tmp/kernel-fixes-summary.md
             echo
           fi
