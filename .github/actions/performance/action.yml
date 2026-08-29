@@ -42,12 +42,6 @@ runs:
           cat "${{ github.workspace }}/kernel_patches/common/clear_page_16bytes_align.patch" | sed -e 's/SYM_FUNC_START_PI(clear_page)/SYM_FUNC_START_PI(__pi_clear_page)/' | patch -p1 -F3 --forward
         fi
 
-        echo "Patching add_limitation_scaling_min_freq.patch"
-        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/add_limitation_scaling_min_freq.patch"
-        echo "Patching re_write_limitation_scaling_min_freq.patch"
-        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/re_write_limitation_scaling_min_freq.patch"
-        echo "Patching adjust_cpu_scan_order.patch"
-        patch -p1 -F3 --forward < "${{ github.workspace }}/kernel_patches/common/adjust_cpu_scan_order.patch"
         echo "Patching avoid_extra_s2idle_wake_attempts.patch"
         FILE="drivers/base/power/wakeup.c"
         # Check if the function exists
