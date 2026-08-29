@@ -124,29 +124,20 @@ jobs:
     - name: Set Build Timestamp from Kernel Commit
       shell: bash
       run: |
-        set -x
-        # Hardcode the build timestamp to the 5th day of the patch level
-        # at 04:20 UTC, using the existing timestamp formats expected by the build.
-        OS_PATCH_LEVEL_INPUT="${{ inputs.os_patch_level }}"
-        if [[ "$OS_PATCH_LEVEL_INPUT" == lts* ]]; then
-          if [[ "$OS_PATCH_LEVEL_INPUT" =~ ^lts-([0-9]{2})$ ]]; then
-            OS_PATCH_LEVEL_YM="$(date -u +%Y)-${BASH_REMATCH[1]}"
-          else
-            OS_PATCH_LEVEL_YM="$(date -u +%Y-%m)"
-          fi
-        else
-          OS_PATCH_LEVEL_YM="$OS_PATCH_LEVEL_INPUT"
+        set -euo pipefail
+        if [ -z "${KERNEL_COMMIT_EPOCH:-}" ]; then
+          echo "KERNEL_COMMIT_EPOCH was not exported by download-kernel" >&2
+          exit 1
         fi
-        FIXED_BUILD_DATE="${OS_PATCH_LEVEL_YM}-05 04:20:00 UTC"
-        SOURCE_DATE_EPOCH=$(date -u -d "$FIXED_BUILD_DATE" +%s)
+
+        SOURCE_DATE_EPOCH="$KERNEL_COMMIT_EPOCH"
         echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> $GITHUB_ENV
-        KBUILD_TS=$(date -u -d @${SOURCE_DATE_EPOCH} '+%a %b %d %H:%M:%S UTC %Y')
+        KBUILD_TS=$(date -u -d "@$SOURCE_DATE_EPOCH" '+%a %b %d %H:%M:%S UTC %Y')
         echo "KBUILD_BUILD_TIMESTAMP=${KBUILD_TS}" >> $GITHUB_ENV
-        # Keep git metadata aligned with the same fixed timestamp.
-        GIT_DATE=$(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%dT%H:%M:%SZ')
+        GIT_DATE=$(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y-%m-%dT%H:%M:%SZ')
         echo "GIT_COMMITTER_DATE=${GIT_DATE}" >> $GITHUB_ENV
         echo "GIT_AUTHOR_DATE=${GIT_DATE}" >> $GITHUB_ENV
-        echo "Build timestamp set to: $(date -u -d @${SOURCE_DATE_EPOCH} '+%Y-%m-%d %H:%M:%S UTC') (epoch: $SOURCE_DATE_EPOCH)"
+        echo "Build timestamp set to kernel commit: $(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y-%m-%d %H:%M:%S UTC') (epoch: $SOURCE_DATE_EPOCH)"
 
     - name: Extract Sublevel and Set File Name
       id: extract
@@ -455,7 +446,7 @@ jobs:
         clear_stats: true
 
     - name: Initialize Config Fragment
-      run: touch "${{ github.workspace }}/wild_gki.fragment"
+      run: touch "${{ github.workspace }}/thefloresto.fragment"
 
     - name: Build Normal Kernel
       env:
@@ -593,7 +584,7 @@ jobs:
       id: kernel-artifact
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.extract.outputs.file_name }}-AnyKernel3
+        name: ${{ steps.extract.outputs.file_name }}-AK3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
         compression-level: 9
@@ -647,7 +638,7 @@ jobs:
         }
 
         read -r kernel_artifact_url kernel_artifact_sha256 < <(
-          resolve_artifact "${{ steps.extract.outputs.file_name }}-AnyKernel3"
+          resolve_artifact "${{ steps.extract.outputs.file_name }}-AK3"
         )
         read -r nomount_module_url nomount_module_sha256 < <(
           resolve_artifact "NoMount-Metamodule"
@@ -663,7 +654,7 @@ jobs:
           --arg nomount_commit "${NOMOUNT_COMMIT:-N/A}" \
           --arg android_branch "${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}" \
           --arg kmi "${{ inputs.android_version }}-${{ inputs.kernel_version }}" \
-          --arg kernel_source_commit "${KERNEL_SOURCE_COMMIT:-N/A}" \
+          --arg kernel_commit_epoch "${KERNEL_COMMIT_EPOCH:-N/A}" \
           --arg provenance_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           --arg artifact_url "$kernel_artifact_url" \
           --arg sha256 "$kernel_artifact_sha256" \
@@ -687,7 +678,7 @@ jobs:
             nomount_commit: $nomount_commit,
             android_branch: $android_branch,
             kmi: $kmi,
-            kernel_source_commit: $kernel_source_commit,
+            kernel_commit_epoch: $kernel_commit_epoch,
             provenance_url: $provenance_url,
             artifact_url: $artifact_url,
             sha256: $sha256,
@@ -711,7 +702,7 @@ jobs:
           (.root.version | length > 0) and
           (.susfs_revision | test("^[0-9a-f]{40}$")) and
           (.nomount_commit | test("^[0-9a-f]{40}$")) and
-          (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
+          (.kernel_commit_epoch | test("^[0-9a-f]{40}$")) and
           (.artifact_url | startswith("https://")) and
           (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
           (.nomount_metamodule.commit == .nomount_commit) and
@@ -742,3 +733,15 @@ jobs:
         path: /tmp/build-summary-${{ env.SUMMARY_BASE }}.md
         if-no-files-found: warn
         compression-level: 9
+
+    - name: Upload Build Logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.extract.outputs.file_name }}-logs
+        path: |
+          ${{ github.workspace }}/kernel/common/build.log
+          ${{ github.workspace }}/kernel/common/out/.config
+        if-no-files-found: ignore
+        compression-level: 9
+        retention-days: 7
