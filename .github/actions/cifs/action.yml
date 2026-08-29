@@ -26,10 +26,3 @@ runs:
       run: |
         sed -i '/"fs\/netfs\/netfs\.ko",/d' modules.bzl
 
-    - name: Fix RUST on android16-6.12
-      if: inputs.version == 'android16-6.12'
-      uses: ./.github/actions/set-kernel-config
-      with:
-        config_list: |
-          CONFIG_RUST=y
-          CONFIG_ANDROID_BINDER_IPC_RUST=m
