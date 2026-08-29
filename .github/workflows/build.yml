@@ -62,7 +62,7 @@ on:
       brand_name:
         required: false
         type: string
-        default: Wild
+        default: TheFloresto
       build_bypass:
         required: false
         type: boolean
