@@ -10,9 +10,9 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: Download .github from TheFloresto/GKI_KernelSU_SUSFS @ Dusfff
+      - name: Download .github from TheFloresto/GKI_KernelSU_SUSFS @ GOOO
         run: |
-          git clone --depth=1 --branch Dusfff \
+          git clone --depth=1 --branch GOOO \
             https://github.com/TheFloresto/GKI_KernelSU_SUSFS.git \
             source_repo
 
@@ -21,7 +21,7 @@ jobs:
           ls -la github_downloaded/
 
       - name: Upload .github as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: github-folder
           path: github_downloaded/
