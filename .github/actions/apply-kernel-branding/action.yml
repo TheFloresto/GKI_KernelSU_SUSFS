@@ -17,9 +17,9 @@ inputs:
     description: 'Sublevel of kernel version (e.g., 1)'
     required: true
   brand_name:
-    description: 'Branding text appended to the version (e.g., Wild)'
+    description: 'Branding text appended to the version (e.g., TheFloresto)'
     required: false
-    default: Wild
+    default: TheFloresto
 
 runs:
   using: "composite"
