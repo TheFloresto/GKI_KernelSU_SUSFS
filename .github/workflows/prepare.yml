@@ -55,7 +55,7 @@ on:
         description: "Kernel branding text appended to the version string"
         required: false
         type: string
-        default: Wild
+        default: TheFloresto
       build_bypass:
         description: "Produce the legacy bypass image"
         required: false
