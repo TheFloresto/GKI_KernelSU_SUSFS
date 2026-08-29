@@ -14,7 +14,8 @@ runs:
         inputs.version == 'android14-5.15' ||
         inputs.version == 'android14-6.1' ||
         inputs.version == 'android15-6.6' ||
-        inputs.version == 'android16-6.12'
+        inputs.version == 'android16-6.12' ||
+        inputs.version == 'android17-6.18'
       working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail

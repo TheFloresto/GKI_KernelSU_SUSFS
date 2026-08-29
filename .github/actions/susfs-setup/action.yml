@@ -29,10 +29,17 @@ runs:
           return 1
         }
 
-        SUSFS_BRANCH="gki-${{ inputs.version }}"
+        # SUSFS has not published an android17-6.18 branch yet. The first
+        # android17 build is intentionally a compatibility experiment using
+        # the android16-6.12 patch series.
+        SUSFS_PATCH_VERSION="${{ inputs.version }}"
+        if [ "$SUSFS_PATCH_VERSION" = "android17-6.18" ]; then
+          SUSFS_PATCH_VERSION="android16-6.12"
+        fi
+        SUSFS_BRANCH="gki-$SUSFS_PATCH_VERSION"
         SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
 
-        echo "Preparing SUSFS for branch: $SUSFS_BRANCH"
+        echo "Preparing SUSFS for branch: $SUSFS_BRANCH (target: ${{ inputs.version }})"
         echo "Cloning latest from $SUSFS_BRANCH..."
         retry git clone "$SUSFS_REPO" -b "$SUSFS_BRANCH" susfs4ksu
 

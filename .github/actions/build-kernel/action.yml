@@ -17,7 +17,7 @@ runs:
     run: |
       set -euo pipefail
       if [ "${{ inputs.bypass }}" = "true" ]; then
-        if [[ ${{ inputs.version }} == "android14-6.1" || ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
+        if [[ ${{ inputs.version }} == "android14-6.1" || ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" || ${{ inputs.version }} == "android17-6.18" ]]; then
           TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module/version.c"
         else
           TARGET_FILE="${{ github.workspace }}/kernel/common/kernel/module.c"
@@ -104,4 +104,3 @@ runs:
       set -euo pipefail
       cp ${{ github.action_path }}/patches/bypass.patch "${{ github.workspace }}/AnyKernel3/bypass.patch"
       patch -p1 < bypass.patch
-

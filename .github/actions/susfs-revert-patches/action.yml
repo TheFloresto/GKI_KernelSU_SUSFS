@@ -86,15 +86,15 @@ runs:
 
     - name: Revert Android 16 6.12 Fake Patches
       shell: bash
-      if: inputs.version == 'android16-6.12'
+      if: inputs.version == 'android16-6.12' || inputs.version == 'android17-6.18'
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
         echo "Reverting 6.12 Fake Patches"
-        if [ "${{ inputs.sublevel }}" -ge "58" ]; then
+        if [[ "${{ inputs.sublevel }}" == "X" || "${{ inputs.sublevel }}" -ge "58" ]]; then
           echo "Reverting exec.c Android 16 6.12 Fake Patch"
           sed -i '/^#include /a #include <linux/dma-buf.h>' fs/exec.c
         fi
-        if [ "${{ inputs.sublevel }}" -ge "69" ]; then
+        if [[ "${{ inputs.sublevel }}" == "X" || "${{ inputs.sublevel }}" -ge "69" ]]; then
           echo "Reverting task_mmu.c Android 16 6.12 Fake Patch"
           sed -i 's/vma_pages/vma_data_pages/g' fs/proc/task_mmu.c
         fi

@@ -20,8 +20,14 @@ runs:
       run: |
         set -euo pipefail
 
-        if [[ ${{ inputs.version }} = "android16-6.12" ]]; then
-          echo "Removing pre-existing ntsync files for android16-6.12"
+        COMPAT_VERSION="${{ inputs.version }}"
+        if [[ "$COMPAT_VERSION" = "android17-6.18" ]]; then
+          COMPAT_VERSION="android16-6.12"
+          echo "Using Android 16 / 6.12 NTSync compatibility patch for Android 17 / 6.18"
+        fi
+
+        if [[ "$COMPAT_VERSION" = "android16-6.12" ]]; then
+          echo "Removing pre-existing ntsync files for ${{ inputs.version }}"
           rm -f include/uapi/linux/ntsync.h
           rm -f drivers/misc/ntsync.c
         fi
@@ -40,7 +46,7 @@ runs:
         elif [[ ${{ inputs.version }} = "android14-5.15" ]]; then
           patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android13-5.15.patch
         else
-          patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${{ inputs.version }}.patch
+          patch -p1 < "${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${COMPAT_VERSION}.patch"
         fi
 
         patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_base.patch

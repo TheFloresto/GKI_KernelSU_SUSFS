@@ -21,7 +21,12 @@ runs:
         # Apply base SUSFS patches
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
-        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
+        SUSFS_PATCH_VERSION="${{ inputs.version }}"
+        if [ "$SUSFS_PATCH_VERSION" = "android17-6.18" ]; then
+          SUSFS_PATCH_VERSION="android16-6.12"
+          echo "Using the Android 16 / 6.12 SUSFS patch for the Android 17 / 6.18 compatibility test"
+        fi
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${SUSFS_PATCH_VERSION}.patch" ./
 
     - name: Apply Android 12 5.10 Fake Patches
       shell: bash
@@ -126,15 +131,15 @@ runs:
 
     - name: Apply Android 16 6.12 Fake Patches
       shell: bash
-      if: inputs.version == 'android16-6.12'
+      if: inputs.version == 'android16-6.12' || inputs.version == 'android17-6.18'
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        echo "Applying 6.12 SUSFS fixes"
-        if [ "${{ inputs.sublevel }}" -ge "58" ]; then
+        echo "Applying Android 16 / Linux 6.12 SUSFS fixes to ${{ inputs.version }}"
+        if [[ "${{ inputs.sublevel }}" == "X" || "${{ inputs.sublevel }}" -ge "58" ]]; then
           echo "Applying exec.c Android 16 6.12 Fake Patch"
           sed -i '/^#include <linux\/dma-buf.h>$/d' fs/exec.c
         fi
-        if [ "${{ inputs.sublevel }}" -ge "69" ]; then
+        if [[ "${{ inputs.sublevel }}" == "X" || "${{ inputs.sublevel }}" -ge "69" ]]; then
           echo "Applying task_mmu.c Android 16 6.12 Fake Patch"
           sed -i 's/vma_data_pages/vma_pages/g' fs/proc/task_mmu.c
         fi
@@ -143,13 +148,15 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
-        patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+        SUSFS_PATCH_VERSION="${{ inputs.version }}"
+        [ "$SUSFS_PATCH_VERSION" = "android17-6.18" ] && SUSFS_PATCH_VERSION="android16-6.12"
+        patch -p1 < "50_add_susfs_in_gki-${SUSFS_PATCH_VERSION}.patch"
 
         # SUSFS v2.2.0's 6.12 patch still passes the removed third argument
         # to getname_flags(). Android 16 / Linux 6.12 exposes the modern
         # two-argument declaration, so normalize the generated open.c after
         # applying the upstream SUSFS patch.
-        if [[ "${{ inputs.version }}" == "android16-6.12" ]]; then
+        if [[ "${{ inputs.version }}" == "android16-6.12" || "${{ inputs.version }}" == "android17-6.18" ]]; then
           sed -i 's/getname_flags(filename, lookup_flags, NULL)/getname_flags(filename, lookup_flags)/g' fs/open.c
           echo "Fixed SUSFS getname_flags() call for Android 16 6.12"
         fi
