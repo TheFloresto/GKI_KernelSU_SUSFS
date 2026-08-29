@@ -67,6 +67,8 @@ runs:
           --config=stamp \
           --lto=full \
           --disk_cache=/home/runner/.cache/bazel \
+          --sandbox_debug \
+          --verbose_failures \
           //common:kernel_aarch64/Image
       fi
 
