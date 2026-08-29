@@ -1,5 +1,7 @@
 name: Sync from WildKernels
-on: workflow_dispatch
+
+on:
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -8,18 +10,26 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Dusfff
+      - name: Checkout GOOO
         uses: actions/checkout@v5
         with:
           ref: GOOO
           fetch-depth: 0
-          token: ${{ secrets.PAT_TOKEN }}l
+          token: ${{ secrets.PAT_TOKEN }}   # без лишней "l"
 
-      - name: Sync from WildKernels main
+      - name: Sync from ahmed-alnassif dev → GOOO
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git remote add wild https://github.com/ahmed-alnassif/GKI_KernelSU_SUSFS.git
+
+          # Источник (публичный репозиторий)
+          git remote add wild https://github.com/ahmed-alnassif/GKI_KernelSU_SUSFS.git || true
           git fetch wild dev
+
+          # Полностью заменить GOOO содержимым dev
           git reset --hard wild/dev
+
+          # Запушить в твой репозиторий
           git push origin GOOO --force
