@@ -903,6 +903,7 @@ jobs:
     - build-android14-6-1
     - build-android15-6-6
     - build-android16-6-12
+    - build-android17-6-18
 
     steps:
     - name: Download Misc Artifacts
@@ -988,6 +989,7 @@ jobs:
     - build-android14-6-1
     - build-android15-6-6
     - build-android16-6-12
+    - build-android17-6-18
     - build-nomount-module
     - publish-manager-artifacts
 
