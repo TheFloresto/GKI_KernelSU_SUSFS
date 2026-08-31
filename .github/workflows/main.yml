@@ -448,7 +448,7 @@ jobs:
 
   list-manager-apks:
     needs: resolve-sources
-    if: needs.resolve-sources.outputs.manager_list != ''
+    if: needs.resolve-sources.outputs.manager_list != '' && needs.resolve-sources.outputs.manager_list != '[]'
     runs-on: ubuntu-latest
     outputs:
       apk_list: ${{ steps.scan.outputs.apk_list }}
@@ -544,7 +544,7 @@ jobs:
 
   publish-manager-artifacts:
     needs: list-manager-apks
-    if: needs.list-manager-apks.outputs.apk_list != ''
+    if: needs.list-manager-apks.outputs.apk_list != '' && needs.list-manager-apks.outputs.apk_list != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
