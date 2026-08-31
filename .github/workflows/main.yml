@@ -1286,7 +1286,7 @@ jobs:
                 enabled.append("Performance Tuning")
             if not enabled:
                 return ""
-            parts = ["## Features Included", "", "See [Kernel Features Documentation](https://github.com/WildKernels/GKI_KernelSU_SUSFS/blob/dev/docs/index.md) for full details.", ""]
+            parts = ["## Features Included", "", "See [Kernel Features Documentation](https://github.com/WildKernels/GKI_KernelSU_SUSFS/blob/dev/docs/features.md) for full details.", ""]
             feature_doc_map = [
                 ("SUSFS", "susfs.md"),
                 ("Baseband Guard", "bbg.md"),
@@ -1560,7 +1560,7 @@ jobs:
                   enabled.append("Performance Tuning")
               if not enabled:
                   return ""
-              parts = ["## Features Included", "", "See [Kernel Features Documentation](https://github.com/WildKernels/GKI_KernelSU_SUSFS/blob/dev/docs/index.md) for full details.", ""]
+              parts = ["## Features Included", "", "See [Kernel Features Documentation](https://github.com/WildKernels/GKI_KernelSU_SUSFS/blob/dev/docs/features.md) for full details.", ""]
               feature_doc_map = [
                   ("SUSFS", "susfs.md"),
                   ("Baseband Guard", "bbg.md"),

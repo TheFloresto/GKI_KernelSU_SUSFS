@@ -3,7 +3,7 @@
 # Wild Kernels for Android
 
 [![KernelSU](https://img.shields.io/badge/KernelSU-Supported-green)](https://kernelsu.org/)
-[![SUSFS](https://img.shields.io/badge/SUSFS-Integrated-orange)](https://gitlab.com/simonpunk/susfs4ksu)
+[![susfs4ksu](https://img.shields.io/badge/susfs4ksu-Integrated-orange)](https://gitlab.com/simonpunk/susfs4ksu)
 
 </div>
 
@@ -34,25 +34,23 @@ By flashing this kernel, **YOU** are choosing to make these modifications. If so
 
 ## Features
 
-- [KernelSU-Next](docs/kernelsu-next.md) / [KernelSU (Classic)](docs/kernelsu-classic.md) / [ReSukiSU](docs/resukisu.md) - root implementations
-- [SUSFS](docs/susfs.md) - root hiding
-- [NoMount](docs/nomount.md) - mount metamodule (root hiding)
-- [Baseband Guard](docs/bbg.md) - partition protection
-- [Networking](docs/networking.md) - WireGuard, BBR, IPSet, CIFS
-- [TMPFS](docs/tmpfs.md) - xattr / POSIX ACLs
-- [BPF](docs/bpf.md) - BTF / eBPF / FUSE-BPF
-- [Ptrace Leak Fix](docs/ptrace.md) - internal to root hiding
-- [Unicode Fix](docs/unicode.md) - internal to root hiding (experimental)
-- [Performance](docs/performance.md) - incl. [NTSync](docs/ntsync.md)
-- [DroidSpaces](docs/droidspaces.md) - container runtime
+- KernelSU / KernelSU-Next / ReSukiSU - root implementations
+- susfs4ksu - root hiding (incl. Ptrace Leak Fix, Unicode Fix)
+- NoMount / Mountify - mount metamodules
+- Baseband Guard - partition protection
+- Networking - WireGuard, BBR, IPSet, CIFS
+- TMPFS - xattr / POSIX ACLs
+- BPF - BTF / eBPF / FUSE-BPF
+- Performance - incl. NTSync
+- DroidSpaces - container runtime
 
-Full documentation: [docs/index.md](docs/index.md)
+Full documentation: [docs/features.md](docs/features.md)
 
 ---
 
 ## Installation
 
-See **[Installation Guide](docs/installation.md)** - [Kernel Flasher](docs/kernelflasher.md) · [Patch boot.img with magiskboot](docs/magiskboot.md).
+See **[Installation Guide](docs/installation.md)**.
 
 ---
 
@@ -69,7 +67,7 @@ See **[Installation Guide](docs/installation.md)** - [Kernel Flasher](docs/kerne
 - **DroidSpaces-OSS**: Developed by [ravindu644](https://github.com/ravindu644/Droidspaces-OSS)
 - **Baseband-guard (BBG)**: Developed by [vc-teahouse](https://github.com/vc-teahouse/Baseband-guard)
 - **Kernel Patches**: Maintained by [WildKernels/kernel_patches](https://github.com/WildKernels/kernel_patches)
-- **AnyKernel3**: Maintained by [WildKernels/AnyKernel3](https://github.com/WildKernels/AnyKernel3) (fork of [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3))
+- **AnyKernel3**: Maintained by [WildKernels/AnyKernel3](https://github.com/WildKernels/AnyKernel3)
 - **Sultan Kernels (Pixel)**: Developed by [kerneltoast](https://github.com/kerneltoast)
 - **Device Boot Fix**: [Boot fix commit](https://github.com/Anything-at-25-00/android_kernel_common_android12-5.10/commit/2476d262b597fe8af82cfb7aaf96676f51c6b4ed) for fixing some devices not booting
 
@@ -109,6 +107,8 @@ Flashing this kernel will void your warranty, and there is always a risk of bric
 ## Special Thanks
 
 **These amazing people help make this project possible!**
+
+[![Contributors](https://contrib.rocks/image?repo=WildKernels/GKI_KernelSU_SUSFS)](https://github.com/WildKernels/GKI_KernelSU_SUSFS/graphs/contributors)
 
 | Contributor | Contribution |
 |-------------|-------------|

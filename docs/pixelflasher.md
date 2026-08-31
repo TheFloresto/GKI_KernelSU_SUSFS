@@ -1,7 +1,6 @@
-# Install with Kernel Flasher
+# Install with PixelFlasher
 
-> [!NOTE]
-> This method is more convenient when upgrading KernelSU and can be done without a computer. Make a backup first.
+Alternative flashing app with advanced options.
 
 > [!CAUTION]
 > Flashing a kernel can brick your device and will void your warranty. Make a full backup (boot partition at minimum) before proceeding.
@@ -14,20 +13,17 @@
 ## Steps
 
 1. **Download the AnyKernel3 ZIP** that matches your kernel version (e.g., `6.1.157-android14`) from the latest [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases) page.
-2. **Open the Kernel Flasher app**, grant necessary root permissions when prompted.
+2. **Open PixelFlasher**, grant necessary root permissions when prompted.
 3. **Select the AnyKernel3 ZIP** you downloaded and flash. Do not interrupt the process.
 4. **Reboot** when prompted and verify KernelSU manager shows the expected version.
 
 > [!NOTE]
 > Match by the full kernel version (e.g., `6.1.157-android14`) - your device's Android version and the `android14` in the kernel version are not necessarily the same.
 
-This requires the flashing app to have root permissions. On first install from stock (no root yet), flash via recovery or fastboot instead, then use this method for subsequent upgrades.
+## About
 
-## Supported flashing apps
-
-- [Kernel Flasher](https://github.com/fatalcoder524/KernelFlasher) - recommended, actively maintained
-
-Requires root to flash a kernel from within Android. See also [PixelFlasher](pixelflasher.md) - alternative with advanced options.
+- **Source:** [badabing2005/PixelFlasher](https://github.com/badabing2005/PixelFlasher) - alternative with advanced options
+- Requires root to flash a kernel from within Android.
 
 ## After flashing
 
@@ -43,4 +39,4 @@ Requires root to flash a kernel from within Android. See also [PixelFlasher](pix
 
 ---
 
-Related: [Installation Overview](installation.md) · [Patch boot.img Manually](magiskboot.md) · [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
+Related: [Installation Overview](installation.md) · [Install with Kernel Flasher](kernelflasher.md) · [Patch boot.img Manually](magiskboot.md) · [Releases](https://github.com/WildKernels/GKI_KernelSU_SUSFS/releases)
