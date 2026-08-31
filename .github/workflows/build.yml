@@ -62,7 +62,7 @@ on:
       brand_name:
         required: false
         type: string
-        default: Wild
+        default: TheFloresto
       bypass:
         required: false
         type: boolean
@@ -466,14 +466,7 @@ jobs:
         clear_stats: true
 
     - name: Initialize Config Fragment
-      run: touch "${{ github.workspace }}/wild_gki.fragment"
-
-    - name: Apply Kernel Bypass Hack
-      if: ${{ inputs.bypass == 'true' }}
-      uses: ./.github/actions/bypass-kernel
-      with:
-        version: ${{ inputs.version }}
-        bypass: true
+      run: touch "${{ github.workspace }}/thefloresto.fragment"
 
     - name: Build Normal Kernel
       env:
@@ -511,8 +504,15 @@ jobs:
         compression_level: 9
         github_token: ${{ github.token }}
 
+    - name: Apply Kernel Bypass Hack
+      if: inputs.bypass
+      uses: ./.github/actions/bypass-kernel
+      with:
+        version: ${{ inputs.version }}
+        bypass: true
+
     - name: Build Bypass Kernel
-      if: inputs.build_bypass
+      if: inputs.bypass
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         KBUILD_BUILD_TIMESTAMP: ${{ env.KBUILD_BUILD_TIMESTAMP }}
@@ -611,7 +611,7 @@ jobs:
       id: kernel-artifact
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.extract.outputs.file_name }}-AnyKernel3
+        name: ${{ steps.extract.outputs.file_name }}-AK3
         path: ${{ github.workspace }}/AnyKernel3/**
         if-no-files-found: ignore
         compression-level: 9
@@ -665,7 +665,7 @@ jobs:
         }
 
         read -r kernel_artifact_url kernel_artifact_sha256 < <(
-          resolve_artifact "${{ steps.extract.outputs.file_name }}-AnyKernel3"
+          resolve_artifact "${{ steps.extract.outputs.file_name }}-AK3"
         )
         read -r nomount_module_url nomount_module_sha256 < <(
           resolve_artifact "NoMount-Metamodule"
@@ -681,7 +681,7 @@ jobs:
           --arg nomount_commit "${NOMOUNT_COMMIT:-N/A}" \
           --arg android_branch "${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}" \
           --arg kmi "${{ inputs.android_version }}-${{ inputs.kernel_version }}" \
-          --arg kernel_source_commit "${KERNEL_SOURCE_COMMIT:-N/A}" \
+          --arg kernel_commit_epoch "${KERNEL_COMMIT_EPOCH:-N/A}" \
           --arg provenance_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           --arg artifact_url "$kernel_artifact_url" \
           --arg sha256 "$kernel_artifact_sha256" \
@@ -705,7 +705,7 @@ jobs:
             nomount_commit: $nomount_commit,
             android_branch: $android_branch,
             kmi: $kmi,
-            kernel_source_commit: $kernel_source_commit,
+            kernel_commit_epoch: $kernel_commit_epoch,
             provenance_url: $provenance_url,
             artifact_url: $artifact_url,
             sha256: $sha256,
@@ -729,7 +729,7 @@ jobs:
           (.root.version | length > 0) and
           (.susfs_revision | test("^[0-9a-f]{40}$")) and
           (.nomount_commit | test("^[0-9a-f]{40}$")) and
-          (.kernel_source_commit | test("^[0-9a-f]{40}$")) and
+          (.kernel_commit_epoch | test("^[0-9]+$")) and
           (.artifact_url | startswith("https://")) and
           (.sha256 | test("^sha256:[0-9a-f]{64}$")) and
           (.nomount_metamodule.commit == .nomount_commit) and
@@ -752,7 +752,7 @@ jobs:
           echo '```'
           echo
         } >> "$summary_file"
-
+        
     - name: Upload Build Summary + Metadata
       uses: actions/upload-artifact@v7
       with:
@@ -760,3 +760,15 @@ jobs:
         path: /tmp/build-summary-${{ env.SUMMARY_BASE }}.md
         if-no-files-found: warn
         compression-level: 9
+
+    - name: Upload Build Logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.extract.outputs.file_name }}-logs
+        path: |
+          ${{ github.workspace }}/kernel/common/build.log
+          ${{ github.workspace }}/kernel/common/out/.config
+        if-no-files-found: ignore
+        compression-level: 9
+        retention-days: 7
