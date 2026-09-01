@@ -55,8 +55,8 @@ runs:
         }
 
         MAX_RETRIES=3
-        RETRY_DELAY_SHORT=15
-        SYNC_TIMEOUT="15m"
+        RETRY_DELAY_SHORT=25
+        SYNC_TIMEOUT="25m"
         attempt=1
         DEPTHS=(1 50 0)
 
