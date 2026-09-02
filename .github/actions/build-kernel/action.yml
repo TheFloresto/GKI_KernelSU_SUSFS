@@ -28,7 +28,7 @@ runs:
         SKIP_EXT_MODULES=1 \
         SKIP_CP_KERNEL_HDR=1 \
         OUT_DIR="/home/runner/out" \
-        LTO=thin \
+        LTO=full \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
         build/build.sh -j"$(nproc)" \
         CC="/usr/bin/ccache clang" \
@@ -44,6 +44,7 @@ runs:
           --config=fast \
           --config=stamp \
           --disk_cache=/home/runner/.cache/bazel \
+          --lto=full \
           //common:kernel_aarch64/Image
       fi
 
@@ -72,3 +73,4 @@ runs:
       fi
 
       exit 1
+
